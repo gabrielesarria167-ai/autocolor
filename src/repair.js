@@ -20,6 +20,9 @@
     var emailError = document.getElementById("emailError");
     var departmentSelect = document.getElementById("department");
     var provinceSelect = document.getElementById("province");
+    var submitError = document.getElementById("submitError");
+    var successCode = document.getElementById("successCode");
+    var copyCodeBtn = document.getElementById("copyCodeBtn");
     var PHONE_DIGITS = 9; // Perú: +51 + PHONE_DIGITS dígitos (celulares peruanos tienen 9 dígitos).
 
     var vehicleCards = Array.prototype.slice.call(document.querySelectorAll(".vehicle-card"));
@@ -544,10 +547,89 @@
     confirmBtn.addEventListener("click", function () {
         if (!isStepValid(current)) return;
         if (current < TOTAL_STEPS) goTo(current + 1);
-        else showSuccess();
+        else submitRequest();
     });
 
-    function showSuccess() {
+    // ==================================================================
+    // Envío de la solicitud
+    //
+    // El taller recibe cada solicitud en la tabla `requests` de la base
+    // `autocolor` (ver server/), que responde con el código de 10 dígitos
+    // con el que el cliente puede consultar su estado más abajo. Hasta que
+    // el servidor confirma no se muestra la pantalla de éxito: prometer que
+    // llegó algo que no se guardó es peor que pedir reintentar.
+    // ==================================================================
+
+    var REQUESTS_ENDPOINT = "/api/requests";
+    var submitting = false;
+
+    function setSubmitError(message) {
+        if (!submitError) return;
+        submitError.textContent = message || "";
+        submitError.hidden = !message;
+    }
+
+    function requestPayload() {
+        return {
+            vehicle: state.vehicle,
+            quality: state.quality,
+            parts: state.parts,
+            firstName: document.getElementById("firstName").value,
+            lastName: document.getElementById("lastName").value,
+            department: departmentSelect ? departmentSelect.value : "",
+            province: provinceSelect ? provinceSelect.value : "",
+            // Se arma aquí y no se toma de #phoneFull porque ese campo se
+            // llena en el evento "input", que un autocompletado del navegador
+            // no siempre dispara.
+            phone: "+51" + phoneInput.value.replace(/\D/g, ""),
+            email: emailInput.value,
+            notes: document.getElementById("notes").value
+        };
+    }
+
+    function submitRequest() {
+        if (submitting) return;
+        submitting = true;
+        setSubmitError("");
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = "Enviando…";
+
+        fetch(REQUESTS_ENDPOINT, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(requestPayload())
+        }).then(function (response) {
+            return response.json().catch(function () { return {}; }).then(function (body) {
+                if (!response.ok) {
+                    throw new Error(body.error || "No pudimos enviar tu solicitud. Inténtalo nuevamente.");
+                }
+                return body;
+            });
+        }).then(function (created) {
+            showSuccess(created.id);
+        }).catch(function (err) {
+            console.error("[repair] No se pudo enviar la solicitud:", err);
+            // fetch solo rechaza así cuando la petición nunca llegó a destino
+            // (servidor apagado, sin conexión); cualquier respuesta del
+            // servidor, incluso un error, ya trae su propio mensaje.
+            var offline = err instanceof TypeError;
+            setSubmitError(offline
+                ? "No pudimos conectar con el servidor. Revisa tu conexión e inténtalo nuevamente."
+                : err.message);
+        }).then(function () {
+            submitting = false;
+            confirmBtn.textContent = "Enviar solicitud";
+            refreshConfirm();
+        });
+    }
+
+    function showSuccess(id) {
+        if (successCode) successCode.textContent = id || "";
+        // Le deja el código puesto al formulario de consulta, ahí abajo, para
+        // que probarlo sea un clic y no un copiado a mano.
+        var lookupInput = document.getElementById("lookupId");
+        if (lookupInput && id) lookupInput.value = id;
+
         progressNav.hidden = true;
         backLink.hidden = true;
         confirmBtn.hidden = true;
@@ -555,6 +637,26 @@
         successPanel.hidden = false;
         var title = successPanel.querySelector("h1");
         if (title) title.focus();
+    }
+
+    if (copyCodeBtn) {
+        var copyResetTimer = null;
+        copyCodeBtn.addEventListener("click", function () {
+            var code = successCode ? successCode.textContent.trim() : "";
+            if (!code || !navigator.clipboard) return;
+            navigator.clipboard.writeText(code).then(function () {
+                copyCodeBtn.textContent = "¡Copiado!";
+                copyCodeBtn.classList.add("is-copied");
+                clearTimeout(copyResetTimer);
+                copyResetTimer = setTimeout(function () {
+                    copyCodeBtn.textContent = "Copiar";
+                    copyCodeBtn.classList.remove("is-copied");
+                }, 2000);
+            }).catch(function () {
+                // El portapapeles puede estar bloqueado por permisos: el código
+                // sigue visible y seleccionable, así que no hay nada que avisar.
+            });
+        });
     }
 
     document.getElementById("resetBtn").addEventListener("click", function () {
@@ -571,6 +673,8 @@
         phoneError.hidden = true;
         emailError.hidden = true;
         phoneFullInput.value = "";
+        setSubmitError("");
+        if (successCode) successCode.textContent = "··········";
         if (departmentSelect) {
             departmentSelect.value = "";
             departmentSelect.classList.add("is-placeholder");

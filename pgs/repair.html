@@ -6,9 +6,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#e1dcbf">
     <meta name="description" content="Solicita un presupuesto para la pintura de tu vehículo en 4 sencillos pasos.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="../styles.css">
     <script src="../src/cities.js" defer></script>
     <script src="../src/repair.js" defer></script>
+    <script src="../src/lookup.js" defer></script>
     <script type="importmap">
     {
       "imports": {
@@ -21,41 +26,50 @@
     <title>Autocolor - Reparación</title>
 </head>
 
-<body>
-    <div class="menu-container">
-        <button class="menu-toggle" type="button" id="menuToggle" aria-label="Abre el menú" aria-expanded="false"
-            aria-controls="navPanel">
-            <span></span><span></span><span></span>
-        </button>
-    </div>
+<body class="wizard">
+    <header class="site-header">
+        <a class="site-header__brand" href="../index.html" aria-label="Autocolor — inicio">
+            <img src="../imgs/logoLight.png" alt="Autocolor" class="site-header__logo">
+        </a>
 
-    <nav id="navPanel" class="nav-panel" aria-label="Menú principal">
-        <a href="#">Home</a>
-        <a href="#">Contáctanos</a>
-        <a href="#">Nosotros</a>
-    </nav>
-
-    <div class="logo-container"><img src="../imgs/logoLight.png" alt="logo" class="logo"></div>
-
-    <main class="repair">
-        <nav class="progress" aria-label="Pasos">
-            <span class="progress-dot is-current" data-step="1" aria-current="step"></span>
-            <span class="progress-line" data-after="1"><span class="fill"></span></span>
-            <span class="progress-dot" data-step="2"></span>
-            <span class="progress-line" data-after="2"><span class="fill"></span></span>
-            <span class="progress-dot" data-step="3"></span>
-            <span class="progress-line" data-after="3"><span class="fill"></span></span>
-            <span class="progress-dot" data-step="4"></span>
+        <nav class="site-nav" aria-label="Navegación principal">
+            <a href="../index.html">Inicio</a>
+            <a href="../index.html#servicios">Servicios</a>
+            <a href="../index.html#acabados">Acabados</a>
+            <a href="../index.html#faq">Preguntas</a>
+            <a href="../index.html#contacto">Contacto</a>
         </nav>
 
-        <button class="back-link" type="button" id="backLink" hidden>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                stroke-linejoin="round">
-                <path d="M15 18l-6-6 6-6" />
-            </svg>
-            Atrás
-        </button>
+        <div class="site-header__actions">
+            <span class="site-header__tag">Cotización en línea</span>
+            <button class="menu-toggle" type="button" id="menuToggle" aria-label="Abre el menú" aria-expanded="false"
+                aria-controls="navPanel">
+                <span></span><span></span><span></span>
+            </button>
+        </div>
+    </header>
 
+    <nav id="navPanel" class="nav-panel" aria-label="Menú principal">
+        <a href="../index.html">Inicio</a>
+        <a href="../index.html#servicios">Servicios</a>
+        <a href="../index.html#acabados">Acabados</a>
+        <a href="../index.html#faq">Preguntas</a>
+        <a href="../index.html#contacto">Contacto</a>
+    </nav>
+
+    <main class="repair">
+      <div class="wizard-card">
+        <nav class="progress" aria-label="Pasos">
+            <span class="progress-dot is-current" data-step="1" data-label="Vehículo" aria-current="step"></span>
+            <span class="progress-line" data-after="1"><span class="fill"></span></span>
+            <span class="progress-dot" data-step="2" data-label="Acabado"></span>
+            <span class="progress-line" data-after="2"><span class="fill"></span></span>
+            <span class="progress-dot" data-step="3" data-label="Piezas"></span>
+            <span class="progress-line" data-after="3"><span class="fill"></span></span>
+            <span class="progress-dot" data-step="4" data-label="Contacto"></span>
+        </nav>
+
+        <div class="wizard-body">
         <section class="step active" data-step="1">
             <h1>Selecciona el vehículo a pintar</h1>
             <p class="step__subtitle">Elige la categoría más parecida a tu vehículo.</p>
@@ -294,6 +308,8 @@
                         placeholder="Daños a reparar, plazos, detalles útiles…"></textarea>
                 </div>
             </form>
+
+            <p class="form-error" id="submitError" role="alert" hidden></p>
         </section>
 
         <div class="success" id="success" hidden>
@@ -305,13 +321,81 @@
             </span>
             <h1 tabindex="-1">¡Solicitud enviada!</h1>
             <p>Te contactaremos en 24 horas con tu presupuesto personalizado.</p>
+
+            <div class="tracking-code">
+                <span class="tracking-code__label">Tu código de seguimiento</span>
+                <div class="tracking-code__row">
+                    <strong class="tracking-code__value" id="successCode">··········</strong>
+                    <button type="button" class="tracking-code__copy" id="copyCodeBtn">Copiar</button>
+                </div>
+                <p class="tracking-code__hint">Guárdalo: con este código puedes ver el estado de tu
+                    solicitud en <a href="#consulta">Consulta tu solicitud</a>, más abajo.</p>
+            </div>
+
             <button type="button" class="success__reset" id="resetBtn">Nueva solicitud</button>
         </div>
+        </div><!-- /.wizard-body -->
+
+        <div class="wizard-foot">
+            <button class="back-link" type="button" id="backLink" hidden>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <path d="M15 18l-6-6 6-6" />
+                </svg>
+                Atrás
+            </button>
+
+            <div class="confirm-container">
+                <button class="step-confirm" type="button" id="stepConfirm" disabled>Continuar</button>
+            </div>
+        </div>
+      </div><!-- /.wizard-card -->
+
+      <section class="lookup" id="consulta" aria-labelledby="lookupTitle">
+        <div class="lookup__head">
+            <h2 id="lookupTitle">Consulta tu solicitud</h2>
+            <p>¿Ya enviaste una? Ingresa el código de 10 dígitos que recibiste para ver en qué estado está.</p>
+        </div>
+
+        <form class="lookup__form" id="lookupForm" novalidate>
+            <div class="field">
+                <label for="lookupId">Código de seguimiento</label>
+                <input type="text" id="lookupId" name="lookupId" inputmode="numeric" autocomplete="off"
+                    maxlength="10" placeholder="1234567890" aria-describedby="lookupError" required>
+            </div>
+            <button type="submit" class="lookup__submit" id="lookupSubmit">Consultar</button>
+        </form>
+
+        <p class="form-error" id="lookupError" role="alert" hidden></p>
+
+        <dl class="lookup__result" id="lookupResult" hidden>
+            <div class="lookup__row">
+                <dt>Código</dt>
+                <dd class="lookup__code" id="resultId"></dd>
+            </div>
+            <div class="lookup__row">
+                <dt>Vehículo</dt>
+                <dd id="resultVehicle"></dd>
+            </div>
+            <div class="lookup__row">
+                <dt>Nombre</dt>
+                <dd id="resultFirstName"></dd>
+            </div>
+            <div class="lookup__row">
+                <dt>Apellido</dt>
+                <dd id="resultLastName"></dd>
+            </div>
+            <div class="lookup__row">
+                <dt>Estado</dt>
+                <dd><span class="status-pill" id="resultStatus"></span></dd>
+            </div>
+        </dl>
+      </section>
     </main>
 
-    <div class="confirm-container">
-        <button class="step-confirm" type="button" id="stepConfirm" disabled>Continuar</button>
-    </div>
+    <p class="wizard-note">Sin compromiso · Te respondemos con el presupuesto en 24&nbsp;horas ·
+        <a href="../index.html#faq">Preguntas frecuentes</a>
+    </p>
 
 </body>
 

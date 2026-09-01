@@ -1,0 +1,318 @@
+'use strict';
+
+/* =============================================================================
+   Servidor de Autocolor.
+
+   Sirve el sitio estático y las dos rutas que necesita el asistente:
+
+     POST /api/requests      guarda una solicitud y devuelve su código
+     GET  /api/requests/:id  consulta una solicitud por código
+
+   Sin framework a propósito: el sitio es HTML y JS a secas, y el servidor
+   necesita dos rutas y archivos estáticos. La única dependencia es `pg`.
+
+       npm install
+       createdb autocolor && npm run db:setup
+       npm start                 # http://localhost:3000
+
+   PORT cambia el puerto; el host, usuario y contraseña de Postgres salen de
+   las variables PG* de siempre.
+   ========================================================================== */
+
+const http = require('node:http');
+const fs = require('node:fs');
+const fsp = require('node:fs/promises');
+const path = require('node:path');
+const { createRequest, findRequest, ping, pool } = require('./db');
+
+const PORT = Number(process.env.PORT) || 3000;
+const ROOT = path.join(__dirname, '..');
+const MAX_BODY_BYTES = 32 * 1024;
+
+/* -----------------------------------------------------------------------------
+   Validación
+
+   El navegador ya valida el formulario, pero eso solo ayuda a quien lo usa
+   como se espera: cualquiera puede llamar a la API directamente, así que lo
+   que se guarda se revisa otra vez aquí. Los límites de largo son lo que
+   impide que una solicitud llene la tabla de texto basura.
+-------------------------------------------------------------------------- */
+
+const VEHICLES = new Set(['van', 'wagon', 'suv']);
+const QUALITIES = new Set(['standard', 'premium', 'custom']);
+const PHONE_RE = /^\+51[0-9]{9}$/;
+const EMAIL_RE = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+const PART_RE = /^[A-Za-z0-9_]{1,40}$/;
+const MAX_PARTS = 40;
+
+function text(value, { max, required = false, field }) {
+    if (value === undefined || value === null || value === '') {
+        if (required) throw new BadRequest(`Falta ${field}.`);
+        return null;
+    }
+    if (typeof value !== 'string') throw new BadRequest(`${field} no es válido.`);
+    const trimmed = value.trim();
+    if (required && trimmed === '') throw new BadRequest(`Falta ${field}.`);
+    if (trimmed.length > max) throw new BadRequest(`${field} es demasiado largo.`);
+    return trimmed === '' ? null : trimmed;
+}
+
+function validateRequest(body) {
+    if (!body || typeof body !== 'object') throw new BadRequest('Cuerpo inválido.');
+
+    if (!VEHICLES.has(body.vehicle)) throw new BadRequest('Tipo de vehículo no válido.');
+    if (!QUALITIES.has(body.quality)) throw new BadRequest('Nivel de acabado no válido.');
+
+    const parts = Array.isArray(body.parts) ? body.parts : null;
+    if (!parts || parts.length === 0) throw new BadRequest('Selecciona al menos una pieza.');
+    if (parts.length > MAX_PARTS) throw new BadRequest('Demasiadas piezas.');
+    // Los ids de pieza salen del GLB de cada modelo ('hood', 'rear_door_left',
+    // 'Object_26', …), así que se valida la forma y no una lista cerrada:
+    // agregar un modelo nuevo no debería obligar a tocar el servidor.
+    for (const part of parts) {
+        if (typeof part !== 'string' || !PART_RE.test(part)) {
+            throw new BadRequest('Pieza no válida.');
+        }
+    }
+
+    const phone = text(body.phone, { max: 20, required: true, field: 'el teléfono' });
+    if (!PHONE_RE.test(phone)) throw new BadRequest('El teléfono debe tener 9 dígitos.');
+
+    const email = text(body.email, { max: 254, field: 'el email' });
+    if (email && !EMAIL_RE.test(email)) throw new BadRequest('El email no es válido.');
+
+    return {
+        vehicle: body.vehicle,
+        quality: body.quality,
+        parts: [...new Set(parts)],
+        firstName: text(body.firstName, { max: 80, required: true, field: 'el nombre' }),
+        lastName: text(body.lastName, { max: 80, required: true, field: 'el apellido' }),
+        department: text(body.department, { max: 80, field: 'el departamento' }),
+        province: text(body.province, { max: 80, field: 'la provincia' }),
+        phone,
+        email,
+        notes: text(body.notes, { max: 2000, field: 'las notas' }),
+    };
+}
+
+class BadRequest extends Error {
+    constructor(message) {
+        super(message);
+        this.status = 400;
+    }
+}
+
+/* -----------------------------------------------------------------------------
+   Límite de peticiones
+
+   Una ventana fija por IP, en memoria. No pretende frenar un ataque serio —
+   para eso hace falta algo delante del proceso — pero sí que un script pueda
+   recorrer códigos de 10 dígitos a toda velocidad buscando nombres de
+   clientes, que es el único dato personal que expone la consulta.
+-------------------------------------------------------------------------- */
+
+const WINDOW_MS = 60_000;
+const buckets = new Map(); // clave -> { count, resetAt }
+
+function rateLimit(key, limit) {
+    const now = Date.now();
+    const bucket = buckets.get(key);
+    if (!bucket || now > bucket.resetAt) {
+        buckets.set(key, { count: 1, resetAt: now + WINDOW_MS });
+        return true;
+    }
+    bucket.count += 1;
+    return bucket.count <= limit;
+}
+
+// Las ventanas vencidas se acumularían para siempre si nadie las quita.
+setInterval(() => {
+    const now = Date.now();
+    for (const [key, bucket] of buckets) {
+        if (now > bucket.resetAt) buckets.delete(key);
+    }
+}, WINDOW_MS).unref();
+
+/* -----------------------------------------------------------------------------
+   Utilidades HTTP
+-------------------------------------------------------------------------- */
+
+function sendJson(res, status, payload) {
+    const body = JSON.stringify(payload);
+    res.writeHead(status, {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Content-Length': Buffer.byteLength(body),
+        'Cache-Control': 'no-store',
+    });
+    res.end(body);
+}
+
+function readJsonBody(req) {
+    return new Promise((resolve, reject) => {
+        let size = 0;
+        const chunks = [];
+        req.on('data', (chunk) => {
+            size += chunk.length;
+            if (size > MAX_BODY_BYTES) {
+                reject(new BadRequest('El formulario es demasiado grande.'));
+                req.destroy();
+                return;
+            }
+            chunks.push(chunk);
+        });
+        req.on('end', () => {
+            try {
+                resolve(JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'));
+            } catch {
+                reject(new BadRequest('JSON inválido.'));
+            }
+        });
+        req.on('error', reject);
+    });
+}
+
+const MIME = {
+    '.html': 'text/html; charset=utf-8',
+    '.css': 'text/css; charset=utf-8',
+    '.js': 'text/javascript; charset=utf-8',
+    '.mjs': 'text/javascript; charset=utf-8',
+    '.json': 'application/json; charset=utf-8',
+    '.svg': 'image/svg+xml',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.webp': 'image/webp',
+    '.ico': 'image/x-icon',
+    '.glb': 'model/gltf-binary',
+    '.woff2': 'font/woff2',
+};
+
+async function serveStatic(req, res, pathname) {
+    const decoded = decodeURIComponent(pathname);
+    const filePath = path.join(ROOT, decoded === '/' ? 'index.html' : decoded);
+
+    // path.join ya resuelve los '..', pero un '..' de más saldría de la carpeta
+    // del proyecto y serviría cualquier archivo del disco: hay que comprobarlo.
+    if (filePath !== ROOT && !filePath.startsWith(ROOT + path.sep)) {
+        res.writeHead(403).end('Prohibido');
+        return;
+    }
+
+    let stat;
+    try {
+        stat = await fsp.stat(filePath);
+    } catch {
+        res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }).end('No encontrado');
+        return;
+    }
+    if (stat.isDirectory()) {
+        res.writeHead(403).end('Prohibido');
+        return;
+    }
+
+    const ext = path.extname(filePath).toLowerCase();
+    res.writeHead(200, {
+        'Content-Type': MIME[ext] || 'application/octet-stream',
+        'Content-Length': stat.size,
+        // Los modelos 3D pesan decenas de MB y no cambian; el resto se
+        // revalida en cada carga para no servir código viejo mientras se
+        // trabaja en el sitio.
+        'Cache-Control': decoded.startsWith('/imgs/') ? 'public, max-age=86400' : 'no-cache',
+    });
+    if (req.method === 'HEAD') {
+        res.end();
+        return;
+    }
+    fs.createReadStream(filePath).on('error', () => res.destroy()).pipe(res);
+}
+
+/* -----------------------------------------------------------------------------
+   Rutas
+-------------------------------------------------------------------------- */
+
+const LOOKUP_PATH = /^\/api\/requests\/([0-9]{10})$/;
+
+async function handleApi(req, res, pathname) {
+    const ip = req.socket.remoteAddress || 'desconocida';
+
+    if (req.method === 'POST' && pathname === '/api/requests') {
+        if (!rateLimit(`post:${ip}`, 10)) {
+            return sendJson(res, 429, { error: 'Demasiadas solicitudes. Espera un minuto.' });
+        }
+        const data = validateRequest(await readJsonBody(req));
+        const created = await createRequest(data);
+        console.log(`[requests] nueva solicitud ${created.id} (${data.vehicle}, ${data.parts.length} piezas)`);
+        return sendJson(res, 201, created);
+    }
+
+    if (req.method === 'GET') {
+        const match = LOOKUP_PATH.exec(pathname);
+        if (match) {
+            if (!rateLimit(`get:${ip}`, 30)) {
+                return sendJson(res, 429, { error: 'Demasiadas consultas. Espera un minuto.' });
+            }
+            const request = await findRequest(match[1]);
+            if (!request) {
+                return sendJson(res, 404, { error: 'No encontramos ninguna solicitud con ese código.' });
+            }
+            return sendJson(res, 200, request);
+        }
+        // Un código con un largo distinto no llega a la base: se responde lo
+        // mismo que a uno inexistente para no delatar qué forma es la válida.
+        if (pathname.startsWith('/api/requests/')) {
+            return sendJson(res, 404, { error: 'No encontramos ninguna solicitud con ese código.' });
+        }
+    }
+
+    return sendJson(res, 404, { error: 'Ruta no encontrada.' });
+}
+
+const server = http.createServer(async (req, res) => {
+    const pathname = new URL(req.url, `http://${req.headers.host || 'localhost'}`).pathname;
+
+    try {
+        if (pathname.startsWith('/api/')) {
+            await handleApi(req, res, pathname);
+            return;
+        }
+        if (req.method === 'GET' || req.method === 'HEAD') {
+            await serveStatic(req, res, pathname);
+            return;
+        }
+        sendJson(res, 405, { error: 'Método no permitido.' });
+    } catch (err) {
+        if (err instanceof BadRequest) {
+            sendJson(res, err.status, { error: err.message });
+            return;
+        }
+        // El detalle queda en el log del servidor; al cliente solo le llega que
+        // falló, para no filtrar la estructura de la base en un mensaje de error.
+        console.error('[error]', err);
+        if (!res.headersSent) {
+            sendJson(res, 500, { error: 'No pudimos procesar la solicitud. Inténtalo nuevamente.' });
+        }
+    }
+});
+
+async function start() {
+    try {
+        await ping();
+    } catch (err) {
+        console.error(`\nNo se pudo conectar a la base "${process.env.PGDATABASE || 'autocolor'}": ${err.message}`);
+        console.error('¿Está corriendo Postgres? ¿Ya creaste la base?\n');
+        console.error('    createdb autocolor && npm run db:setup\n');
+        process.exit(1);
+    }
+    server.listen(PORT, () => {
+        console.log(`Autocolor en http://localhost:${PORT}`);
+        console.log(`Base de datos: ${process.env.PGDATABASE || 'autocolor'}`);
+    });
+}
+
+for (const signal of ['SIGINT', 'SIGTERM']) {
+    process.on(signal, () => {
+        server.close(() => pool.end().then(() => process.exit(0)));
+    });
+}
+
+start();

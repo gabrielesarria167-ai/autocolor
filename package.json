@@ -1,0 +1,14 @@
+{
+  "name": "autocolor",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Autocolor — sitio y asistente de cotización de pintura automotriz",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server/server.js",
+    "db:setup": "psql -v ON_ERROR_STOP=1 -d ${PGDATABASE:-autocolor} -f server/schema.sql"
+  },
+  "dependencies": {
+    "pg": "^8.13.1"
+  }
+}
