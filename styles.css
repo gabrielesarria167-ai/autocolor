@@ -667,9 +667,6 @@ svg {
     position: relative;
     width: 100%;
     aspect-ratio: 4 / 3;
-    background: var(--surface-tint);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
     overflow: hidden;
 }
 
@@ -693,7 +690,6 @@ svg {
     justify-content: center;
     gap: 12px;
     padding: 20px;
-    background: var(--surface-tint);
     transition: opacity 0.3s var(--ease-out);
 }
 

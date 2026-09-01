@@ -1,3 +1,25 @@
+/* =========================================================================
+   car3d.js — 3D panel-picker for step 3 of the Autocolor wizard (SUV only)
+
+   This is the same viewer built and hardened in suv-3d.html (button-only
+   camera, front initial view, top-relayed turns, gimbal-lock-safe
+   orientation via precomputed quaternions), adapted to run as a widget
+   inside repair.html instead of a standalone page:
+
+     - It owns NO selection state of its own. Every click asks the host
+       page (via `onPartToggle`) to mutate its shared `state.parts`, and
+       queries the host page (via `isPartSelected`) to decide how to draw
+       the selected/hover overlays. This keeps repair.js's `state.parts`
+       array as the single source of truth, shared with the 2D flow.
+     - It exposes a small controller API (resize / refreshSelection /
+       resetView / destroy) instead of wiring its own buttons + sidebar,
+       since those now live in repair.html/repair.js so they can sit next
+       to the 2D flow's markup and match the site's own styling.
+
+   Import this lazily (`import('../src/car3d.js')`) — only when a user
+   actually reaches step 3 with "suv" selected — so van/wagon users never
+   pay for three.js or the model download.
+   ========================================================================= */
 
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -47,12 +69,13 @@ export function mountCar3D(options) {
   } = options;
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xf7f3e8); // --surface-tint
+  // No scene.background: the canvas stays transparent so the car appears
+  // to float directly on the page background instead of sitting in a box.
 
   const camera = new THREE.PerspectiveCamera(FOV_DEG, 1, 0.05, 500);
   camera.position.set(6, 3, 8);
 
-  const renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias: true });
+  const renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
