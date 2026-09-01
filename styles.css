@@ -627,33 +627,33 @@ svg {
     color: var(--tier);
 }
 
-/* ===== 3D car view (step 3, SUV only) ===== */
-
-/* The wizard shell is normally capped at 600px; the 3D stage + resume
-   panel need more breathing room side by side, so this widens the cap
-   only while that view is active. On narrow viewports this changes
-   nothing — max-width only ever shrinks a container, never stretches it
-   past the viewport. */
-.repair.is-3d-active {
-    max-width: 960px;
-}
+/* ===== 3D car view (step 3, every vehicle) ===== */
 
 .car-view-2d[hidden],
 .car-view-3d[hidden] {
     display: none;
 }
 
+/* The stage and its resume panel need more room side by side than the
+   600px wizard column, but widening the shell for this step would move the
+   progress bar, the back link and the Continue button on this step alone.
+   So this one block bleeds symmetrically out of the column instead — up to
+   the 960px the two-column layout is built around, never closer than ~32px
+   to the viewport edge, and not at all once the viewport is too narrow to
+   give anything back (max(0px, …), which is also what keeps mobile intact). */
 .car-view-3d {
+    --stage-bleed: max(0px, min(200px, (100vw - 100% - 64px) / 2));
     display: grid;
     grid-template-columns: 1fr;
     gap: 20px;
-    margin-bottom: 18px;
+    margin: 0 calc(-1 * var(--stage-bleed)) 18px;
 }
 
 @media (min-width: 760px) {
     .car-view-3d {
         grid-template-columns: 1.6fr 1fr;
-        align-items: start;
+        /* No align-items: start — the resume panel stretches to the stage's
+           full height instead of hugging its own contents. */
     }
 }
 
@@ -769,11 +769,17 @@ svg {
     white-space: nowrap;
 }
 
+/* flex-basis 0 keeps the list out of the panel's natural height, so a long
+   selection never drives the row taller than the stage — it fills whatever
+   space the stage leaves and scrolls past that, keeping "Quitar todas"
+   pinned to the bottom of the panel. */
 .car-view-3d__list {
     display: flex;
     flex-direction: column;
     gap: 6px;
+    flex: 1 1 0;
     min-height: 40px;
+    overflow-y: auto;
 }
 
 .car-view-3d__list-item {

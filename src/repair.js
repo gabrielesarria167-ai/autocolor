@@ -28,7 +28,6 @@
     var viewTabs = Array.prototype.slice.call(document.querySelectorAll("#carView2d .view-tab"));
     var carView = document.getElementById("carView");
 
-    var repairMain = document.querySelector(".repair");
     var carView2d = document.getElementById("carView2d");
     var carView3d = document.getElementById("carView3d");
     var carView3dCanvasWrap = document.getElementById("carView3dCanvasWrap");
@@ -41,9 +40,10 @@
     var carView3dList = document.getElementById("carView3dList");
     var carView3dCount = document.getElementById("carView3dCount");
     var carView3dClear = document.getElementById("carView3dClear");
-    var MODEL_3D_URL = "../imgs/assets/3d-visuals/suv/suv.glb";
-    var car3d = null;    
-    var car3dLoading = false;
+    var car3d = null;        // controller for the currently mounted viewer
+    var car3dVehicle = null; // vehicle it is mounted (or being mounted) for
+    var car3dModule = null;  // cached import() of the viewer module
+    var car3dMountId = 0;    // guards against a superseded mount finishing last
 
     var menuToggle = document.getElementById("menuToggle");
     var navPanel = document.getElementById("navPanel");
@@ -69,17 +69,39 @@
         "left-door-rear": "Puerta trasera izquierda",
         "right-door-front": "Puerta delantera derecha",
         "right-door-rear": "Puerta trasera derecha",
-        // 3D viewer (SUV only) — its GLB node names, distinct from the 2D
-        // ids above (hood/roof are reused as-is since they mean the same
-        // thing in both vocabularies).
+        // 3D viewer — the GLB node names of every paintable panel across
+        // the three models (see VEHICLE_MODELS in carVisual.js), distinct
+        // from the 2D ids above; hood/roof are reused as-is since they mean
+        // the same thing in both vocabularies. One flat map serves all three
+        // vehicles because every id they share names the same panel on each.
+        // Only-on-the-SUV:
         "front_bumper": "Parachoques delantero",
+        "tonneau": "Platón y portón",
+        // Only-on-the-furgoneta (its sliding doors, and its own spelling of
+        // the front fenders / rear quarter panels):
+        "back_door_left": "Puerta corrediza izquierda",
+        "back_door_right": "Puerta corrediza derecha",
+        "left_fender": "Guardabarros delantero izquierdo",
+        "right_fender": "Guardabarros delantero derecho",
+        "rear_window_left": "Panel lateral trasero izquierdo",
+        "rear_window_right": "Panel lateral trasero derecho",
+        // Only-on-the-familiar:
+        "front_door_left001": "Puerta delantera izquierda",
+        "bumper": "Parachoques delantero",
+        "back_bumper": "Parachoques trasero",
+        "Object_26": "Moldura trasera del techo",
+        // Shared by two or more models:
         "front_door_left": "Puerta delantera izquierda",
         "front_door_right": "Puerta delantera derecha",
         "rear_door_left": "Puerta trasera izquierda",
         "rear_door_right": "Puerta trasera derecha",
-        "fender_left": "Guardabarros izquierdo",
-        "fender_right": "Guardabarros derecho",
-        "tonneau": "Platón y portón"
+        "fender_left": "Guardabarros delantero izquierdo",
+        "fender_right": "Guardabarros delantero derecho",
+        "quarter_panel_left": "Guardabarros trasero izquierdo",
+        "quarter_panel_right": "Guardabarros trasero derecho",
+        "side_skirt_left": "Faldón lateral izquierdo",
+        "side_skirt_right": "Faldón lateral derecho",
+        "rear_hatch": "Portón trasero"
     };
 
     // Side-view lower body (bumper/fenders/doors) is shared across the
@@ -267,10 +289,12 @@
     }
 
     // ==================================================================
-    // 3D viewer (step 3, SUV only) — lazy-loaded, mounted once, then just
-    // shown/hidden as the wizard steps back and forth. The module owns no
-    // selection state itself; it reads/writes state.parts through the two
-    // callbacks below, same as the 2D SVG parts do via toggleCarPart.
+    // 3D viewer (step 3) — lazy-loaded, then shown/hidden as the wizard
+    // steps back and forth. Each vehicle has its own model, so the viewer
+    // is torn down and rebuilt whenever the chosen vehicle changes and only
+    // one is ever alive. The module owns no selection state itself; it
+    // reads/writes state.parts through the two callbacks below, same as the
+    // 2D SVG parts do via toggleCarPart.
     // ==================================================================
 
     function renderPartsSummary() {
@@ -314,31 +338,91 @@
         });
     }
 
-    function ensureCar3D() {
-        if (car3d || car3dLoading || !carView3dCanvas) return;
-        car3dLoading = true;
-        import("../src/carVisual.js").then(function (mod) {
+    // A canvas is single-use here: tearing a viewer down drops its WebGL
+    // context (see destroy() in carVisual.js), so the next vehicle gets a
+    // fresh element to draw into.
+    function replaceCar3DCanvas() {
+        if (!carView3dCanvasWrap || !carView3dCanvas) return;
+        var fresh = document.createElement("canvas");
+        fresh.id = carView3dCanvas.id;
+        fresh.className = carView3dCanvas.className;
+        carView3dCanvasWrap.replaceChild(fresh, carView3dCanvas);
+        carView3dCanvas = fresh;
+    }
+
+    // Puts the loading overlay back the way a fresh mount expects it: a
+    // previous viewer leaves it faded out, and an earlier failure leaves an
+    // error message where the progress bar belongs.
+    function resetCar3DOverlay() {
+        if (carView3dOverlay) carView3dOverlay.classList.remove("hidden");
+        if (carView3dProgressBar) {
+            carView3dProgressBar.style.width = "0%";
+            if (carView3dProgressBar.parentElement) carView3dProgressBar.parentElement.style.display = "";
+        }
+        if (carView3dLoadingLabel) {
+            carView3dLoadingLabel.hidden = false;
+            carView3dLoadingLabel.textContent = "Cargando modelo 3D…";
+        }
+        if (carView3dError) {
+            carView3dError.hidden = true;
+            carView3dError.textContent = "";
+        }
+    }
+
+    function showCar3DError(message) {
+        if (carView3dOverlay) carView3dOverlay.classList.remove("hidden");
+        if (carView3dProgressBar && carView3dProgressBar.parentElement) {
+            carView3dProgressBar.parentElement.style.display = "none";
+        }
+        if (carView3dLoadingLabel) carView3dLoadingLabel.hidden = true;
+        if (carView3dError) {
+            carView3dError.textContent = message;
+            carView3dError.hidden = false;
+        }
+    }
+
+    function ensureCar3D(vehicle) {
+        if (!vehicle || !carView3dCanvas) return;
+        // Already mounted — or still mounting — for this vehicle.
+        if (car3dVehicle === vehicle) return;
+
+        if (car3d) {
+            car3d.destroy();
+            car3d = null;
+            replaceCar3DCanvas();
+        }
+        car3dVehicle = vehicle;
+        resetCar3DOverlay();
+
+        // The module is fetched once; only the viewer inside it is rebuilt
+        // per vehicle.
+        if (!car3dModule) car3dModule = import("../src/carVisual.js");
+        var mountId = ++car3dMountId;
+        var canvasEl = carView3dCanvas;
+
+        car3dModule.then(function (mod) {
+            // A later call already claimed the canvas and the loading UI
+            // (the customer went back and changed vehicle while this import
+            // was still in flight), so this one has nothing left to mount.
+            if (mountId !== car3dMountId) return;
             car3d = mod.mountCar3D({
-                canvasEl: carView3dCanvas,
+                vehicle: vehicle,
+                canvasEl: canvasEl,
                 canvasWrapEl: carView3dCanvasWrap,
                 overlayEl: carView3dOverlay,
                 progressBarEl: carView3dProgressBar,
                 loadingLabelEl: carView3dLoadingLabel,
                 errorEl: carView3dError,
                 buttonsEl: carView3dButtons,
-                modelUrl: MODEL_3D_URL,
                 isPartSelected: function (id) { return state.parts.indexOf(id) !== -1; },
                 onPartToggle: function (id) { toggleCarPart(id); }
             });
-            car3dLoading = false;
         }).catch(function (err) {
-            car3dLoading = false;
+            if (mountId !== car3dMountId) return;
+            // Cleared so a later visit to step 3 retries the mount.
+            car3dVehicle = null;
             console.error("[repair] No se pudo cargar el visor 3D:", err);
-            if (carView3dError) {
-                carView3dError.textContent = "No se pudo cargar el visor 3D. Intenta recargar la página.";
-                carView3dError.hidden = false;
-            }
-            if (carView3dOverlay) carView3dOverlay.classList.remove("hidden");
+            showCar3DError("No se pudo cargar el visor 3D. Intenta recargar la página.");
         });
     }
 
@@ -438,19 +522,13 @@
         confirmBtn.textContent = step === TOTAL_STEPS ? "Enviar solicitud" : "Continuar";
         current = step;
         if (step === 3) {
-            if (state.vehicle === "suv") {
-                if (carView2d) carView2d.hidden = true;
-                if (carView3d) carView3d.hidden = false;
-                if (repairMain) repairMain.classList.add("is-3d-active");
-                ensureCar3D();
-                if (car3d) car3d.resize();
-                renderPartsSummary();
-            } else {
-                if (carView3d) carView3d.hidden = true;
-                if (carView2d) carView2d.hidden = false;
-                if (repairMain) repairMain.classList.remove("is-3d-active");
-                renderCarView();
-            }
+            if (carView3d) carView3d.hidden = false;
+            ensureCar3D(state.vehicle);
+            // On a first mount the viewer sizes itself; this is for coming
+            // back to a viewer that was measured while its container was
+            // hidden (and so has no size of its own yet).
+            if (car3d) car3d.resize();
+            renderPartsSummary();
         }
         refreshConfirm();
 
@@ -508,9 +586,10 @@
         if (carView) carView.innerHTML = "";
 
         if (carView3d) carView3d.hidden = true;
-        if (carView2d) carView2d.hidden = false;
-        if (repairMain) repairMain.classList.remove("is-3d-active");
         renderPartsSummary();
+        // The viewer stays mounted: picking the same vehicle again then
+        // costs nothing, and ensureCar3D() swaps the model out if the next
+        // request is for a different one.
         if (car3d) {
             car3d.refreshSelection();
             car3d.resetView();
@@ -527,9 +606,9 @@
         card.addEventListener("click", function () {
             var newVehicle = card.dataset.value;
             if (state.vehicle !== newVehicle && state.parts.length) {
-                // The 3D (SUV) and 2D (van/wagon) flows use different part-id
-                // vocabularies, so a selection made under one vehicle type
-                // can't carry over correctly to another.
+                // Each model names — and splits up — its body panels
+                // differently, so a selection made for one vehicle can't
+                // carry over to another.
                 state.parts = [];
                 renderPartsSummary();
                 if (car3d) car3d.refreshSelection();
