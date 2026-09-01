@@ -25,7 +25,6 @@
     var vehicleCards = Array.prototype.slice.call(document.querySelectorAll(".vehicle-card"));
     var qualityCards = Array.prototype.slice.call(document.querySelectorAll(".quality-card"));
     // Scoped to #carView2d: the 3D camera buttons (#carView3dButtons) reuse
-    // the .view-tab class for styling but are wired separately by car3d.js.
     var viewTabs = Array.prototype.slice.call(document.querySelectorAll("#carView2d .view-tab"));
     var carView = document.getElementById("carView");
 
@@ -42,8 +41,8 @@
     var carView3dList = document.getElementById("carView3dList");
     var carView3dCount = document.getElementById("carView3dCount");
     var carView3dClear = document.getElementById("carView3dClear");
-    var MODEL_3D_URL = "../models/suv.glb";
-    var car3d = null;        // controller returned by car3d.js once mounted, else null
+    var MODEL_3D_URL = "../imgs/assets/3d-visuals/suv/suv.glb";
+    var car3d = null;    
     var car3dLoading = false;
 
     var menuToggle = document.getElementById("menuToggle");
@@ -318,7 +317,7 @@
     function ensureCar3D() {
         if (car3d || car3dLoading || !carView3dCanvas) return;
         car3dLoading = true;
-        import("../src/car3d.js").then(function (mod) {
+        import("../src/carVisual.js").then(function (mod) {
             car3d = mod.mountCar3D({
                 canvasEl: carView3dCanvas,
                 canvasWrapEl: carView3dCanvasWrap,
