@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Autocolor — Select Panels · Toyota Hilux</title>
+<style>
+  :root {
+    --bg-top: #fdfbf5;
+    --bg-bottom: #ffffff;
+    --ink: #16140f;
+    --ink-soft: #5c584e;
+    --line: #e7e1d3;
+    --accent: #2f5fed;
+    --accent-ink: #ffffff;
+    --panel-bg: #ffffff;
+    --gold: #d9a441;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--ink);
+    background: linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 45%);
+  }
+  #app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 22px;
+    border-bottom: 1px solid var(--line);
+    flex-shrink: 0;
+    background: rgba(255,255,255,0.6);
+  }
+  .brand {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+  .brand .mark {
+    font-weight: 700;
+    font-size: 19px;
+    letter-spacing: -0.02em;
+  }
+  .brand .sep {
+    color: var(--line);
+  }
+  .brand .step {
+    font-size: 14px;
+    color: var(--ink-soft);
+  }
+  .vehicle-name {
+    font-size: 14px;
+    color: var(--ink-soft);
+  }
+  .vehicle-name strong {
+    color: var(--ink);
+    font-weight: 600;
+  }
+  main {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+  }
+  #viewport-wrap {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+  }
+  #viewport {
+    width: 100%;
+    height: 100%;
+    display: block;
+    cursor: default;
+  }
+  #viewport.hoverable { cursor: pointer; }
+
+  aside {
+    width: 300px;
+    flex-shrink: 0;
+    border-left: 1px solid var(--line);
+    background: var(--panel-bg);
+    display: flex;
+    flex-direction: column;
+    padding: 18px;
+    gap: 18px;
+    overflow-y: auto;
+  }
+  .section-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink-soft);
+    margin: 0 0 10px 0;
+  }
+  .view-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .view-btn {
+    padding: 9px 4px;
+    font-size: 13px;
+    border: 1px solid var(--line);
+    background: #fff;
+    color: var(--ink);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+  .view-btn:hover { border-color: var(--accent); }
+  .view-btn:active { background: #f1f1f1; }
+  .view-btn.span2 { grid-column: span 2; }
+
+  #selection-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
+    min-height: 60px;
+  }
+  #selection-list li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 10px;
+    background: #f7f5ef;
+    border-radius: 7px;
+    font-size: 13.5px;
+  }
+  #selection-list li.empty {
+    color: var(--ink-soft);
+    background: transparent;
+    padding: 4px 2px;
+    line-height: 1.5;
+  }
+  #selection-list li button {
+    border: none;
+    background: transparent;
+    color: var(--ink-soft);
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    padding: 2px 4px;
+    border-radius: 4px;
+  }
+  #selection-list li button:hover {
+    color: var(--ink);
+    background: #e9e5d8;
+  }
+  .selection-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .selection-header .count {
+    font-size: 12px;
+    color: var(--ink-soft);
+  }
+  #clear-btn {
+    border: 1px solid var(--line);
+    background: #fff;
+    color: var(--ink-soft);
+    font-size: 13px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  #clear-btn:hover { border-color: #c33; color: #c33; }
+  #clear-btn:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+  #clear-btn:disabled:hover { border-color: var(--line); color: var(--ink-soft); }
+
+  .hint {
+    font-size: 12px;
+    color: var(--ink-soft);
+    line-height: 1.5;
+    border-top: 1px solid var(--line);
+    padding-top: 14px;
+  }
+  .swatch {
+    display: inline-block;
+    width: 9px; height: 9px;
+    border-radius: 2px;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+
+  #overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 60%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    z-index: 10;
+    transition: opacity 0.35s ease;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  #overlay .spinner-label {
+    font-size: 14px;
+    color: var(--ink-soft);
+  }
+  #progress-track {
+    width: 220px;
+    height: 5px;
+    border-radius: 3px;
+    background: #ece7d9;
+    overflow: hidden;
+  }
+  #progress-bar {
+    height: 100%;
+    width: 0%;
+    background: var(--accent);
+    transition: width 0.15s ease;
+  }
+  #overlay.error #progress-track { display: none; }
+  #overlay .error-msg {
+    display: none;
+    max-width: 320px;
+    text-align: center;
+    font-size: 14px;
+    color: #b3261e;
+    line-height: 1.5;
+  }
+  #overlay.error .error-msg { display: block; }
+  #overlay.error .spinner-label { display: none; }
+
+  @media (max-width: 760px) {
+    main { flex-direction: column; }
+    aside {
+      width: auto;
+      border-left: none;
+      border-top: 1px solid var(--line);
+      max-height: 42vh;
+    }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="brand">
+      <span class="mark">Autocolor</span>
+      <span class="sep">/</span>
+      <span class="step">Select panels to paint</span>
+    </div>
+    <div class="vehicle-name">Vehicle: <strong>Toyota Hilux</strong></div>
+  </header>
+  <main>
+    <div id="viewport-wrap">
+      <canvas id="viewport"></canvas>
+      <div id="overlay">
+        <div class="spinner-label" id="loading-label">Loading vehicle model…</div>
+        <div id="progress-track"><div id="progress-bar"></div></div>
+        <div class="error-msg" id="error-msg"></div>
+      </div>
+    </div>
+    <aside>
+      <div>
+        <p class="section-title">Camera views</p>
+        <div class="view-grid">
+          <button class="view-btn" data-view="front">Front</button>
+          <button class="view-btn" data-view="back">Back</button>
+          <button class="view-btn" data-view="top">Top</button>
+          <button class="view-btn" data-view="left">Left</button>
+          <button class="view-btn" data-view="right">Right</button>
+          <button class="view-btn" data-view="intro">Reset</button>
+        </div>
+      </div>
+      <div style="display:flex; flex-direction:column; flex:1; min-height:0;">
+        <div class="selection-header">
+          <p class="section-title" style="margin:0;">Selected panels</p>
+          <span class="count"><span id="selection-count">0</span> selected</span>
+        </div>
+        <ul id="selection-list">
+          <li class="empty">No panels selected yet — click a part on the vehicle.</li>
+        </ul>
+        <button id="clear-btn" disabled>Clear all</button>
+      </div>
+      <p class="hint">
+        <span class="swatch" style="background:#d9a441;"></span>Hover a panel to preview it.<br>
+        <span class="swatch" style="background:#2f5fed;"></span>Click to select it for painting.<br>
+        Use the camera view buttons above to move around.
+      </p>
+    </aside>
+  </main>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.169.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.169.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+/* =========================================================================
+   Configuration
+   Derived and verified against model.glb (Toyota Hilux, 1079 nodes / 369
+   meshes / ~1.14M triangles) via an offline render-verification pass:
+   every candidate carpaint-material node was rendered from multiple angles
+   and visually confirmed before being added to PAINTABLE_NAMES. Nodes that
+   turned out to be a hidden underlying body shell (huge bounding box, but
+   only visible as thin seam slivers between real panels) were deliberately
+   left out of the clickable set — they still receive the corrected paint
+   color at runtime because the color override below is applied to the
+   shared "carpaint" material itself, not per-panel.
+   ========================================================================= */
+
+const MODEL_URL = './suv.glb';
+const PAINT_MATERIAL_NAME = 'carpaint';
+
+// Node names confirmed (by rendering, not by trusting the name) to be real,
+// visible, individually-clickable body panels. "tonneau" looked suspicious
+// by name but turned out to be the entire cargo bed + tailgate as one mesh.
+const PAINTABLE_NAMES = [
+  'hood', 'roof', 'front_bumper',
+  'front_door_left', 'front_door_right',
+  'rear_door_left', 'rear_door_right',
+  'fender_left', 'fender_right',
+  'tonneau',
+];
+
+const FRIENDLY_NAMES = {
+  hood: 'Hood',
+  roof: 'Roof',
+  front_bumper: 'Front Bumper',
+  front_door_left: 'Left Front Door',
+  front_door_right: 'Right Front Door',
+  rear_door_left: 'Left Rear Door',
+  rear_door_right: 'Right Rear Door',
+  fender_left: 'Left Fender',
+  fender_right: 'Right Fender',
+  tonneau: 'Bed & Tailgate',
+};
+
+// Coordinate convention for THIS file, determined in Phase 2 by rendering
+// (not assumed): +Z = front, -Z = back, X = lateral, Y = up.
+// Facing +Z with up +Y, cross(forward, up) = -X, so -X = the vehicle's own
+// right side and +X = its left side. Confirmed by rendering the *_left /
+// *_right named doors and checking they land on the correct on-screen side.
+const FRONT_AXIS = new THREE.Vector3(0, 0, 1);
+const UP_AXIS = new THREE.Vector3(0, 1, 0);
+const LEFT_AXIS = new THREE.Vector3(1, 0, 0);
+
+const FOV_DEG = 45;
+const CAMERA_PADDING = 1.2;
+
+const HOVER_COLOR = 0xd9a441;
+const HOVER_OPACITY = 0.35;
+const SELECTED_COLOR = 0x2f5fed;
+const SELECTED_OPACITY = 0.55;
+const HOVER_THROTTLE_MS = 50;
+const LEG_DURATION_MS = 650; // duration of one leg; a routed path (via top) chains two
+
+/* ========================================================================= */
+
+const viewportWrap = document.getElementById('viewport-wrap');
+const canvas = document.getElementById('viewport');
+const overlay = document.getElementById('overlay');
+const progressBar = document.getElementById('progress-bar');
+const loadingLabel = document.getElementById('loading-label');
+const errorMsg = document.getElementById('error-msg');
+const selectionList = document.getElementById('selection-list');
+const selectionCount = document.getElementById('selection-count');
+const clearBtn = document.getElementById('clear-btn');
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xf3f1ea);
+
+const camera = new THREE.PerspectiveCamera(FOV_DEG, 1, 0.05, 500);
+camera.position.set(6, 3, 8);
+
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+
+// No OrbitControls: the camera is driven entirely by the view-preset buttons
+// (see flyToView below), which set camera.position/quaternion directly. There
+// is deliberately nothing here that responds to drag, scroll, or touch input.
+
+// Lighting: soft hemisphere fill + a key directional + a rim light so the
+// (now light-colored) paint reads with some shape instead of going flat.
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8672, 0.95));
+const keyLight = new THREE.DirectionalLight(0xffffff, 2.4);
+keyLight.position.set(5, 8, 6);
+scene.add(keyLight);
+const rimLight = new THREE.DirectionalLight(0xffffff, 1.1);
+rimLight.position.set(-6, 4, -7);
+scene.add(rimLight);
+
+function resizeRenderer() {
+  const w = viewportWrap.clientWidth;
+  const h = viewportWrap.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+resizeRenderer();
+
+/* ---------------------------------------------------------------------
+   Multi-primitive-aware resolver (Phase 6/7): several PAINTABLE_NAMES
+   load as a Group with more than one primitive (e.g. a door's body panel
+   plus its separately-materialed window trim). getObjectByName finds the
+   Group; we then descend to the specific child Mesh whose material is the
+   paint material. Verified against the real GLTFLoader output before
+   shipping — every name below resolved to a Mesh with material.name ===
+   'carpaint' and was reachable via root.traverse().
+--------------------------------------------------------------------- */
+function resolvePaintMesh(root, name) {
+  const obj = root.getObjectByName(name);
+  if (!obj) return null;
+  if (obj.isMesh) return obj;
+  let found = null;
+  obj.traverse((child) => {
+    if (!found && child.isMesh && child.material && child.material.name === PAINT_MATERIAL_NAME) {
+      found = child;
+    }
+  });
+  return found;
+}
+
+function makeOverlay(mesh, color, opacity) {
+  const mat = new THREE.MeshBasicMaterial({
+    color,
+    transparent: true,
+    opacity,
+    depthTest: true,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    polygonOffset: true,
+    polygonOffsetFactor: -4,
+    polygonOffsetUnits: -4,
+  });
+  const overlayMesh = new THREE.Mesh(mesh.geometry, mat);
+  overlayMesh.visible = false;
+  overlayMesh.renderOrder = 999;
+  overlayMesh.raycast = () => {}; // overlays must never themselves be pickable
+  mesh.add(overlayMesh); // parenting inherits the mesh's exact world transform
+  return overlayMesh;
+}
+
+function fitDistance(horiz, vert, fovDeg, aspect, padding) {
+  const fov = THREE.MathUtils.degToRad(fovDeg);
+  const dVert = (vert / 2) / Math.tan(fov / 2);
+  const dHoriz = (horiz / 2) / (Math.tan(fov / 2) * aspect);
+  return Math.max(dVert, dHoriz) * padding;
+}
+
+let center = new THREE.Vector3();
+let sizeX = 0, sizeY = 0, sizeZ = 0;
+let presets = {};
+let introPos = new THREE.Vector3();
+let viewOrientation = {};
+
+// The quaternion a camera at `position` would end up with after
+// camera.lookAt(target), for the given `up` — computed on a throwaway
+// matrix so it can be precomputed and slerped between without ever calling
+// lookAt() on the real camera mid-flight. `up` matters: for a camera sitting
+// almost directly above its target (the top preset), the default world-up
+// (0,1,0) is parallel to the view direction, which makes lookAt's basis
+// degenerate — this is exactly what caused the "flip" when arriving at the
+// top view. The top view is given a horizontal up vector instead so its
+// orientation stays well-defined.
+function computeOrientationQuaternion(position, target, up) {
+  const m = new THREE.Matrix4().lookAt(position, target, up);
+  return new THREE.Quaternion().setFromRotationMatrix(m);
+}
+
+function computePresets() {
+  const aspect = camera.aspect;
+  const distFB  = fitDistance(sizeX, sizeY, FOV_DEG, aspect, CAMERA_PADDING) + sizeZ / 2;
+  const distLR  = fitDistance(sizeZ, sizeY, FOV_DEG, aspect, CAMERA_PADDING) + sizeX / 2;
+  const distTop = fitDistance(sizeX, sizeZ, FOV_DEG, aspect, CAMERA_PADDING) + sizeY / 2;
+
+  presets = {
+    front: center.clone().addScaledVector(FRONT_AXIS, distFB),
+    back:  center.clone().addScaledVector(FRONT_AXIS, -distFB),
+    left:  center.clone().addScaledVector(LEFT_AXIS, distLR),
+    right: center.clone().addScaledVector(LEFT_AXIS, -distLR),
+    top:   center.clone().add(new THREE.Vector3(0, distTop, 0.001)),
+  };
+
+  // A pleasant three-quarter "intro" framing, not one of the button presets:
+  // roughly front-left, pulled back a bit further than the flat presets.
+  const introDist = Math.max(distFB, distLR) * 1.05;
+  introPos = center.clone().add(
+    new THREE.Vector3(0.55, 0.42, 0.72).normalize().multiplyScalar(introDist)
+  );
+
+  // Top view's up vector is the vehicle's own front axis, so looking straight
+  // down still shows the car's nose toward the top of the frame instead of
+  // an arbitrary (and unstable) orientation.
+  viewOrientation = {
+    front: computeOrientationQuaternion(presets.front, center, UP_AXIS),
+    back:  computeOrientationQuaternion(presets.back,  center, UP_AXIS),
+    left:  computeOrientationQuaternion(presets.left,  center, UP_AXIS),
+    right: computeOrientationQuaternion(presets.right, center, UP_AXIS),
+    top:   computeOrientationQuaternion(presets.top,   center, FRONT_AXIS),
+    intro: computeOrientationQuaternion(introPos,       center, UP_AXIS),
+  };
+}
+
+/* ---------------------------------------------------------------------
+   Camera flights. Position is lerped and orientation is *slerped* between
+   precomputed {position, quaternion} waypoints — orientation is never
+   derived from a live lookAt() call mid-flight, which is what keeps things
+   stable instead of flipping when the camera passes near vertical.
+
+   Turns between two side views are routed through the top waypoint —
+   left -> top -> front, back -> top -> front, and so on — so the camera
+   arcs over the vehicle instead of sweeping sideways through it. The only
+   flights that skip that relay are ones already going to/from the top
+   view itself (a relay through top would be a no-op detour there).
+--------------------------------------------------------------------- */
+let flightActive = false;
+let currentView = 'front'; // matches the camera's initial position on load
+
+function easeInOutQuad(t) {
+  return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+}
+
+function runLeg(fromPos, fromQuat, toPos, toQuat, duration) {
+  return new Promise((resolve) => {
+    const startTime = performance.now();
+    function step(now) {
+      const t = Math.min(1, (now - startTime) / duration);
+      const eased = easeInOutQuad(t);
+      camera.position.lerpVectors(fromPos, toPos, eased);
+      camera.quaternion.slerpQuaternions(fromQuat, toQuat, eased);
+      if (t < 1) {
+        requestAnimationFrame(step);
+      } else {
+        resolve();
+      }
+    }
+    requestAnimationFrame(step);
+  });
+}
+
+async function flyToView(view) {
+  if (flightActive || view === currentView) return;
+  const targetPos = view === 'intro' ? introPos : presets[view];
+  const targetQuat = viewOrientation[view];
+  if (!targetPos || !targetQuat) return;
+
+  flightActive = true;
+  const startPos = camera.position.clone();
+  const startQuat = camera.quaternion.clone();
+  const viaTop = currentView !== 'top' && view !== 'top';
+
+  if (viaTop) {
+    await runLeg(startPos, startQuat, presets.top, viewOrientation.top, LEG_DURATION_MS);
+    await runLeg(presets.top, viewOrientation.top, targetPos, targetQuat, LEG_DURATION_MS);
+  } else {
+    await runLeg(startPos, startQuat, targetPos, targetQuat, LEG_DURATION_MS);
+  }
+
+  currentView = view;
+  flightActive = false;
+}
+
+/* ---------------------------------------------------------------------
+   Loading
+--------------------------------------------------------------------- */
+function formatBytes(n) {
+  if (n > 1e6) return (n / 1e6).toFixed(1) + ' MB';
+  if (n > 1e3) return (n / 1e3).toFixed(0) + ' KB';
+  return n + ' B';
+}
+
+function showError(message) {
+  overlay.classList.add('error');
+  overlay.classList.remove('hidden');
+  errorMsg.textContent = message;
+}
+
+const pickable = [];
+const overlayFor = new Map(); // mesh -> { hover, selected, name }
+const selected = new Set();
+let hoveredMesh = null;
+
+const loader = new GLTFLoader();
+loader.load(
+  MODEL_URL,
+  (gltf) => {
+    const root = gltf.scene;
+    scene.add(root);
+    root.updateMatrixWorld(true);
+
+    const box = new THREE.Box3().setFromObject(root);
+    box.getCenter(center);
+    const size = box.getSize(new THREE.Vector3());
+    sizeX = size.x; sizeY = size.y; sizeZ = size.z;
+
+    // --- Material color correction -------------------------------------
+    // The paint material's base color, as authored, is near-black with no
+    // color texture (it relies on an occlusion/roughness texture only), so
+    // it must be overridden at runtime. Walk every material once (dedup via
+    // a Set) so a shared material is corrected exactly once, no matter how
+    // many meshes reference it.
+    const paintMaterials = new Set();
+    root.traverse((obj) => {
+      if (obj.isMesh && obj.material) {
+        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+        for (const mat of mats) {
+          if (mat.name === PAINT_MATERIAL_NAME) paintMaterials.add(mat);
+        }
+      }
+      // Defensive: some exporters omit vertex normals on stray primitives.
+      if (obj.isMesh && obj.geometry && !obj.geometry.attributes.normal) {
+        obj.geometry.computeVertexNormals();
+      }
+    });
+    for (const mat of paintMaterials) {
+      mat.color.setRGB(0.82, 0.83, 0.86);
+      mat.roughness = Math.min(mat.roughness ?? 0.3, 0.3);
+      mat.metalness = Math.max(mat.metalness ?? 0, 0.25);
+      mat.needsUpdate = true;
+    }
+
+    // --- Pickable list: snapshot BEFORE overlays are added --------------
+    root.traverse((obj) => { if (obj.isMesh) pickable.push(obj); });
+
+    // --- Resolve panels + build hover/selected overlays ------------------
+    for (const name of PAINTABLE_NAMES) {
+      const mesh = resolvePaintMesh(root, name);
+      if (!mesh) {
+        console.warn('[suv-3d] Could not resolve paintable panel:', name);
+        continue;
+      }
+      const hover = makeOverlay(mesh, HOVER_COLOR, HOVER_OPACITY);
+      const sel = makeOverlay(mesh, SELECTED_COLOR, SELECTED_OPACITY);
+      overlayFor.set(mesh, { hover, selected: sel, name });
+    }
+
+    computePresets();
+    camera.position.copy(presets.front);
+    camera.quaternion.copy(viewOrientation.front);
+    currentView = 'front';
+
+    overlay.classList.add('hidden');
+  },
+  (xhr) => {
+    if (xhr.total) {
+      const pct = Math.min(100, Math.round((xhr.loaded / xhr.total) * 100));
+      progressBar.style.width = pct + '%';
+      loadingLabel.textContent = `Loading vehicle model… ${pct}%`;
+    } else {
+      loadingLabel.textContent = `Loading vehicle model… ${formatBytes(xhr.loaded)}`;
+    }
+  },
+  (err) => {
+    console.error('[suv-3d] GLTFLoader error:', err);
+    showError('Could not load the vehicle model. Make sure "suv.glb" is in the same folder as this page, then reload.');
+  }
+);
+
+/* ---------------------------------------------------------------------
+   Pointer interaction: hover (throttled) + click-to-select
+--------------------------------------------------------------------- */
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+
+function setPointerFromEvent(event) {
+  const rect = canvas.getBoundingClientRect();
+  pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+}
+
+function closestPick(event) {
+  setPointerFromEvent(event);
+  raycaster.setFromCamera(pointer, camera);
+  const hits = raycaster.intersectObjects(pickable, false);
+  return hits.length ? hits[0] : null;
+}
+
+let lastHoverTime = 0;
+function onPointerMove(event) {
+  if (pickable.length === 0) return;
+  const now = performance.now();
+  if (now - lastHoverTime < HOVER_THROTTLE_MS) return;
+  lastHoverTime = now;
+
+  const hit = closestPick(event);
+  const newHovered = (hit && overlayFor.has(hit.object)) ? hit.object : null;
+
+  if (newHovered !== hoveredMesh) {
+    if (hoveredMesh && !selected.has(hoveredMesh)) {
+      overlayFor.get(hoveredMesh).hover.visible = false;
+    }
+    if (newHovered && !selected.has(newHovered)) {
+      overlayFor.get(newHovered).hover.visible = true;
+    }
+    hoveredMesh = newHovered;
+    canvas.classList.toggle('hoverable', !!newHovered);
+  }
+}
+
+function onPointerClick(event) {
+  if (pickable.length === 0) return;
+  const hit = closestPick(event);
+  if (!hit || !overlayFor.has(hit.object)) return;
+  const mesh = hit.object;
+  const info = overlayFor.get(mesh);
+
+  if (selected.has(mesh)) {
+    selected.delete(mesh);
+    info.selected.visible = false;
+    if (mesh === hoveredMesh) info.hover.visible = true;
+  } else {
+    selected.add(mesh);
+    info.hover.visible = false;
+    info.selected.visible = true;
+  }
+  updateSelectionPanel();
+}
+
+canvas.addEventListener('pointermove', onPointerMove);
+canvas.addEventListener('click', onPointerClick);
+
+/* ---------------------------------------------------------------------
+   Selection sidebar
+--------------------------------------------------------------------- */
+function deselect(mesh) {
+  const info = overlayFor.get(mesh);
+  selected.delete(mesh);
+  info.selected.visible = false;
+  if (mesh === hoveredMesh) info.hover.visible = true;
+}
+
+function updateSelectionPanel() {
+  selectionList.innerHTML = '';
+  if (selected.size === 0) {
+    const li = document.createElement('li');
+    li.className = 'empty';
+    li.textContent = 'No panels selected yet — click a part on the vehicle.';
+    selectionList.appendChild(li);
+  } else {
+    for (const mesh of selected) {
+      const info = overlayFor.get(mesh);
+      const li = document.createElement('li');
+      const label = document.createElement('span');
+      label.textContent = FRIENDLY_NAMES[info.name] ?? info.name;
+      const btn = document.createElement('button');
+      btn.textContent = '✕';
+      btn.setAttribute('aria-label', `Remove ${FRIENDLY_NAMES[info.name] ?? info.name}`);
+      btn.addEventListener('click', () => {
+        deselect(mesh);
+        updateSelectionPanel();
+      });
+      li.appendChild(label);
+      li.appendChild(btn);
+      selectionList.appendChild(li);
+    }
+  }
+  selectionCount.textContent = String(selected.size);
+  clearBtn.disabled = selected.size === 0;
+}
+
+clearBtn.addEventListener('click', () => {
+  for (const mesh of Array.from(selected)) deselect(mesh);
+  updateSelectionPanel();
+});
+
+/* ---------------------------------------------------------------------
+   Camera preset buttons
+--------------------------------------------------------------------- */
+document.querySelectorAll('.view-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    flyToView(btn.dataset.view);
+  });
+});
+
+/* ---------------------------------------------------------------------
+   Resize (presets depend on aspect ratio, so recompute — not just resize)
+--------------------------------------------------------------------- */
+window.addEventListener('resize', () => {
+  resizeRenderer();
+  if (sizeX || sizeY || sizeZ) computePresets();
+});
+
+/* ---------------------------------------------------------------------
+   Render loop
+--------------------------------------------------------------------- */
+function animate() {
+  requestAnimationFrame(animate);
+  renderer.render(scene, camera);
+}
+animate();
+</script>
+</body>
+</html>

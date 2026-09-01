@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#e1dcbf">
+    <meta name="description" content="Solicita un presupuesto para la pintura de tu vehículo en 4 sencillos pasos.">
+    <link rel="stylesheet" href="../styles.css">
+    <script src="../src/cities.js" defer></script>
+    <script src="../src/repair.js" defer></script>
+    <script src="../src/carVisual.js" defer></script>
+    <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.169.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.169.0/examples/jsm/"
+      }
+    }
+    </script>
+
+    <title>Autocolor - Reparación</title>
+</head>
+
+<body>
+    <div class="menu-container">
+        <button class="menu-toggle" type="button" id="menuToggle" aria-label="Abre el menú" aria-expanded="false"
+            aria-controls="navPanel">
+            <span></span><span></span><span></span>
+        </button>
+    </div>
+
+    <nav id="navPanel" class="nav-panel" aria-label="Menú principal">
+        <a href="#">Home</a>
+        <a href="#">Contáctanos</a>
+        <a href="#">Nosotros</a>
+    </nav>
+
+    <div class="logo-container"><img src="../imgs/logoLight.png" alt="logo" class="logo"></div>
+
+    <main class="repair">
+        <nav class="progress" aria-label="Pasos">
+            <span class="progress-dot is-current" data-step="1" aria-current="step"></span>
+            <span class="progress-line" data-after="1"><span class="fill"></span></span>
+            <span class="progress-dot" data-step="2"></span>
+            <span class="progress-line" data-after="2"><span class="fill"></span></span>
+            <span class="progress-dot" data-step="3"></span>
+            <span class="progress-line" data-after="3"><span class="fill"></span></span>
+            <span class="progress-dot" data-step="4"></span>
+        </nav>
+
+        <button class="back-link" type="button" id="backLink" hidden>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round">
+                <path d="M15 18l-6-6 6-6" />
+            </svg>
+            Atrás
+        </button>
+
+        <section class="step active" data-step="1">
+            <h1>Selecciona el vehículo a pintar</h1>
+            <p class="step__subtitle">Elige la categoría más parecida a tu vehículo.</p>
+
+            <div class="vehicle-grid" role="radiogroup" aria-label="Tipo de vehículo">
+                <button type="button" class="vehicle-card" role="radio" aria-checked="false" data-value="van">
+                    <img class="vehicle-img" src="../imgs/assets/van.png" alt="Furgoneta">
+                    <span class="vehicle-check" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"
+                            stroke-linejoin="round">
+                            <path d="M20 6L9 17l-5-5" />
+                        </svg>
+                    </span>
+                    <span class="vehicle-label">Furgoneta</span>
+                </button>
+
+                <button type="button" class="vehicle-card" role="radio" aria-checked="false" data-value="wagon">
+                    <img class="vehicle-img" src="../imgs/assets/station-wagon.png" alt="Familiar">
+                    <span class="vehicle-check" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"
+                            stroke-linejoin="round">
+                            <path d="M20 6L9 17l-5-5" />
+                        </svg>
+                    </span>
+                    <span class="vehicle-label">Familiar</span>
+                </button>
+
+                <button type="button" class="vehicle-card" role="radio" aria-checked="false" data-value="suv">
+                    <img class="vehicle-img" src="../imgs/assets/suv.png" alt="SUV">
+                    <span class="vehicle-check" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"
+                            stroke-linejoin="round">
+                            <path d="M20 6L9 17l-5-5" />
+                        </svg>
+                    </span>
+                    <span class="vehicle-label">SUV</span>
+                </button>
+            </div>
+        </section>
+
+        <section class="step" data-step="2" hidden>
+            <h1>¿Qué nivel de acabado deseas?</h1>
+            <p class="step__subtitle">Cada paquete incluye preparación y pintura profesional.</p>
+
+            <div class="quality-cards" role="radiogroup" aria-label="Nivel de acabado">
+                <button type="button" class="quality-card quality-card--standard" role="radio" aria-checked="false"
+                    data-value="standard">
+                    <span class="quality-card__head">
+                        <span class="quality-card__title">Económico</span>
+                        <span class="quality-card__radio" aria-hidden="true"></span>
+                    </span>
+                    <span class="quality-card__sub">Desde S/ 250 por pieza</span>
+                    <span class="quality-card__desc">Solución práctica y funcional.</span>
+                    <ul class="quality-card__features">
+                        <li>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+                                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M20 6L9 17l-5-5" />
+                            </svg>
+                            <span>Preparación básica</span>
+                        </li>
+                        <li>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+                                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M20 6L9 17l-5-5" />
+                            </svg>
+                            <span>Materiales estándar</span>
+                        </li>
+                        <li>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+                                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M20 6L9 17l-5-5" />
+                            </svg>
+                            <span>Pintura y barniz estándar</span>
+                        </li>
+                    </ul>
+                </button>
+
+                <button type="button" class="quality-card quality-card--premium" role="radio" aria-checked="false"
+                    data-value="premium">
+                    <span class="quality-card__badge">Más elegido</span>
+                    <span class="quality-card__head">
+                        <span class="quality-card__title">Profesional</span>
+                        <span class="quality-card__radio" aria-hidden="true"></span>
+                    </span>
+                    <span class="quality-card__sub">Desde S/ 350 por pieza</span>
+                    <span class="quality-card__desc">Mejor acabado y durabilidad por un precio justo.</span>
+                    <ul class="quality-card__features">
+                        <li>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+                                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M20 6L9 17l-5-5" />
+                            </svg>
+                            <span>Preparación completa</span>
+                        </li>
+                        <li>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+                                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M20 6L9 17l-5-5" />
+                            </svg>
+                            <span>Materiales de calidad</span>
+                        </li>
+                        <li>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+                                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M20 6L9 17l-5-5" />
+                            </svg>
+                            <span>Pintura y barniz profesional</span>
+                        </li>
+                    </ul>
+                </button>
+
+                <button type="button" class="quality-card quality-card--alta-gama" role="radio" aria-checked="false"
+                    data-value="custom">
+                    <span class="quality-card__head">
+                        <span class="quality-card__title">Alta gama</span>
+                        <span class="quality-card__radio" aria-hidden="true"></span>
+                    </span>
+                    <span class="quality-card__sub">Desde S/ 450 por pieza</span>
+                    <span class="quality-card__desc">Máximo nivel de acabado.</span>
+                    <ul class="quality-card__features">
+                        <li>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+                                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M20 6L9 17l-5-5" />
+                            </svg>
+                            <span>Preparación detallada</span>
+                        </li>
+                        <li>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+                                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M20 6L9 17l-5-5" />
+                            </svg>
+                            <span>Materiales premium</span>
+                        </li>
+                        <li>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+                                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M20 6L9 17l-5-5" />
+                            </svg>
+                            <span>Pintura y barniz premium</span>
+                        </li>
+                    </ul>
+                </button>
+            </div>
+        </section>
+
+        <section class="step" data-step="3" hidden>
+            <h1>¿Qué zonas quieres pintar?</h1>
+            <p class="step__subtitle">Toca las partes de la carrocería que quieres pintar.</p>
+
+            <div class="car-view-2d" id="carView2d">
+                <div class="car-view" id="carView" role="tabpanel" tabindex="0"></div>
+
+                <div class="view-tabs" role="tablist" aria-label="Ángulo de vista">
+                    <button type="button" class="view-tab is-active" role="tab" aria-selected="true"
+                        aria-controls="carView" data-view="top">Vista aérea</button>
+                    <button type="button" class="view-tab" role="tab" aria-selected="false" aria-controls="carView"
+                        data-view="side">Vista lateral</button>
+                    <button type="button" class="view-tab" role="tab" aria-selected="false" aria-controls="carView"
+                        data-view="front">Vista frontal</button>
+                </div>
+            </div>
+
+            <div class="car-view-3d" id="carView3d" hidden>
+                <div class="car-view-3d__stage">
+                    <div class="car-view-3d__canvas-wrap" id="carView3dCanvasWrap">
+                        <canvas id="carView3dCanvas" class="car-view-3d__canvas"></canvas>
+                        <div class="car-view-3d__overlay" id="carView3dOverlay">
+                            <div class="car-view-3d__progress-track">
+                                <div class="car-view-3d__progress-bar" id="carView3dProgressBar"></div>
+                            </div>
+                            <p class="car-view-3d__loading-label" id="carView3dLoadingLabel">Cargando modelo 3D…</p>
+                            <p class="car-view-3d__error" id="carView3dError" role="alert" hidden></p>
+                        </div>
+                    </div>
+
+                    <div class="view-tabs car-view-3d__buttons" id="carView3dButtons" role="group"
+                        aria-label="Ángulo de cámara">
+                        <button type="button" class="view-tab" data-view="front" aria-pressed="true">Frente</button>
+                        <button type="button" class="view-tab" data-view="right" aria-pressed="false">Derecha</button>
+                        <button type="button" class="view-tab" data-view="back" aria-pressed="false">Atrás</button>
+                        <button type="button" class="view-tab" data-view="left" aria-pressed="false">Izquierda</button>
+                        <button type="button" class="view-tab" data-view="top" aria-pressed="false">Arriba</button>
+                        <button type="button" class="view-tab" data-view="intro" aria-pressed="false">Reiniciar</button>
+                    </div>
+                    <p class="car-view-3d__hint">Toca una pieza del vehículo para seleccionarla o quitarla. Usa los
+                        botones para mover la cámara.</p>
+                </div>
+
+                <aside class="car-view-3d__summary" aria-label="Resumen de piezas seleccionadas">
+                    <div class="car-view-3d__summary-head">
+                        <h2>Piezas seleccionadas</h2>
+                        <span class="car-view-3d__count"><span id="carView3dCount">0</span> piezas</span>
+                    </div>
+                    <ul class="car-view-3d__list" id="carView3dList">
+                        <li class="car-view-3d__empty">Ninguna pieza seleccionada. Toca el vehículo para elegir.</li>
+                    </ul>
+                    <button type="button" class="car-view-3d__clear" id="carView3dClear" disabled>Quitar todas</button>
+                </aside>
+            </div>
+        </section>
+
+        <section class="step" data-step="4" hidden>
+            <h1>¿Cómo podemos contactarte?</h1>
+            <p class="step__subtitle">Te enviaremos un presupuesto personalizado en 24 horas.</p>
+
+            <form class="contact-form" id="contactForm" novalidate>
+                <div class="field">
+                    <label for="firstName">Nombre</label>
+                    <input type="text" id="firstName" name="firstName" autocomplete="given-name" required>
+                </div>
+                <div class="field">
+                    <label for="lastName">Apellido</label>
+                    <input type="text" id="lastName" name="lastName" autocomplete="family-name" required>
+                </div>
+                <div class="field">
+                    <label for="department">Departamento <span class="field__optional">(opcional)</span></label>
+                    <select id="department" name="department" autocomplete="address-level1">
+                        <option value="" selected disabled hidden>Selecciona tu departamento</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="province">Provincia <span class="field__optional">(opcional)</span></label>
+                    <select id="province" name="province" autocomplete="address-level2" disabled>
+                        <option value="" selected disabled hidden>Selecciona tu provincia</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="phone">Teléfono</label>
+                    <div class="phone-input">
+                        <span class="phone-input__prefix" aria-hidden="true">+51</span>
+                        <input type="tel" id="phone" name="phone" autocomplete="tel" inputmode="numeric"
+                            pattern="[0-9]{9}" maxlength="9" placeholder="987654321" required
+                            aria-describedby="phoneError">
+                    </div>
+                    <p class="field__error" id="phoneError" role="alert" hidden></p>
+                    <input type="hidden" id="phoneFull" name="phoneFull" value="">
+                </div>
+                <div class="field">
+                    <label for="email">Email <span class="field__optional">(opcional)</span></label>
+                    <input type="email" id="email" name="email" autocomplete="email"
+                        pattern="[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}" aria-describedby="emailError">
+                    <p class="field__error" id="emailError" role="alert" hidden></p>
+                </div>
+                <div class="field field--full">
+                    <label for="notes">Notas adicionales <span class="field__optional">(opcional)</span></label>
+                    <textarea id="notes" name="notes" rows="3"
+                        placeholder="Daños a reparar, plazos, detalles útiles…"></textarea>
+                </div>
+            </form>
+        </section>
+
+        <div class="success" id="success" hidden>
+            <span class="success__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <path d="M20 6L9 17l-5-5" />
+                </svg>
+            </span>
+            <h1 tabindex="-1">¡Solicitud enviada!</h1>
+            <p>Te contactaremos en 24 horas con tu presupuesto personalizado.</p>
+            <button type="button" class="success__reset" id="resetBtn">Nueva solicitud</button>
+        </div>
+    </main>
+
+    <div class="confirm-container">
+        <button class="step-confirm" type="button" id="stepConfirm" disabled>Continuar</button>
+    </div>
+
+</body>
+
+</html>
