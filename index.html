@@ -1,12 +1,666 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
-    <script src="script.js" defer></script>
+    <meta name="theme-color" content="#e1dcbf">
+    <meta name="description"
+        content="Autocolor — planchado y pintura automotriz al horno. Color idéntico al original, garantía por escrito y presupuesto en línea en 2 minutos.">
+    <meta property="og:title" content="Autocolor — Planchado y pintura automotriz">
+    <meta property="og:description"
+        content="Devolvemos a tu vehículo el color de fábrica. Cotiza en línea en 2 minutos.">
+    <meta property="og:type" content="website">
+    <!-- TODO: reemplazar por la URL real del sitio y una foto real del taller -->
+    <meta property="og:image" content="imgs/logoLight.png">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <script src="src/home.js" defer></script>
+
+    <title>Autocolor — Planchado y pintura automotriz</title>
 </head>
-<body>
-    <button id="btn">click here</button>
+
+<body class="home">
+
+    <a class="skip-link" href="#contenido">Saltar al contenido</a>
+
+    <header class="site-header">
+        <a class="site-header__brand" href="index.html" aria-label="Autocolor — inicio">
+            <img src="imgs/logoLight.png" alt="Autocolor" class="site-header__logo">
+        </a>
+
+        <nav class="site-nav" aria-label="Navegación principal">
+            <a href="#servicios">Servicios</a>
+            <a href="#proceso">Cómo funciona</a>
+            <a href="#acabados">Acabados</a>
+            <a href="#trabajos">Trabajos</a>
+            <a href="#contacto">Contacto</a>
+        </nav>
+
+        <div class="site-header__actions">
+            <a class="btn btn--primary btn--sm" href="pgs/repair.html">Cotizar ahora</a>
+            <button class="menu-toggle" type="button" id="menuToggle" aria-label="Abre el menú" aria-expanded="false"
+                aria-controls="navPanel">
+                <span></span><span></span><span></span>
+            </button>
+        </div>
+    </header>
+
+    <nav id="navPanel" class="nav-panel" aria-label="Menú principal">
+        <a href="#servicios">Servicios</a>
+        <a href="#proceso">Cómo funciona</a>
+        <a href="#acabados">Acabados</a>
+        <a href="#trabajos">Trabajos</a>
+        <a href="#faq">Preguntas</a>
+        <a href="#contacto">Contacto</a>
+        <a class="nav-panel__cta" href="pgs/repair.html">Cotizar ahora</a>
+    </nav>
+
+    <main id="contenido">
+
+        <!-- ===== Hero ===== -->
+        <section class="hero">
+            <div class="hero__inner">
+                <div class="hero__copy reveal">
+                    <p class="eyebrow">Planchado y pintura al horno</p>
+                    <h1 class="hero__title">Tu vehículo, con el color <em>de fábrica</em>.</h1>
+                    <p class="hero__lede">
+                        Igualamos el color original con colorimetría y secamos en cabina de horno,
+                        pieza por pieza. Arma tu presupuesto en línea en 2 minutos —
+                        sin llamadas ni visitas previas.
+                    </p>
+
+                    <div class="hero__actions">
+                        <a class="btn btn--primary btn--lg" href="pgs/repair.html">
+                            Cotizar mi vehículo
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M5 12h14M13 6l6 6-6 6" />
+                            </svg>
+                        </a>
+                        <!-- TODO: reemplaza el número por el WhatsApp real del taller (formato 51987654321) -->
+                        <a class="btn btn--ghost btn--lg" href="https://wa.me/51000000000" target="_blank"
+                            rel="noopener">
+                            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                <path
+                                    d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2Zm0 18.15h-.01a8.2 8.2 0 0 1-4.19-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.19 8.19 0 0 1-1.26-4.38c0-4.54 3.7-8.23 8.25-8.23 2.2 0 4.27.86 5.83 2.41a8.18 8.18 0 0 1 2.41 5.83c0 4.54-3.7 8.23-8.24 8.23Zm4.52-6.16c-.25-.12-1.47-.72-1.69-.81-.23-.08-.39-.12-.56.13-.16.24-.64.8-.78.97-.15.16-.29.18-.53.06-.25-.13-1.05-.39-1.99-1.23-.74-.66-1.23-1.47-1.38-1.72-.14-.25-.01-.38.11-.5.11-.11.25-.29.37-.44.12-.15.16-.25.25-.41.08-.17.04-.31-.02-.44-.06-.12-.56-1.34-.76-1.84-.2-.48-.4-.42-.56-.43h-.48c-.16 0-.43.06-.65.31-.22.25-.85.84-.85 2.03s.87 2.35 1 2.51c.12.16 1.72 2.62 4.17 3.67.58.25 1.04.4 1.39.51.58.19 1.12.16 1.54.1.47-.07 1.47-.6 1.67-1.18.21-.58.21-1.07.15-1.18-.06-.11-.22-.17-.47-.29Z" />
+                            </svg>
+                            Escríbenos por WhatsApp
+                        </a>
+                    </div>
+
+                    <ul class="hero__trust">
+                        <li>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6l7-3Z" />
+                                <path d="M9 12l2 2 4-4" />
+                            </svg>
+                            <!-- TODO: confirmar el plazo real de garantía antes de publicar -->
+                            Garantía por escrito
+                        </li>
+                        <li>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M4 20V9l8-5 8 5v11" />
+                                <path d="M9 20v-6h6v6" />
+                            </svg>
+                            Cabina de horno
+                        </li>
+                        <li>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <circle cx="12" cy="12" r="9" />
+                                <path d="M12 7v5l3 2" />
+                            </svg>
+                            Fecha de entrega cerrada
+                        </li>
+                        <li>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <circle cx="12" cy="12" r="4" />
+                                <path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2" />
+                            </svg>
+                            Color idéntico al original
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="hero__visual reveal">
+                    <div class="hero__stage">
+                        <div class="hero__vehicle" id="heroVehicle">
+                            <img src="imgs/assets/suv.png" alt="Vehículo pintado en Autocolor"
+                                class="hero__vehicle-img" id="heroVehicleImg" width="1024" height="1024">
+                            <span class="hero__vehicle-tint" aria-hidden="true"></span>
+                        </div>
+                    </div>
+
+                    <div class="swatches">
+                        <p class="swatches__label" id="swatchesLabel">Previsualiza el color</p>
+                        <div class="swatches__row" role="radiogroup" aria-labelledby="swatchesLabel">
+                            <button type="button" class="swatch is-active" role="radio" aria-checked="true"
+                                data-tint="" data-filter="" data-boost="" style="--sw:#cbbda4"
+                                title="Color original">
+                                <span class="sr-only">Color original</span>
+                            </button>
+                            <button type="button" class="swatch" role="radio" aria-checked="false"
+                                data-tint="#d61f14" data-filter="brightness(0.72)" data-boost="saturate(2.4) contrast(1.06)"
+                                style="--sw:#e5352b" title="Rojo Fuego">
+                                <span class="sr-only">Rojo Fuego</span>
+                            </button>
+                            <button type="button" class="swatch" role="radio" aria-checked="false"
+                                data-tint="#1f6feb" data-filter="brightness(0.76)" data-boost="saturate(2.1)"
+                                style="--sw:#1f6feb" title="Azul Océano">
+                                <span class="sr-only">Azul Océano</span>
+                            </button>
+                            <button type="button" class="swatch" role="radio" aria-checked="false"
+                                data-tint="#0f7a4f" data-filter="brightness(0.74)" data-boost="saturate(2.3)"
+                                style="--sw:#0f7a4f" title="Verde Bosque">
+                                <span class="sr-only">Verde Bosque</span>
+                            </button>
+                            <button type="button" class="swatch" role="radio" aria-checked="false" data-tint=""
+                                data-filter="saturate(0.07) brightness(1.2) contrast(0.98)" data-boost=""
+                                style="--sw:#dcdcdc" title="Blanco Perla">
+                                <span class="sr-only">Blanco Perla</span>
+                            </button>
+                            <button type="button" class="swatch" role="radio" aria-checked="false" data-tint=""
+                                data-filter="saturate(0.06) brightness(0.3) contrast(1.3)" data-boost=""
+                                style="--sw:#22242a" title="Negro Onyx">
+                                <span class="sr-only">Negro Onyx</span>
+                            </button>
+                        </div>
+                        <p class="swatches__note">Referencia visual. El tono final se define por el código de
+                            color de tu vehículo.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== Servicios ===== -->
+        <section class="section" id="servicios">
+            <div class="section__inner">
+                <header class="section__head reveal">
+                    <p class="eyebrow">Servicios</p>
+                    <h2>Todo lo que le devuelve la cara a tu vehículo</h2>
+                    <p class="section__lede">Desde un raspón en una puerta hasta un cambio de color completo.
+                        Trabajamos por pieza, así pagas solo lo que necesitas.</p>
+                </header>
+
+                <div class="cards">
+                    <article class="card reveal">
+                        <span class="card__icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M3 17l6-6 3 3 4-4 5 5" />
+                                <path d="M3 21h18" />
+                                <circle cx="7.5" cy="6.5" r="2.5" />
+                            </svg>
+                        </span>
+                        <h3>Pintura completa</h3>
+                        <p>Repintado integral de la carrocería con preparación, fondo, color y barniz secados
+                            al horno.</p>
+                    </article>
+
+                    <article class="card reveal">
+                        <span class="card__icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="4" width="8" height="7" rx="1.5" />
+                                <rect x="13" y="4" width="8" height="7" rx="1.5" />
+                                <rect x="3" y="13" width="8" height="7" rx="1.5" />
+                                <rect x="13" y="13" width="8" height="7" rx="1.5" />
+                            </svg>
+                        </span>
+                        <h3>Pintura por piezas</h3>
+                        <p>Capó, puertas, guardafangos o parachoques por separado, con difuminado para que el
+                            color calce con el resto.</p>
+                    </article>
+
+                    <article class="card reveal">
+                        <span class="card__icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M14 4l6 6-9 9-6-6 9-9Z" />
+                                <path d="M8 10l6 6" />
+                                <path d="M3 21h6" />
+                            </svg>
+                        </span>
+                        <h3>Planchado y desabolladura</h3>
+                        <p>Enderezado de golpes y abolladuras antes de pintar, para que la superficie quede
+                            recta y no se marque bajo la luz.</p>
+                    </article>
+
+                    <article class="card reveal">
+                        <span class="card__icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M4 15s3-8 8-8 8 8 8 8" />
+                                <path d="M9 19l2-4M15 19l-2-4" />
+                            </svg>
+                        </span>
+                        <h3>Raspones y rayaduras</h3>
+                        <p>Reparación puntual de rayones profundos y roces de estacionamiento sin repintar todo
+                            el vehículo.</p>
+                    </article>
+
+                    <article class="card reveal">
+                        <span class="card__icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="8" />
+                                <path d="M8.5 13.5c1.5 1.5 5.5 1.5 7-1.5" />
+                                <circle cx="9.5" cy="9.5" r="1" />
+                            </svg>
+                        </span>
+                        <h3>Pulido y abrillantado</h3>
+                        <p>Recuperación del brillo en pintura opacada por el sol, con corrección de micro
+                            rayas y sellado.</p>
+                    </article>
+
+                    <article class="card reveal">
+                        <span class="card__icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 3v18" />
+                                <path d="M12 3a9 9 0 0 1 0 18" fill="currentColor" stroke="none" opacity="0.25" />
+                                <circle cx="12" cy="12" r="9" />
+                            </svg>
+                        </span>
+                        <h3>Cambio de color</h3>
+                        <p>Personalización completa de tonalidad, incluyendo acabados perlados y mate, con
+                            registro fotográfico del proceso.</p>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== Proceso ===== -->
+        <section class="section section--tint" id="proceso">
+            <div class="section__inner">
+                <header class="section__head reveal">
+                    <p class="eyebrow">Cómo funciona</p>
+                    <h2>Del presupuesto a la entrega, en cuatro pasos</h2>
+                    <p class="section__lede">El presupuesto se arma en línea. Recién cuando lo apruebas
+                        coordinamos la entrega del vehículo.</p>
+                </header>
+
+                <ol class="steps">
+                    <li class="step-card reveal">
+                        <span class="step-card__num">1</span>
+                        <h3>Elige tu vehículo</h3>
+                        <p>Furgoneta, familiar o SUV. Cada categoría tiene su propio cálculo de superficie.</p>
+                    </li>
+                    <li class="step-card reveal">
+                        <span class="step-card__num">2</span>
+                        <h3>Elige el acabado</h3>
+                        <p>Económico, profesional o alta gama, según el nivel de preparación y los materiales.
+                        </p>
+                    </li>
+                    <li class="step-card reveal">
+                        <span class="step-card__num">3</span>
+                        <h3>Marca las piezas</h3>
+                        <p>Sobre un modelo 3D de tu tipo de vehículo, tocas exactamente lo que quieres pintar.
+                        </p>
+                    </li>
+                    <li class="step-card reveal">
+                        <span class="step-card__num">4</span>
+                        <h3>Recibe tu presupuesto</h3>
+                        <p>Te contactamos en 24 horas con el precio cerrado y la fecha de entrega.</p>
+                    </li>
+                </ol>
+
+                <div class="section__cta reveal">
+                    <a class="btn btn--primary btn--lg" href="pgs/repair.html">Empezar mi cotización</a>
+                    <span class="section__cta-note">Toma unos 2 minutos · Sin compromiso</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== Acabados ===== -->
+        <section class="section" id="acabados">
+            <div class="section__inner">
+                <header class="section__head reveal">
+                    <p class="eyebrow">Niveles de acabado</p>
+                    <h2>Tres formas de hacerlo bien</h2>
+                    <p class="section__lede">Todos incluyen preparación y pintura profesional. La diferencia
+                        está en el nivel de detalle y en los materiales.</p>
+                </header>
+
+                <div class="tiers">
+                    <article class="tier tier--standard reveal">
+                        <h3>Económico</h3>
+                        <p class="tier__price">Desde S/ 250 <span>por pieza</span></p>
+                        <p class="tier__desc">Solución práctica y funcional.</p>
+                        <ul class="tier__list">
+                            <li>Preparación básica</li>
+                            <li>Materiales estándar</li>
+                            <li>Pintura y barniz estándar</li>
+                        </ul>
+                        <a class="btn btn--ghost btn--block" href="pgs/repair.html">Cotizar</a>
+                    </article>
+
+                    <article class="tier tier--premium reveal">
+                        <span class="tier__badge">Más elegido</span>
+                        <h3>Profesional</h3>
+                        <p class="tier__price">Desde S/ 350 <span>por pieza</span></p>
+                        <p class="tier__desc">Mejor acabado y durabilidad por un precio justo.</p>
+                        <ul class="tier__list">
+                            <li>Preparación completa</li>
+                            <li>Materiales de calidad</li>
+                            <li>Pintura y barniz profesional</li>
+                        </ul>
+                        <a class="btn btn--primary btn--block" href="pgs/repair.html">Cotizar</a>
+                    </article>
+
+                    <article class="tier tier--alta reveal">
+                        <h3>Alta gama</h3>
+                        <p class="tier__price">Desde S/ 450 <span>por pieza</span></p>
+                        <p class="tier__desc">Máximo nivel de acabado.</p>
+                        <ul class="tier__list">
+                            <li>Preparación detallada</li>
+                            <li>Materiales premium</li>
+                            <li>Pintura y barniz premium</li>
+                        </ul>
+                        <a class="btn btn--ghost btn--block" href="pgs/repair.html">Cotizar</a>
+                    </article>
+                </div>
+
+                <p class="tiers__note">Los precios mostrados son referenciales por pieza. El presupuesto final
+                    depende del estado de la pieza, el tipo de vehículo y el color.</p>
+            </div>
+        </section>
+
+        <!-- ===== Trabajos / antes y después ===== -->
+        <section class="section section--tint" id="trabajos">
+            <div class="section__inner">
+                <header class="section__head reveal">
+                    <p class="eyebrow">Nuestro trabajo</p>
+                    <h2>Antes y después</h2>
+                    <p class="section__lede">Trabajos reales del taller, con el detalle de la pieza intervenida
+                        y el tiempo de entrega.</p>
+                </header>
+
+                <!--
+                    TODO: reemplazar cada figura por una foto real del taller.
+                    Sugerido: 3 a 6 trabajos, foto "antes" y "después" del mismo ángulo,
+                    formato 4:3, máximo 300 KB cada una, en imgs/trabajos/.
+                -->
+                <div class="gallery">
+                    <figure class="gallery__item reveal is-placeholder">
+                        <div class="gallery__media" role="img" aria-label="Espacio reservado para una foto del taller">
+                            <span>Foto pendiente</span>
+                        </div>
+                        <figcaption>
+                            <strong>[TODO: vehículo y trabajo]</strong>
+                            <span>[TODO: piezas · días de entrega]</span>
+                        </figcaption>
+                    </figure>
+                    <figure class="gallery__item reveal is-placeholder">
+                        <div class="gallery__media" role="img" aria-label="Espacio reservado para una foto del taller">
+                            <span>Foto pendiente</span>
+                        </div>
+                        <figcaption>
+                            <strong>[TODO: vehículo y trabajo]</strong>
+                            <span>[TODO: piezas · días de entrega]</span>
+                        </figcaption>
+                    </figure>
+                    <figure class="gallery__item reveal is-placeholder">
+                        <div class="gallery__media" role="img" aria-label="Espacio reservado para una foto del taller">
+                            <span>Foto pendiente</span>
+                        </div>
+                        <figcaption>
+                            <strong>[TODO: vehículo y trabajo]</strong>
+                            <span>[TODO: piezas · días de entrega]</span>
+                        </figcaption>
+                    </figure>
+                </div>
+
+                <!--
+                    TODO: testimonios. No publiques reseñas inventadas: pega aquí solo
+                    comentarios reales de clientes (con su nombre y autorización), o
+                    enlaza directamente a tus reseñas de Google.
+                -->
+                <div class="quotes">
+                    <blockquote class="quote reveal is-placeholder">
+                        <p>[TODO: reseña real del cliente]</p>
+                        <cite>[TODO: nombre] · [TODO: vehículo]</cite>
+                    </blockquote>
+                    <blockquote class="quote reveal is-placeholder">
+                        <p>[TODO: reseña real del cliente]</p>
+                        <cite>[TODO: nombre] · [TODO: vehículo]</cite>
+                    </blockquote>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== Por qué Autocolor ===== -->
+        <section class="section" id="nosotros">
+            <div class="section__inner section__inner--split">
+                <div class="split__copy reveal">
+                    <p class="eyebrow">Por qué Autocolor</p>
+                    <h2>Pintar bien es, sobre todo, preparar bien</h2>
+                    <p class="section__lede">El brillo que se ve al recoger el vehículo lo define lo que pasó
+                        antes: el enderezado, el lijado, el fondo y el control del polvo dentro de la cabina.
+                        Ahí es donde ponemos el tiempo.</p>
+
+                    <dl class="facts">
+                        <div class="fact">
+                            <dt>Colorimetría</dt>
+                            <dd>Leemos el código de color de tu vehículo y ajustamos la mezcla hasta que calce
+                                con la pieza contigua.</dd>
+                        </div>
+                        <div class="fact">
+                            <dt>Cabina de horno</dt>
+                            <dd>Secado a temperatura controlada y aire filtrado: menos polvo atrapado y un
+                                barniz más duro.</dd>
+                        </div>
+                        <div class="fact">
+                            <dt>Presupuesto cerrado</dt>
+                            <dd>El precio que apruebas es el que pagas. Si aparece algo extra, te consultamos
+                                antes de tocarlo.</dd>
+                        </div>
+                        <div class="fact">
+                            <dt>Seguimiento</dt>
+                            <dd>Te avisamos por WhatsApp en cada etapa, con fotos del avance.</dd>
+                        </div>
+                    </dl>
+                </div>
+
+                <aside class="split__panel reveal">
+                    <!-- TODO: reemplazar por cifras reales del taller (o eliminar el bloque) -->
+                    <ul class="stats">
+                        <li>
+                            <strong>[TODO]</strong>
+                            <span>años de experiencia</span>
+                        </li>
+                        <li>
+                            <strong>[TODO]</strong>
+                            <span>vehículos entregados</span>
+                        </li>
+                        <li>
+                            <strong>24 h</strong>
+                            <span>para recibir tu presupuesto</span>
+                        </li>
+                        <li>
+                            <strong>[TODO]</strong>
+                            <span>de garantía por escrito</span>
+                        </li>
+                    </ul>
+                </aside>
+            </div>
+        </section>
+
+        <!-- ===== FAQ ===== -->
+        <section class="section section--tint" id="faq">
+            <div class="section__inner section__inner--narrow">
+                <header class="section__head reveal">
+                    <p class="eyebrow">Preguntas frecuentes</p>
+                    <h2>Antes de dejarnos tu vehículo</h2>
+                </header>
+
+                <div class="faq">
+                    <details class="faq__item reveal">
+                        <summary>¿Cuánto demora un trabajo de pintura?</summary>
+                        <div class="faq__body">
+                            <p>Depende de cuántas piezas se intervienen y de si hay planchado previo. Una pieza
+                                suelta suele salir en pocos días; un repintado completo toma más. La fecha
+                                exacta te la damos junto con el presupuesto, y no cambia salvo que aparezca un
+                                daño oculto.</p>
+                            <p class="faq__todo">[TODO: indicar los plazos reales del taller.]</p>
+                        </div>
+                    </details>
+
+                    <details class="faq__item reveal">
+                        <summary>¿El color va a quedar igual al original?</summary>
+                        <div class="faq__body">
+                            <p>Partimos del código de color de fábrica de tu vehículo y ajustamos la mezcla con
+                                pruebas sobre probeta antes de aplicar. En piezas contiguas usamos difuminado
+                                para que la transición no se note, incluso en colores perlados o metalizados,
+                                que son los más difíciles de igualar.</p>
+                        </div>
+                    </details>
+
+                    <details class="faq__item reveal">
+                        <summary>¿Trabajan con seguros?</summary>
+                        <div class="faq__body">
+                            <p class="faq__todo">[TODO: indicar si el taller trabaja con aseguradoras y con
+                                cuáles, o eliminar esta pregunta.]</p>
+                        </div>
+                    </details>
+
+                    <details class="faq__item reveal">
+                        <summary>¿Necesito llevar el vehículo para que me coticen?</summary>
+                        <div class="faq__body">
+                            <p>No. La cotización en línea se arma marcando las piezas sobre un modelo 3D y toma
+                                unos dos minutos. Solo pedimos ver el vehículo si el daño requiere planchado,
+                                para confirmar el alcance antes de cerrar el precio.</p>
+                        </div>
+                    </details>
+
+                    <details class="faq__item reveal">
+                        <summary>¿Qué garantía tiene el trabajo?</summary>
+                        <div class="faq__body">
+                            <p>Entregamos la garantía por escrito junto con el comprobante, cubriendo defectos
+                                de aplicación como descascarado, pelado o pérdida de brillo prematura.</p>
+                            <p class="faq__todo">[TODO: indicar el plazo y las exclusiones reales de la
+                                garantía.]</p>
+                        </div>
+                    </details>
+
+                    <details class="faq__item reveal">
+                        <summary>¿Qué formas de pago aceptan?</summary>
+                        <div class="faq__body">
+                            <p class="faq__todo">[TODO: indicar medios de pago aceptados —efectivo, Yape/Plin,
+                                transferencia, tarjeta— y si se pide adelanto.]</p>
+                        </div>
+                    </details>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== Contacto ===== -->
+        <section class="section" id="contacto">
+            <div class="section__inner">
+                <div class="contact">
+                    <div class="contact__copy reveal">
+                        <p class="eyebrow">Contacto</p>
+                        <h2>Cotiza hoy y agenda tu ingreso</h2>
+                        <p class="section__lede">Arma tu presupuesto en línea o escríbenos directamente. Te
+                            respondemos dentro del horario de taller.</p>
+
+                        <div class="hero__actions">
+                            <a class="btn btn--primary btn--lg" href="pgs/repair.html">Cotizar mi vehículo</a>
+                            <!-- TODO: reemplaza el número por el WhatsApp real del taller -->
+                            <a class="btn btn--ghost btn--lg" href="https://wa.me/51000000000" target="_blank"
+                                rel="noopener">WhatsApp</a>
+                        </div>
+                    </div>
+
+                    <ul class="contact__details reveal">
+                        <li>
+                            <span class="contact__label">Dirección</span>
+                            <!-- TODO: dirección real del taller -->
+                            <span class="contact__value">[TODO: calle y número, distrito, ciudad]</span>
+                        </li>
+                        <li>
+                            <span class="contact__label">Teléfono</span>
+                            <!-- TODO: teléfono real -->
+                            <a class="contact__value" href="tel:+51000000000">[TODO: +51 000 000 000]</a>
+                        </li>
+                        <li>
+                            <span class="contact__label">Correo</span>
+                            <!-- TODO: correo real -->
+                            <a class="contact__value" href="mailto:hola@autocolor.pe">[TODO: correo]</a>
+                        </li>
+                        <li>
+                            <span class="contact__label">Horario</span>
+                            <!-- TODO: horario real -->
+                            <span class="contact__value">[TODO: Lun–Vie 00:00–00:00 · Sáb 00:00–00:00]</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- TODO: insertar el iframe de Google Maps con la ubicación real del taller -->
+                <div class="map is-placeholder" role="img" aria-label="Espacio reservado para el mapa de ubicación">
+                    <span>Mapa pendiente — insertar aquí el iframe de Google Maps</span>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <div class="site-footer__inner">
+            <div class="site-footer__brand">
+                <img src="imgs/logoLight.png" alt="Autocolor" class="site-footer__logo">
+                <p>Planchado y pintura automotriz. Color idéntico al original, garantía por escrito.</p>
+            </div>
+
+            <nav class="site-footer__nav" aria-label="Pie de página">
+                <h2>Servicios</h2>
+                <a href="#servicios">Pintura completa</a>
+                <a href="#servicios">Pintura por piezas</a>
+                <a href="#servicios">Planchado</a>
+                <a href="#servicios">Pulido</a>
+            </nav>
+
+            <nav class="site-footer__nav" aria-label="Enlaces">
+                <h2>Autocolor</h2>
+                <a href="#proceso">Cómo funciona</a>
+                <a href="#acabados">Acabados</a>
+                <a href="#faq">Preguntas frecuentes</a>
+                <a href="pgs/repair.html">Cotizar</a>
+            </nav>
+
+            <div class="site-footer__nav">
+                <h2>Síguenos</h2>
+                <!-- TODO: enlaces reales a redes sociales, o eliminar este bloque -->
+                <a href="#">Instagram</a>
+                <a href="#">Facebook</a>
+                <a href="#">TikTok</a>
+            </div>
+        </div>
+
+        <div class="site-footer__bottom">
+            <p>© <span id="year">2026</span> Autocolor. Todos los derechos reservados.</p>
+            <p class="site-footer__legal">
+                <!-- TODO: RUC y razón social si corresponde -->
+                [TODO: razón social · RUC]
+            </p>
+        </div>
+    </footer>
+
+    <a class="whatsapp-fab" href="https://wa.me/51000000000" target="_blank" rel="noopener"
+        aria-label="Escríbenos por WhatsApp">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path
+                d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2Zm0 18.15h-.01a8.2 8.2 0 0 1-4.19-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.19 8.19 0 0 1-1.26-4.38c0-4.54 3.7-8.23 8.25-8.23 2.2 0 4.27.86 5.83 2.41a8.18 8.18 0 0 1 2.41 5.83c0 4.54-3.7 8.23-8.24 8.23Zm4.52-6.16c-.25-.12-1.47-.72-1.69-.81-.23-.08-.39-.12-.56.13-.16.24-.64.8-.78.97-.15.16-.29.18-.53.06-.25-.13-1.05-.39-1.99-1.23-.74-.66-1.23-1.47-1.38-1.72-.14-.25-.01-.38.11-.5.11-.11.25-.29.37-.44.12-.15.16-.25.25-.41.08-.17.04-.31-.02-.44-.06-.12-.56-1.34-.76-1.84-.2-.48-.4-.42-.56-.43h-.48c-.16 0-.43.06-.65.31-.22.25-.85.84-.85 2.03s.87 2.35 1 2.51c.12.16 1.72 2.62 4.17 3.67.58.25 1.04.4 1.39.51.58.19 1.12.16 1.54.1.47-.07 1.47-.6 1.67-1.18.21-.58.21-1.07.15-1.18-.06-.11-.22-.17-.47-.29Z" />
+        </svg>
+    </a>
+
 </body>
+
 </html>
