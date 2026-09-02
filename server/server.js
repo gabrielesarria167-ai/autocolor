@@ -12,11 +12,11 @@
    necesita dos rutas y archivos estáticos. La única dependencia es `pg`.
 
        npm install
-       createdb autocolor && npm run db:setup
+       npm run db:init           # crea y levanta el Postgres propio (puerto 5433)
        npm start                 # http://localhost:3000
 
-   PORT cambia el puerto; el host, usuario y contraseña de Postgres salen de
-   las variables PG* de siempre.
+   PORT cambia el puerto del sitio. La base vive en su propio servidor
+   Postgres, aparte del general de la máquina — ver server/pgserver.sh.
    ========================================================================== */
 
 const http = require('node:http');
@@ -28,6 +28,21 @@ const { createRequest, findRequest, ping, pool } = require('./db');
 const PORT = Number(process.env.PORT) || 3000;
 const ROOT = path.join(__dirname, '..');
 const MAX_BODY_BYTES = 32 * 1024;
+
+// Orígenes que pueden llamar a la API desde otro dominio, separados por comas:
+//
+//     ALLOWED_ORIGINS=https://gabrielesarria167-ai.github.io npm start
+//
+// Hace falta cuando el sitio se publica en un alojamiento estático (GitHub
+// Pages y compañía) y la API corre en otro lado. Vacío por omisión: si el
+// mismo servidor sirve el sitio y la API, no hay petición entre dominios que
+// permitir, y una lista vacía es mejor que un comodín.
+const ALLOWED_ORIGINS = new Set(
+    (process.env.ALLOWED_ORIGINS || '')
+        .split(',')
+        .map((origin) => origin.trim())
+        .filter(Boolean)
+);
 
 /* -----------------------------------------------------------------------------
    Validación
@@ -232,8 +247,30 @@ async function serveStatic(req, res, pathname) {
 
 const LOOKUP_PATH = /^\/api\/requests\/([0-9]{10})$/;
 
+// Devuelve true si la petición ya quedó contestada (un preflight OPTIONS).
+function applyCors(req, res) {
+    const origin = req.headers.origin;
+    if (origin && ALLOWED_ORIGINS.has(origin)) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        // El origen permitido depende de la cabecera Origin, así que las
+        // cachés intermedias tienen que saber que la respuesta varía con ella.
+        res.setHeader('Vary', 'Origin');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+        res.setHeader('Access-Control-Max-Age', '86400');
+    }
+    if (req.method === 'OPTIONS') {
+        // Sin cabeceras CORS arriba, el navegador rechazará el preflight por su
+        // cuenta; responder 204 igualmente evita dejar la petición colgando.
+        res.writeHead(204).end();
+        return true;
+    }
+    return false;
+}
+
 async function handleApi(req, res, pathname) {
     const ip = req.socket.remoteAddress || 'desconocida';
+    if (applyCors(req, res)) return;
 
     if (req.method === 'POST' && pathname === '/api/requests') {
         if (!rateLimit(`post:${ip}`, 10)) {
@@ -298,14 +335,22 @@ async function start() {
     try {
         await ping();
     } catch (err) {
-        console.error(`\nNo se pudo conectar a la base "${process.env.PGDATABASE || 'autocolor'}": ${err.message}`);
-        console.error('¿Está corriendo Postgres? ¿Ya creaste la base?\n');
-        console.error('    createdb autocolor && npm run db:setup\n');
+        // Al no haber nadie escuchando en el puerto, Node agrupa un intento por
+        // dirección (::1 y 127.0.0.1) en un AggregateError cuyo propio .message
+        // viene vacío; sin esto el aviso terminaría en dos puntos y nada.
+        const detail = err.message || (err.errors || []).map((e) => e.message).join('; ') || err.code || err;
+        console.error(`\nNo se pudo conectar a la base "${process.env.PGDATABASE || 'autocolor'}": ${detail}`);
+        console.error('\nAutocolor usa su propio servidor Postgres, aparte del general de la');
+        console.error('máquina. Para levantarlo (o crearlo, la primera vez):\n');
+        console.error('    npm run db:start        # o  npm run db:init  la primera vez\n');
         process.exit(1);
     }
     server.listen(PORT, () => {
         console.log(`Autocolor en http://localhost:${PORT}`);
         console.log(`Base de datos: ${process.env.PGDATABASE || 'autocolor'}`);
+        if (ALLOWED_ORIGINS.size > 0) {
+            console.log(`Orígenes permitidos: ${[...ALLOWED_ORIGINS].join(', ')}`);
+        }
     });
 }
 

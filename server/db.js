@@ -8,11 +8,18 @@
 const crypto = require('node:crypto');
 const { Pool } = require('pg');
 
-// El resto de la conexión (host, puerto, usuario, contraseña) sale de las
-// variables PG* estándar de libpq, que `pg` lee por su cuenta. En desarrollo
-// eso normalmente significa el Postgres local del propio usuario.
+// Autocolor tiene su propio servidor Postgres, en su propio puerto — no
+// comparte clúster con los demás proyectos de la máquina (ver
+// server/pgserver.sh). El puerto va escrito aquí y no se deja en manos de
+// libpq justamente por eso: sin él, el valor por omisión es el 5432 del
+// Postgres general, y la aplicación terminaría escribiendo en el clúster
+// compartido sin que nadie lo note.
 const pool = new Pool({
+    host: process.env.PGHOST || 'localhost',
+    port: Number(process.env.PGPORT) || 5434,
     database: process.env.PGDATABASE || 'autocolor',
+    user: process.env.PGUSER,          // por omisión, el usuario del sistema
+    password: process.env.PGPASSWORD,
     max: 10,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 5_000,

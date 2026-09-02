@@ -560,8 +560,19 @@
     // llegó algo que no se guardó es peor que pedir reintentar.
     // ==================================================================
 
-    var REQUESTS_ENDPOINT = "/api/requests";
+    // Vacío = mismo origen (es lo normal: `npm start` sirve el sitio y la API
+    // juntos). Ver src/config.js para cuando la API vive en otro dominio.
+    var REQUESTS_ENDPOINT = (window.AUTOCOLOR_API_BASE || "") + "/api/requests";
     var submitting = false;
+
+    // El sitio puede estar publicado en un alojamiento estático, sin la API
+    // detrás: ahí el POST no llega a ejecutarse y el servidor de archivos
+    // responde 405 (o 404, según el proveedor). Vale la pena distinguirlo de
+    // un error pasajero, porque decirle a alguien que reintente cuando no hay
+    // nada que atienda su solicitud solo le hace perder el tiempo.
+    var API_MISSING_STATUS = [404, 405, 501];
+    var API_MISSING_MESSAGE = "El envío de solicitudes no está disponible en esta versión del sitio. " +
+        "Escríbenos desde la página de contacto y preparamos tu presupuesto.";
 
     function setSubmitError(message) {
         if (!submitError) return;
@@ -599,6 +610,9 @@
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(requestPayload())
         }).then(function (response) {
+            if (API_MISSING_STATUS.indexOf(response.status) !== -1) {
+                throw new Error(API_MISSING_MESSAGE);
+            }
             return response.json().catch(function () { return {}; }).then(function (body) {
                 if (!response.ok) {
                     throw new Error(body.error || "No pudimos enviar tu solicitud. Inténtalo nuevamente.");

@@ -7,19 +7,57 @@ al cliente un código de 10 dígitos con el que puede consultar su estado.
 
 ## Puesta en marcha
 
-Hace falta Node 18 o más nuevo y un Postgres corriendo en la máquina.
+Hace falta Node 18 o más nuevo y los binarios de Postgres instalados
+(Postgres.app o Homebrew).
 
 ```bash
 npm install                          # única dependencia: pg
-createdb autocolor                   # crea la base
-npm run db:setup                     # crea la tabla requests
+npm run db:init                      # crea y levanta el servidor propio
 npm start                            # http://localhost:3000
 ```
 
-`PORT` cambia el puerto. El host, usuario y contraseña de Postgres salen de
-las variables `PG*` de libpq (`PGHOST`, `PGUSER`, `PGPASSWORD`, `PGPORT`); en
-desarrollo normalmente basta con el Postgres local del propio usuario.
-`PGDATABASE` permite apuntar a otra base que no se llame `autocolor`.
+`db:init` es solo la primera vez. Después, cada vez que se trabaja en el
+proyecto:
+
+```bash
+npm run db:start                     # levanta el Postgres de Autocolor
+npm start
+```
+
+## El servidor Postgres de Autocolor
+
+Autocolor **no comparte clúster con los demás proyectos de la máquina**:
+corre su propio servidor, con su propio directorio de datos y su propio
+puerto. Apagar, respaldar, actualizar o borrar la base de otro proyecto no
+toca la de Autocolor, y al revés.
+
+Está dado de alta en Postgres.app, así que aparece en su lista —junto a
+sarTech (5432) y coursepostgreSQL (5433)— y se puede arrancar y parar con el
+botón Start de siempre. Los comandos de abajo hacen lo mismo desde la
+terminal; ambos caminos actúan sobre el mismo servidor, así que da igual cuál
+se use.
+
+| | |
+| --- | --- |
+| Puerto | `5434` |
+| Datos | `~/Library/Application Support/Postgres/autocolor` |
+| Log | `~/Library/Application Support/Postgres/autocolor/postgresql.log` |
+| Base | `autocolor`, tabla `requests` |
+
+```bash
+npm run db:start     npm run db:stop      npm run db:status
+npm run db:psql      # psql sobre la base autocolor
+npm run db:schema    # vuelve a aplicar server/schema.sql
+```
+
+El directorio de datos vive fuera del repositorio a propósito: un
+`git clean -xfd` no debe poder borrar las solicitudes de los clientes.
+
+Todo se puede reubicar con variables de entorno —`AUTOCOLOR_PGDATA`,
+`AUTOCOLOR_PGPORT`, `AUTOCOLOR_PG_BIN`, `AUTOCOLOR_PGDATABASE`— y la
+aplicación acepta las `PG*` de libpq (`PGHOST`, `PGPORT`, `PGUSER`,
+`PGPASSWORD`, `PGDATABASE`) por si en producción la base está en otro lado.
+`PORT` cambia el puerto del sitio.
 
 ## Cómo está organizado
 
@@ -32,9 +70,50 @@ desarrollo normalmente basta con el Postgres local del propio usuario.
 | `src/cities.js` | Departamentos y provincias del Perú |
 | `styles.css` | Todos los estilos del sitio |
 | `server/server.js` | Sirve el sitio y la API |
+| `src/config.js` | A qué servidor le habla el sitio |
 | `server/db.js` | Acceso a Postgres |
+| `server/pgserver.sh` | Crea y controla el servidor Postgres propio |
 | `server/schema.sql` | Tabla `requests` + consultas útiles para el taller |
 | `imgs/assets/3d-visuals/` | Modelos `.glb` y las páginas donde se prepararon |
+
+## Publicar el sitio
+
+El asistente necesita el servidor de `server/` para funcionar: guarda las
+solicitudes y las consulta por código. Un alojamiento **estático** (GitHub
+Pages, Netlify sin funciones, S3) sirve el HTML pero no puede correr ese
+servidor — ahí el formulario responde `405` al enviar, porque no hay nada
+que atienda el `POST`.
+
+Hay dos formas de publicarlo:
+
+1. **Todo junto.** Un servicio que corra Node (Render, Railway, Fly.io, un
+   VPS) sirve el sitio y la API desde el mismo dominio, con una base
+   Postgres al lado. No hay nada que configurar: `AUTOCOLOR_API_BASE` se
+   queda vacío y el sitio le habla a su propio origen.
+
+2. **Separados.** El sitio en GitHub Pages y la API en otro servicio. Ahí
+   hacen falta dos cosas:
+
+   - En `src/config.js`, el origen de la API:
+
+     ```js
+     window.AUTOCOLOR_API_BASE = "https://api-de-autocolor.example";
+     ```
+
+   - En el servidor, el origen del sitio, o el navegador bloqueará las
+     peticiones por CORS:
+
+     ```bash
+     ALLOWED_ORIGINS=https://gabrielesarria167-ai.github.io npm start
+     ```
+
+Mientras no haya API detrás, el sitio publicado lo dice con todas sus
+letras en vez de pedir que se reintente: el formulario avisa que el envío no
+está disponible en esa versión del sitio, y la consulta por código, lo mismo.
+
+Ojo: GitHub Pages publica **todo** el repositorio, `server/` incluido. Ahí no
+debe haber contraseñas ni claves; las que haga falta van en variables de
+entorno del servicio que corra la API.
 
 ## API
 

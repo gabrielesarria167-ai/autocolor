@@ -27,6 +27,13 @@
 
     var CODE_DIGITS = 10;
 
+    // Igual que en repair.js: vacío es el mismo origen, y un 404/405/501 aquí
+    // significa que este sitio se publicó sin la API detrás, no que el código
+    // esté mal.
+    var API_BASE = window.AUTOCOLOR_API_BASE || "";
+    var API_MISSING_STATUS = [404, 405, 501];
+    var API_MISSING_MESSAGE = "La consulta de solicitudes no está disponible en esta versión del sitio.";
+
     // Las mismas categorías del paso 1 del asistente.
     var VEHICLE_LABELS = {
         van: "Furgoneta",
@@ -85,8 +92,16 @@
         submitBtn.disabled = true;
         submitBtn.textContent = "Consultando…";
 
-        fetch("/api/requests/" + code).then(function (response) {
-            return response.json().catch(function () { return {}; }).then(function (body) {
+        fetch(API_BASE + "/api/requests/" + code).then(function (response) {
+            // Un 404 con cuerpo JSON es "ese código no existe", que es una
+            // respuesta legítima de la API; uno sin JSON es un alojamiento
+            // estático respondiendo por un archivo que no tiene.
+            return response.json().catch(function () { return null; }).then(function (body) {
+                if (!body) {
+                    throw new Error(API_MISSING_STATUS.indexOf(response.status) !== -1
+                        ? API_MISSING_MESSAGE
+                        : "No pudimos consultar tu solicitud.");
+                }
                 if (!response.ok) {
                     throw new Error(body.error || "No pudimos consultar tu solicitud.");
                 }

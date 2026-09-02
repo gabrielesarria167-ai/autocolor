@@ -6,7 +6,12 @@
   "type": "commonjs",
   "scripts": {
     "start": "node server/server.js",
-    "db:setup": "psql -v ON_ERROR_STOP=1 -d ${PGDATABASE:-autocolor} -f server/schema.sql"
+    "db:init": "./server/pgserver.sh init",
+    "db:start": "./server/pgserver.sh start",
+    "db:stop": "./server/pgserver.sh stop",
+    "db:status": "./server/pgserver.sh status",
+    "db:psql": "./server/pgserver.sh psql",
+    "db:schema": "./server/pgserver.sh schema"
   },
   "dependencies": {
     "pg": "^8.13.1"
