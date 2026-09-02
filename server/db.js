@@ -35,9 +35,10 @@ function generateId() {
 }
 
 const INSERT_REQUEST = `
-    INSERT INTO requests (id, vehicle, quality, parts, first_name, last_name,
+    INSERT INTO requests (id, brand, model, body_type, model_year, plate, mileage, color_code,
+                          vehicle, quality, parts, first_name, last_name,
                           department, province, phone, email, notes)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
     RETURNING id, status, created_at
 `;
 
@@ -58,6 +59,13 @@ async function createRequest(data) {
         try {
             const { rows } = await pool.query(INSERT_REQUEST, [
                 id,
+                data.brand,
+                data.model,
+                data.bodyType,
+                data.year,
+                data.plate,
+                data.mileage,
+                data.colorCode,
                 data.vehicle,
                 data.quality,
                 data.parts,
@@ -85,7 +93,7 @@ async function createRequest(data) {
  */
 async function findRequest(id) {
     const { rows } = await pool.query(
-        `SELECT id, vehicle, first_name, last_name, status
+        `SELECT id, brand, model, vehicle, first_name, last_name, status
            FROM requests
           WHERE id = $1`,
         [id]
@@ -94,6 +102,11 @@ async function findRequest(id) {
     const row = rows[0];
     return {
         id: row.id.trim(),
+        // La marca y el modelo son lo que el cliente reconoce como «su»
+        // vehículo; `vehicle` (la silueta 3D) queda para las solicitudes
+        // anteriores a que el asistente los pidiera.
+        brand: row.brand,
+        model: row.model,
         vehicle: row.vehicle,
         firstName: row.first_name,
         lastName: row.last_name,

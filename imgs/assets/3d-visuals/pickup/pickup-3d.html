@@ -329,7 +329,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
    shared "carpaint" material itself, not per-panel.
    ========================================================================= */
 
-const MODEL_URL = './suv.glb';
+const MODEL_URL = './pickup.glb';
 const PAINT_MATERIAL_NAME = 'carpaint';
 
 // Node names confirmed (by rendering, not by trusting the name) to be real,
@@ -650,7 +650,7 @@ loader.load(
     for (const name of PAINTABLE_NAMES) {
       const mesh = resolvePaintMesh(root, name);
       if (!mesh) {
-        console.warn('[suv-3d] Could not resolve paintable panel:', name);
+        console.warn('[pickup-3d] Could not resolve paintable panel:', name);
         continue;
       }
       const hover = makeOverlay(mesh, HOVER_COLOR, HOVER_OPACITY);
@@ -675,8 +675,8 @@ loader.load(
     }
   },
   (err) => {
-    console.error('[suv-3d] GLTFLoader error:', err);
-    showError('Could not load the vehicle model. Make sure "suv.glb" is in the same folder as this page, then reload.');
+    console.error('[pickup-3d] GLTFLoader error:', err);
+    showError('Could not load the vehicle model. Make sure "pickup.glb" is in the same folder as this page, then reload.');
   }
 );
 

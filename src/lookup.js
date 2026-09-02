@@ -34,11 +34,12 @@
     var API_MISSING_STATUS = [404, 405, 501];
     var API_MISSING_MESSAGE = "La consulta de solicitudes no está disponible en esta versión del sitio.";
 
-    // Las mismas categorías del paso 1 del asistente.
+    // Reserva para las solicitudes que se enviaron cuando el paso 1 solo
+    // preguntaba la categoría del vehículo y no la marca y el modelo.
     var VEHICLE_LABELS = {
         van: "Furgoneta",
         wagon: "Familiar",
-        suv: "SUV"
+        pickup: "Pickup"
     };
 
     // Los estados que admite la columna `status` de la tabla `requests`. El
@@ -60,7 +61,8 @@
 
     function showResult(request) {
         resultId.textContent = request.id;
-        resultVehicle.textContent = VEHICLE_LABELS[request.vehicle] || request.vehicle;
+        var car = [request.brand, request.model].filter(Boolean).join(" ");
+        resultVehicle.textContent = car || VEHICLE_LABELS[request.vehicle] || request.vehicle;
         resultFirstName.textContent = request.firstName;
         resultLastName.textContent = request.lastName;
         resultStatus.textContent = STATUS_LABELS[request.status] || request.status;

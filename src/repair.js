@@ -1,8 +1,12 @@
 (function () {
     "use strict";
     var TOTAL_STEPS = 4;
+    var CONFIRM_LABELS = { 1: "Guardar y continuar", 4: "Enviar solicitud" };
     var current = 1;
     var viewMode = "top";
+    // `vehicle` ya no lo elige el cliente: sale de la carrocería del modelo
+    // que escribe en el paso 1, y es la silueta 3D sobre la que elegirá las
+    // piezas en el paso 3.
     var state = { vehicle: null, parts: [], quality: null };
 
     var steps = Array.prototype.slice.call(document.querySelectorAll(".step"));
@@ -25,7 +29,23 @@
     var copyCodeBtn = document.getElementById("copyCodeBtn");
     var PHONE_DIGITS = 9; // Perú: +51 + PHONE_DIGITS dígitos (celulares peruanos tienen 9 dígitos).
 
-    var vehicleCards = Array.prototype.slice.call(document.querySelectorAll(".vehicle-card"));
+    var carForm = document.getElementById("carForm");
+    var brandSelect = document.getElementById("carBrand");
+    var modelSelect = document.getElementById("carModel");
+    var carYearInput = document.getElementById("carYear");
+    var carYearError = document.getElementById("carYearError");
+    var carPlateInput = document.getElementById("carPlate");
+    var carPlateError = document.getElementById("carPlateError");
+    var carMileageInput = document.getElementById("carMileage");
+    var carColorCodeInput = document.getElementById("carColorCode");
+    var carPreview = document.getElementById("carPreview");
+    var carPreviewTitle = document.getElementById("carPreviewTitle");
+    var carPreviewType = document.getElementById("carPreviewType");
+    var carPreviewPhoto = document.getElementById("carPreviewPhoto");
+    var carPreviewLogo = document.getElementById("carPreviewLogo");
+    var carPreviewNote = document.getElementById("carPreviewNote");
+    var firstNameInput = document.getElementById("firstName");
+    var lastNameInput = document.getElementById("lastName");
     var qualityCards = Array.prototype.slice.call(document.querySelectorAll(".quality-card"));
     // Scoped to #carView2d: the 3D camera buttons (#carView3dButtons) reuse
     var viewTabs = Array.prototype.slice.call(document.querySelectorAll("#carView2d .view-tab"));
@@ -109,7 +129,7 @@
 
     // Side-view lower body (bumper/fenders/doors) is shared across the
     // three vehicles — only the roofline and wheel size change between
-    // them, which is what actually reads as "van" vs "wagon" vs "suv"
+    // them, which is what actually reads as "van" vs "wagon" vs "pickup"
     // in profile.
     var SIDE_LOWER_BODY = [
         { id: "front-bumper", d: "M35 100 L50 100 L50 170 L35 170 A15 15 0 0 1 20 155 L20 115 A15 15 0 0 1 35 100 Z" },
@@ -210,7 +230,7 @@
                 ]
             }
         },
-        suv: {
+        pickup: {
             top: {
                 viewBox: "0 0 200 420",
                 parts: [
@@ -492,7 +512,13 @@
     // ==================================================================
 
     function isStepValid(step) {
-        if (step === 1) return !!state.vehicle;
+        if (step === 1) {
+            return !!state.vehicle &&
+                isYearValid(carYearInput.value) &&
+                PLATE_PATTERN.test(carPlateInput.value) &&
+                firstNameInput.value.trim() !== "" &&
+                lastNameInput.value.trim() !== "";
+        }
         if (step === 2) return !!state.quality;
         if (step === 3) return state.parts.length > 0;
         if (step === 4) return contactForm.checkValidity();
@@ -522,7 +548,7 @@
         });
         updateProgress(step);
         backLink.hidden = step === 1;
-        confirmBtn.textContent = step === TOTAL_STEPS ? "Enviar solicitud" : "Continuar";
+        confirmBtn.textContent = CONFIRM_LABELS[step] || "Continuar";
         current = step;
         if (step === 3) {
             if (carView3d) carView3d.hidden = false;
@@ -581,12 +607,23 @@
     }
 
     function requestPayload() {
+        var car = selectedCar();
         return {
             vehicle: state.vehicle,
             quality: state.quality,
             parts: state.parts,
-            firstName: document.getElementById("firstName").value,
-            lastName: document.getElementById("lastName").value,
+            // El taller necesita el vehículo con nombre y apellido, no solo la
+            // silueta: la marca y el modelo van tal como se muestran, y el
+            // tipo de carrocería como lo llama el catálogo.
+            brand: car ? car.brand.name : "",
+            model: car ? car.model.name : "",
+            bodyType: car ? car.model.type : "",
+            year: carYearInput.value,
+            plate: carPlateInput.value,
+            mileage: carMileageInput.value,
+            colorCode: carColorCodeInput.value,
+            firstName: firstNameInput.value,
+            lastName: lastNameInput.value,
             department: departmentSelect ? departmentSelect.value : "",
             province: provinceSelect ? provinceSelect.value : "",
             // Se arma aquí y no se toma de #phoneFull porque ese campo se
@@ -632,7 +669,7 @@
                 : err.message);
         }).then(function () {
             submitting = false;
-            confirmBtn.textContent = "Enviar solicitud";
+            confirmBtn.textContent = CONFIRM_LABELS[TOTAL_STEPS];
             refreshConfirm();
         });
     }
@@ -676,7 +713,7 @@
     document.getElementById("resetBtn").addEventListener("click", function () {
         state = { vehicle: null, parts: [], quality: null };
 
-        vehicleCards.forEach(function (c) { c.classList.remove("is-selected"); c.setAttribute("aria-checked", "false"); });
+        resetCarForm();
         qualityCards.forEach(function (q) { q.classList.remove("is-selected"); q.setAttribute("aria-checked", "false"); });
         contactForm.reset();
         [phoneInput, emailInput].forEach(function (input) {
@@ -719,28 +756,211 @@
         goTo(1);
     });
 
-    // ---------- Paso 1: selección de vehículo ----------
-    vehicleCards.forEach(function (card) {
-        card.addEventListener("click", function () {
-            var newVehicle = card.dataset.value;
-            if (state.vehicle !== newVehicle && state.parts.length) {
-                // Each model names — and splits up — its body panels
-                // differently, so a selection made for one vehicle can't
-                // carry over to another.
-                state.parts = [];
-                renderPartsSummary();
-                if (car3d) car3d.refreshSelection();
-            }
-            vehicleCards.forEach(function (c) {
-                c.classList.remove("is-selected");
-                c.setAttribute("aria-checked", "false");
-            });
-            card.classList.add("is-selected");
-            card.setAttribute("aria-checked", "true");
-            state.vehicle = newVehicle;
+    // ==================================================================
+    // Paso 1 — datos del vehículo
+    //
+    // El cliente ya no elige una silueta: escribe qué vehículo tiene y el
+    // resto sale de ahí. La marca llena la lista de modelos, el modelo trae
+    // su carrocería desde el catálogo (src/carModels.js) y la carrocería
+    // decide sola sobre cuál de los tres modelos 3D se pintará en el paso 3.
+    // ==================================================================
+
+    var NO_CATALOG = function () { return null; };
+    var CATALOG = window.CAR_CATALOG ||
+        { brands: [], bodyTypes: {}, findBrand: NO_CATALOG, findModel: NO_CATALOG };
+    var VEHICLE_LABELS = { van: "Furgoneta", wagon: "Familiar", pickup: "Pickup" };
+
+    var PLATE_PATTERN = /^[A-Z0-9]{3}-[A-Z0-9]{3}$/;
+    var YEAR_MIN = 1980;
+    var YEAR_MAX = new Date().getFullYear() + 1;
+
+    // Fotos de los vehículos: se piden a imagin.studio, que las entrega
+    // recortadas y sin fondo. Es un servicio de pago y la clave del taller va
+    // en src/config.js; mientras no haya clave —o si la imagen no carga— la
+    // ficha muestra el logo de la marca, que sí es nuestro y siempre está.
+    var CAR_IMAGE_CUSTOMER = window.AUTOCOLOR_CAR_IMAGE_CUSTOMER || "";
+    // imagin escribe algunas marcas distinto que nosotros.
+    var IMAGE_MAKES = { mercedes: "mercedes-benz" };
+
+    function carPhotoUrl(brand, model, year) {
+        if (!CAR_IMAGE_CUSTOMER) return "";
+        var url = "https://cdn.imagin.studio/getimage" +
+            "?customer=" + encodeURIComponent(CAR_IMAGE_CUSTOMER) +
+            "&make=" + encodeURIComponent(IMAGE_MAKES[brand.id] || brand.id) +
+            "&modelFamily=" + encodeURIComponent(model.family) +
+            "&angle=01&zoomType=fullscreen";
+        if (isYearValid(year)) url += "&modelYear=" + encodeURIComponent(year);
+        return url;
+    }
+
+    function showBrandLogo(brand) {
+        carPreviewPhoto.hidden = true;
+        carPreviewPhoto.removeAttribute("src");
+        carPreviewLogo.style.setProperty("--logo-src", 'url("' + brand.logo + '")');
+        carPreviewLogo.style.setProperty("--logo-color", brand.color);
+        carPreviewLogo.hidden = false;
+    }
+
+    function isYearValid(value) {
+        var year = Number(value);
+        return /^[0-9]{4}$/.test(value || "") && year >= YEAR_MIN && year <= YEAR_MAX;
+    }
+
+    function selectedCar() {
+        if (!brandSelect || !brandSelect.value || !modelSelect.value) return null;
+        var brand = CATALOG.findBrand(brandSelect.value);
+        var model = CATALOG.findModel(brandSelect.value, modelSelect.value);
+        if (!brand || !model) return null;
+        return { brand: brand, model: model, body: CATALOG.bodyTypes[model.type] || null };
+    }
+
+    // El único punto donde cambia state.vehicle. Cambiarlo invalida las piezas
+    // ya elegidas: cada modelo 3D nombra y reparte sus paneles a su manera, así
+    // que una selección hecha sobre una silueta no significa lo mismo en otra.
+    function setVehicle(next) {
+        if (state.vehicle === next) return;
+        if (state.parts.length) {
+            state.parts = [];
+            renderPartsSummary();
+            if (car3d) car3d.refreshSelection();
+        }
+        state.vehicle = next;
+    }
+
+    function populateModelOptions(brandId) {
+        modelSelect.innerHTML = '<option value="" selected disabled hidden>Seleccionar modelo</option>';
+        var brand = CATALOG.findBrand(brandId);
+        modelSelect.disabled = !brand;
+        modelSelect.classList.add("is-placeholder");
+        if (!brand) return;
+        brand.models.forEach(function (model) {
+            var opt = document.createElement("option");
+            opt.value = model.id;
+            opt.textContent = model.name;
+            modelSelect.appendChild(opt);
+        });
+    }
+
+    function updateCarPreview() {
+        var car = selectedCar();
+        if (!car || !car.body) {
+            carPreview.hidden = true;
+            setVehicle(null);
+            return;
+        }
+
+        setVehicle(car.body.vehicle);
+        carPreviewTitle.textContent = car.brand.name + " " + car.model.name;
+        carPreviewType.textContent = car.body.label;
+
+        // Cuando la carrocería no tiene modelo 3D propio (un sedán, una
+        // pickup) se pinta sobre el más parecido. Vale más decirlo aquí que
+        // dejar que la sorpresa llegue en el paso 3. Se comparan las claves y
+        // no las etiquetas: 'wagon' se llama «Station wagon» en el catálogo y
+        // «Familiar» en el visor, pero es la misma silueta.
+        var scheme = VEHICLE_LABELS[car.body.vehicle];
+        var borrowed = car.model.type !== car.body.vehicle;
+        carPreviewNote.textContent = borrowed
+            ? "En el paso 3 elegirás las piezas sobre el esquema " + scheme + ", el más parecido a tu vehículo."
+            : "";
+        carPreviewNote.hidden = !borrowed;
+
+        var photo = carPhotoUrl(car.brand, car.model, carYearInput.value);
+        if (photo) {
+            carPreviewPhoto.alt = "Imagen referencial de un " + car.brand.name + " " + car.model.name;
+            carPreviewPhoto.hidden = false;
+            carPreviewLogo.hidden = true;
+            carPreviewPhoto.src = photo;
+        } else {
+            showBrandLogo(car.brand);
+        }
+
+        carPreview.hidden = false;
+    }
+
+    if (carForm) {
+        CATALOG.brands.forEach(function (brand) {
+            var opt = document.createElement("option");
+            opt.value = brand.id;
+            opt.textContent = brand.name;
+            brandSelect.appendChild(opt);
+        });
+
+        // Una foto que no llega (sin conexión, modelo que el proveedor no
+        // tiene) no deja el hueco vacío: cae al logo de la marca.
+        carPreviewPhoto.addEventListener("error", function () {
+            var car = selectedCar();
+            if (car) showBrandLogo(car.brand);
+        });
+
+        brandSelect.addEventListener("change", function () {
+            brandSelect.classList.toggle("is-placeholder", brandSelect.value === "");
+            populateModelOptions(brandSelect.value);
+            updateCarPreview();
             refreshConfirm();
         });
-    });
+
+        modelSelect.addEventListener("change", function () {
+            modelSelect.classList.toggle("is-placeholder", modelSelect.value === "");
+            updateCarPreview();
+            refreshConfirm();
+        });
+
+        // Año: cuatro dígitos dentro de un rango razonable. El proveedor de
+        // imágenes lo usa para traer la generación correcta, así que un año
+        // nuevo vuelve a pedir la foto.
+        carYearInput.addEventListener("input", function () {
+            var digits = carYearInput.value.replace(/\D/g, "").slice(0, 4);
+            if (digits !== carYearInput.value) carYearInput.value = digits;
+            if (carYearInput.closest(".field").classList.contains("field--invalid") && isYearValid(digits)) {
+                setFieldValidity(carYearInput, carYearError, true);
+            }
+            refreshConfirm();
+        });
+        carYearInput.addEventListener("change", function () {
+            if (isYearValid(carYearInput.value)) updateCarPreview();
+        });
+        carYearInput.addEventListener("blur", function () {
+            setFieldValidity(carYearInput, carYearError, isYearValid(carYearInput.value),
+                "Ingresa un año entre " + YEAR_MIN + " y " + YEAR_MAX + ".");
+        });
+
+        // Placa peruana: tres caracteres, guion y tres más (ABC-123). El guion
+        // lo pone el campo para que nadie tenga que adivinar el formato.
+        carPlateInput.addEventListener("input", function () {
+            var raw = carPlateInput.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+            var formatted = raw.length > 3 ? raw.slice(0, 3) + "-" + raw.slice(3) : raw;
+            if (formatted !== carPlateInput.value) carPlateInput.value = formatted;
+            if (carPlateInput.closest(".field").classList.contains("field--invalid") &&
+                PLATE_PATTERN.test(formatted)) {
+                setFieldValidity(carPlateInput, carPlateError, true);
+            }
+            refreshConfirm();
+        });
+        carPlateInput.addEventListener("blur", function () {
+            setFieldValidity(carPlateInput, carPlateError, PLATE_PATTERN.test(carPlateInput.value),
+                "Ingresa la placa con tres caracteres, guion y tres más. Por ejemplo ABC-123.");
+        });
+
+        carMileageInput.addEventListener("input", function () {
+            var digits = carMileageInput.value.replace(/\D/g, "").slice(0, 7);
+            if (digits !== carMileageInput.value) carMileageInput.value = digits;
+        });
+
+        carForm.addEventListener("input", refreshConfirm);
+    }
+
+    function resetCarForm() {
+        if (!carForm) return;
+        carForm.reset();
+        populateModelOptions("");
+        brandSelect.classList.add("is-placeholder");
+        modelSelect.classList.add("is-placeholder");
+        carPreview.hidden = true;
+        [carYearInput, carPlateInput].forEach(function (input) {
+            setFieldValidity(input, input === carYearInput ? carYearError : carPlateError, true);
+        });
+    }
 
     // ---------- Paso 2: selección de acabado ----------
     qualityCards.forEach(function (card) {
@@ -871,5 +1091,6 @@
 
     // ---------- Init ----------
     updateProgress(1);
+    confirmBtn.textContent = CONFIRM_LABELS[1];
     refreshConfirm();
 })();

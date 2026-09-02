@@ -20,8 +20,25 @@ CREATE TABLE IF NOT EXISTS requests (
     -- datos de otros clientes probando números vecinos.
     id          char(10)    PRIMARY KEY CHECK (id ~ '^[0-9]{10}$'),
 
-    -- Lo elegido en los pasos 1 a 3 del asistente.
-    vehicle     text        NOT NULL CHECK (vehicle IN ('van', 'wagon', 'suv')),
+    -- El vehículo tal como lo describió el cliente en el paso 1. Marca y
+    -- modelo se guardan con el nombre que se le mostró en pantalla, no con
+    -- el id del catálogo (src/carModels.js): el taller lee esta tabla y
+    -- 'Yaris Sedán' le dice más que 'yaris-sedan'. Son NULL solo en las
+    -- solicitudes anteriores a que el asistente los pidiera.
+    brand       text,
+    model       text,
+    body_type   text        CHECK (body_type IN ('sedan', 'hatchback', 'coupe', 'wagon',
+                                                 'suv', 'pickup', 'minivan', 'van')),
+    model_year  integer     CHECK (model_year BETWEEN 1980 AND 2100),
+    plate       text        CHECK (plate ~ '^[A-Z0-9]{3}-[A-Z0-9]{3}$'),
+    mileage     integer     CHECK (mileage >= 0),
+    color_code  text,
+
+    -- La silueta 3D sobre la que se eligieron las piezas. Se deduce de
+    -- body_type (ver BODY_TYPES en src/carModels.js) porque solo hay tres
+    -- modelos 3D: un sedán se pinta sobre la silueta 'wagon', y una SUV
+    -- sobre la 'pickup'.
+    vehicle     text        NOT NULL CHECK (vehicle IN ('van', 'wagon', 'pickup')),
     quality     text        NOT NULL CHECK (quality IN ('standard', 'premium', 'custom')),
     -- Los ids de panel que usa el visor 3D ('hood', 'rear_door_left', …). Son
     -- distintos por modelo, así que se guardan tal cual llegan, como arreglo:
@@ -46,6 +63,35 @@ CREATE TABLE IF NOT EXISTS requests (
     created_at  timestamptz NOT NULL DEFAULT now(),
     updated_at  timestamptz NOT NULL DEFAULT now()
 );
+
+-- Las columnas del vehículo llegaron después de las primeras solicitudes, así
+-- que para una base ya creada se agregan aquí. En una base nueva el CREATE de
+-- arriba ya las trae y estos ALTER no hacen nada.
+ALTER TABLE requests ADD COLUMN IF NOT EXISTS brand      text;
+ALTER TABLE requests ADD COLUMN IF NOT EXISTS model      text;
+ALTER TABLE requests ADD COLUMN IF NOT EXISTS body_type  text
+    CHECK (body_type IN ('sedan', 'hatchback', 'coupe', 'wagon',
+                         'suv', 'pickup', 'minivan', 'van'));
+ALTER TABLE requests ADD COLUMN IF NOT EXISTS model_year integer
+    CHECK (model_year BETWEEN 1980 AND 2100);
+ALTER TABLE requests ADD COLUMN IF NOT EXISTS plate      text
+    CHECK (plate ~ '^[A-Z0-9]{3}-[A-Z0-9]{3}$');
+ALTER TABLE requests ADD COLUMN IF NOT EXISTS mileage    integer
+    CHECK (mileage >= 0);
+ALTER TABLE requests ADD COLUMN IF NOT EXISTS color_code text;
+
+
+-- La silueta 'suv' pasó a llamarse 'pickup' cuando se separaron las dos
+-- carrocerías: el modelo 3D siempre fue el de una pickup (una Hilux doble
+-- cabina), así que las solicitudes que decían 'suv' se refieren a este mismo
+-- archivo y se renombran en el sitio.
+-- El CHECK se retira antes del UPDATE: el de la base vieja todavía nombra
+-- 'suv' y rechazaría el valor nuevo.
+ALTER TABLE requests DROP CONSTRAINT IF EXISTS requests_vehicle_check;
+UPDATE requests SET vehicle = 'pickup' WHERE vehicle = 'suv';
+ALTER TABLE requests ADD CONSTRAINT requests_vehicle_check
+    CHECK (vehicle IN ('van', 'wagon', 'pickup'));
+
 
 -- La cola de trabajo del taller: lo pendiente, lo más antiguo primero.
 CREATE INDEX IF NOT EXISTS requests_status_created_at_idx
@@ -73,7 +119,8 @@ CREATE TRIGGER requests_touch_updated_at
 -- Solicitudes pendientes, las más recientes primero:
 --
 --   SELECT id, created_at::date AS fecha, first_name || ' ' || last_name AS cliente,
---          vehicle, quality, cardinality(parts) AS piezas, phone, status
+--          brand || ' ' || model AS vehiculo, model_year, plate,
+--          quality, cardinality(parts) AS piezas, phone, status
 --     FROM requests
 --    WHERE status NOT IN ('entregado', 'cancelado')
 --    ORDER BY created_at DESC;

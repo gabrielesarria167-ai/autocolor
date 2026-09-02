@@ -13,6 +13,7 @@
     <link rel="stylesheet" href="../styles.css">
     <script src="../src/config.js" defer></script>
     <script src="../src/cities.js" defer></script>
+    <script src="../src/carModels.js" defer></script>
     <script src="../src/repair.js" defer></script>
     <script src="../src/lookup.js" defer></script>
     <script type="importmap">
@@ -72,43 +73,119 @@
 
         <div class="wizard-body">
         <section class="step active" data-step="1">
-            <h1>Selecciona el vehículo a pintar</h1>
-            <p class="step__subtitle">Elige la categoría más parecida a tu vehículo.</p>
+            <h1>Datos del vehículo</h1>
+            <p class="step__subtitle">Completa la información para identificar tu vehículo.</p>
 
-            <div class="vehicle-grid" role="radiogroup" aria-label="Tipo de vehículo">
-                <button type="button" class="vehicle-card" role="radio" aria-checked="false" data-value="van">
-                    <img class="vehicle-img" src="../imgs/assets/van.png" alt="Furgoneta">
-                    <span class="vehicle-check" aria-hidden="true">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"
-                            stroke-linejoin="round">
-                            <path d="M20 6L9 17l-5-5" />
-                        </svg>
-                    </span>
-                    <span class="vehicle-label">Furgoneta</span>
-                </button>
+            <form class="car-form" id="carForm" novalidate>
+                <section class="data-card" aria-labelledby="carDataTitle">
+                    <h2 class="data-card__head" id="carDataTitle">
+                        <span class="data-card__icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M5 17H3.5v-5L5.5 7h13l2 5v5H19" />
+                                <path d="M9.5 17h5" />
+                                <circle cx="7" cy="17" r="2" />
+                                <circle cx="17" cy="17" r="2" />
+                                <path d="M4 12h16" />
+                            </svg>
+                        </span>
+                        Vehículo
+                    </h2>
 
-                <button type="button" class="vehicle-card" role="radio" aria-checked="false" data-value="wagon">
-                    <img class="vehicle-img" src="../imgs/assets/station-wagon.png" alt="Familiar">
-                    <span class="vehicle-check" aria-hidden="true">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"
-                            stroke-linejoin="round">
-                            <path d="M20 6L9 17l-5-5" />
-                        </svg>
-                    </span>
-                    <span class="vehicle-label">Familiar</span>
-                </button>
+                    <div class="field-row field-row--wide">
+                        <div class="field">
+                            <label for="carBrand">Marca</label>
+                            <select id="carBrand" name="carBrand" class="is-placeholder" required>
+                                <option value="" selected disabled hidden>Seleccionar marca</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label for="carModel">Modelo</label>
+                            <select id="carModel" name="carModel" class="is-placeholder" required disabled>
+                                <option value="" selected disabled hidden>Seleccionar modelo</option>
+                            </select>
+                        </div>
+                    </div>
 
-                <button type="button" class="vehicle-card" role="radio" aria-checked="false" data-value="suv">
-                    <img class="vehicle-img" src="../imgs/assets/suv.png" alt="SUV">
-                    <span class="vehicle-check" aria-hidden="true">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"
-                            stroke-linejoin="round">
-                            <path d="M20 6L9 17l-5-5" />
-                        </svg>
-                    </span>
-                    <span class="vehicle-label">SUV</span>
-                </button>
-            </div>
+                    <figure class="car-preview" id="carPreview" hidden>
+                        <figcaption class="car-preview__head">
+                            <span class="car-preview__names">
+                                <strong class="car-preview__title" id="carPreviewTitle"></strong>
+                                <span class="car-preview__sub">Imagen referencial</span>
+                            </span>
+                            <span class="car-preview__type" id="carPreviewType"></span>
+                            <span class="car-preview__check" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"
+                                    stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M20 6L9 17l-5-5" />
+                                </svg>
+                            </span>
+                        </figcaption>
+
+                        <div class="car-preview__media">
+                            <img class="car-preview__photo" id="carPreviewPhoto" alt="" hidden>
+                            <span class="car-preview__logo" id="carPreviewLogo" hidden></span>
+                        </div>
+
+                        <p class="car-preview__note" id="carPreviewNote" hidden></p>
+                    </figure>
+
+                    <div class="field-row">
+                        <div class="field">
+                            <label for="carYear">Año</label>
+                            <input type="text" id="carYear" name="carYear" inputmode="numeric" maxlength="4"
+                                placeholder="Ej. 2020" autocomplete="off" required aria-describedby="carYearError">
+                            <p class="field__error" id="carYearError" role="alert" hidden></p>
+                        </div>
+                        <div class="field">
+                            <label for="carPlate">Placa</label>
+                            <input type="text" id="carPlate" name="carPlate" maxlength="7" placeholder="Ej. ABC-123"
+                                autocomplete="off" spellcheck="false" required aria-describedby="carPlateError">
+                            <p class="field__error" id="carPlateError" role="alert" hidden></p>
+                        </div>
+                    </div>
+
+                    <div class="field-row">
+                        <div class="field">
+                            <label for="carMileage">Kilometraje <span class="field__optional">(opcional)</span></label>
+                            <input type="text" id="carMileage" name="carMileage" inputmode="numeric" maxlength="7"
+                                placeholder="Ej. 85000" autocomplete="off">
+                        </div>
+                        <div class="field">
+                            <label for="carColorCode">Código de color <span class="field__optional">(opcional)</span></label>
+                            <input type="text" id="carColorCode" name="carColorCode" maxlength="20" placeholder="Ej. 1F7"
+                                autocomplete="off" spellcheck="false" aria-describedby="carColorCodeHint">
+                            <p class="field__hint" id="carColorCodeHint">Generalmente está en una etiqueta del vehículo.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="data-card" aria-labelledby="ownerDataTitle">
+                    <h2 class="data-card__head" id="ownerDataTitle">
+                        <span class="data-card__icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="8" r="3.6" />
+                                <path d="M4.5 20.5c0-3.6 3.4-5.6 7.5-5.6s7.5 2 7.5 5.6" />
+                            </svg>
+                        </span>
+                        Propietario
+                    </h2>
+
+                    <div class="field-row field-row--wide">
+                        <div class="field">
+                            <label for="firstName">Nombres</label>
+                            <input type="text" id="firstName" name="firstName" autocomplete="given-name"
+                                placeholder="Ingresa tus nombres" maxlength="80" required>
+                        </div>
+                        <div class="field">
+                            <label for="lastName">Apellidos</label>
+                            <input type="text" id="lastName" name="lastName" autocomplete="family-name"
+                                placeholder="Ingresa tus apellidos" maxlength="80" required>
+                        </div>
+                    </div>
+                </section>
+            </form>
         </section>
 
         <section class="step" data-step="2" hidden>
@@ -267,14 +344,6 @@
 
             <form class="contact-form" id="contactForm" novalidate>
                 <div class="field">
-                    <label for="firstName">Nombre</label>
-                    <input type="text" id="firstName" name="firstName" autocomplete="given-name" required>
-                </div>
-                <div class="field">
-                    <label for="lastName">Apellido</label>
-                    <input type="text" id="lastName" name="lastName" autocomplete="family-name" required>
-                </div>
-                <div class="field">
                     <label for="department">Departamento <span class="field__optional">(opcional)</span></label>
                     <select id="department" name="department" autocomplete="address-level1">
                         <option value="" selected disabled hidden>Selecciona tu departamento</option>
@@ -300,7 +369,7 @@
                 <div class="field">
                     <label for="email">Email <span class="field__optional">(opcional)</span></label>
                     <input type="email" id="email" name="email" autocomplete="email"
-                        pattern="[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}" aria-describedby="emailError">
+                        pattern="[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}" aria-describedby="emailError">
                     <p class="field__error" id="emailError" role="alert" hidden></p>
                 </div>
                 <div class="field field--full">

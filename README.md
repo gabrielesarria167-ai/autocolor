@@ -115,16 +115,47 @@ Ojo: GitHub Pages publica **todo** el repositorio, `server/` incluido. Ahí no
 debe haber contraseñas ni claves; las que haga falta van en variables de
 entorno del servicio que corra la API.
 
+## El catálogo de vehículos
+
+En el paso 1 el cliente escribe qué vehículo tiene —marca, modelo, año y
+placa— y el asistente deduce el resto. Las marcas y modelos viven en
+`src/carModels.js`, un archivo que se edita a mano:
+
+```js
+{ id: "corolla", name: "Corolla", type: "sedan", family: "corolla" }
+```
+
+`type` es la carrocería, y de ella sale sola la silueta 3D sobre la que se
+eligen las piezas en el paso 3: hay tres modelos (`van`, `wagon`, `pickup`),
+así que un sedán o un hatchback se pintan sobre la de auto, y una SUV sobre
+la de la pickup. Cuando no coinciden, la ficha del paso 1 lo avisa. La
+equivalencia está en `BODY_TYPES`, al principio del mismo archivo.
+
+### Las fotos de los vehículos
+
+La ficha muestra el vehículo elegido. Las fotos —recortadas, sin fondo— las
+entrega [imagin.studio](https://imagin.studio), que es un servicio de pago:
+la clave del taller va en `src/config.js`.
+
+```js
+window.AUTOCOLOR_CAR_IMAGE_CUSTOMER = "la-clave-del-taller";
+```
+
+Sin clave contratada, y también cuando una foto puntual no carga, la ficha
+muestra el logo de la marca (`imgs/brands/`, uno por marca) recortado con
+máscara y pintado en el color de la marca. No depende de ningún servicio, así
+que el paso 1 nunca se queda con un hueco.
+
 ## API
 
 | Ruta | Qué hace |
 | --- | --- |
 | `POST /api/requests` | Guarda una solicitud y devuelve `{ id, status, createdAt }` |
-| `GET /api/requests/:id` | Devuelve `{ id, vehicle, firstName, lastName, status }` |
+| `GET /api/requests/:id` | Devuelve `{ id, brand, model, vehicle, firstName, lastName, status }` |
 
-La consulta solo devuelve esos cinco campos: el código circula en mensajes y
-papeles, así que no debería alcanzar para sacar el teléfono, el correo ni las
-notas de un cliente.
+La consulta devuelve solo eso: el código circula en mensajes y papeles, así
+que no debería alcanzar para sacar el teléfono, el correo ni las notas de un
+cliente.
 
 ## El día a día del taller
 
@@ -133,7 +164,8 @@ verlas y para mover una de estado:
 
 ```sql
 SELECT id, created_at::date, first_name || ' ' || last_name AS cliente,
-       vehicle, quality, cardinality(parts) AS piezas, phone, status
+       brand || ' ' || model AS vehiculo, model_year, plate,
+       quality, cardinality(parts) AS piezas, phone, status
   FROM requests
  WHERE status NOT IN ('entregado', 'cancelado')
  ORDER BY created_at DESC;

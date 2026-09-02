@@ -53,29 +53,61 @@ const ALLOWED_ORIGINS = new Set(
    impide que una solicitud llene la tabla de texto basura.
 -------------------------------------------------------------------------- */
 
-const VEHICLES = new Set(['van', 'wagon', 'suv']);
+const VEHICLES = new Set(['van', 'wagon', 'pickup']);
+const BODY_TYPES = new Set(['sedan', 'hatchback', 'coupe', 'wagon', 'suv', 'pickup', 'minivan', 'van']);
+const PLATE_RE = /^[A-Z0-9]{3}-[A-Z0-9]{3}$/;
+const YEAR_MIN = 1980;
+const YEAR_MAX = new Date().getFullYear() + 1;
+const MAX_MILEAGE = 2_000_000;
 const QUALITIES = new Set(['standard', 'premium', 'custom']);
 const PHONE_RE = /^\+51[0-9]{9}$/;
 const EMAIL_RE = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 const PART_RE = /^[A-Za-z0-9_]{1,40}$/;
 const MAX_PARTS = 40;
 
+// Los campos se nombran en minúscula ('el año', 'la placa') porque casi
+// siempre aparecen a mitad de frase; cuando abren una, suben la inicial.
+function capitalize(field) {
+    return field.charAt(0).toUpperCase() + field.slice(1);
+}
+
 function text(value, { max, required = false, field }) {
     if (value === undefined || value === null || value === '') {
         if (required) throw new BadRequest(`Falta ${field}.`);
         return null;
     }
-    if (typeof value !== 'string') throw new BadRequest(`${field} no es válido.`);
+    if (typeof value !== 'string') throw new BadRequest(`${capitalize(field)} no es válido.`);
     const trimmed = value.trim();
     if (required && trimmed === '') throw new BadRequest(`Falta ${field}.`);
-    if (trimmed.length > max) throw new BadRequest(`${field} es demasiado largo.`);
+    if (trimmed.length > max) throw new BadRequest(`${capitalize(field)} es demasiado largo.`);
     return trimmed === '' ? null : trimmed;
+}
+
+// Los números llegan del formulario como texto ('2020', ''). Se convierten
+// aquí, con su rango, para que la base reciba enteros o NULL y nunca la
+// cadena vacía.
+function integer(value, { min, max, required = false, field }) {
+    if (value === undefined || value === null || value === '' ) {
+        if (required) throw new BadRequest(`Falta ${field}.`);
+        return null;
+    }
+    const number = typeof value === 'number' ? value : Number(String(value).trim());
+    if (!Number.isInteger(number) || number < min || number > max) {
+        throw new BadRequest(`${capitalize(field)} no es válido.`);
+    }
+    return number;
 }
 
 function validateRequest(body) {
     if (!body || typeof body !== 'object') throw new BadRequest('Cuerpo inválido.');
 
     if (!VEHICLES.has(body.vehicle)) throw new BadRequest('Tipo de vehículo no válido.');
+    if (!BODY_TYPES.has(body.bodyType)) throw new BadRequest('Carrocería no válida.');
+    // El catálogo de marcas y modelos vive en el navegador (src/carModels.js),
+    // así que aquí no hay contra qué contrastarlos: se comprueba que vengan y
+    // que sean texto corto, igual que con las piezas del visor 3D.
+    const plate = text(body.plate, { max: 7, required: true, field: 'la placa' }).toUpperCase();
+    if (!PLATE_RE.test(plate)) throw new BadRequest('La placa no es válida.');
     if (!QUALITIES.has(body.quality)) throw new BadRequest('Nivel de acabado no válido.');
 
     const parts = Array.isArray(body.parts) ? body.parts : null;
@@ -97,6 +129,13 @@ function validateRequest(body) {
     if (email && !EMAIL_RE.test(email)) throw new BadRequest('El email no es válido.');
 
     return {
+        brand: text(body.brand, { max: 40, required: true, field: 'la marca' }),
+        model: text(body.model, { max: 60, required: true, field: 'el modelo' }),
+        bodyType: body.bodyType,
+        year: integer(body.year, { min: YEAR_MIN, max: YEAR_MAX, required: true, field: 'el año' }),
+        plate,
+        mileage: integer(body.mileage, { min: 0, max: MAX_MILEAGE, field: 'el kilometraje' }),
+        colorCode: text(body.colorCode, { max: 20, field: 'el código de color' }),
         vehicle: body.vehicle,
         quality: body.quality,
         parts: [...new Set(parts)],

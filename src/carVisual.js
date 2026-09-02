@@ -125,10 +125,11 @@ export const VEHICLE_MODELS = {
     hiddenNodes: [],
   },
 
-  // SUV (Hilux double cab). Its bed is one 'tonneau' panel, and its only
-  // fenders are the front pair.
-  suv: {
-    url: new URL('../imgs/assets/3d-visuals/suv/suv.glb', import.meta.url).href,
+  // Pickup (Hilux double cab). Its bed is one 'tonneau' panel, and its only
+  // fenders are the front pair. It stands in for the SUVs too: de las tres
+  // siluetas es la única con esa altura y ese volumen.
+  pickup: {
+    url: new URL('../imgs/assets/3d-visuals/pickup/pickup.glb', import.meta.url).href,
     paintMaterial: 'carpaint',
     front: [0, 0, 1],
     left: [1, 0, 0],
