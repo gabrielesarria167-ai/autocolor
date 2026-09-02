@@ -20,8 +20,14 @@
              la solicitud; no se cambia una vez publicado.
    `type`    la carrocería, de las de BODY_TYPES. De ella sale sola la
              categoría con la que trabaja el visor 3D del paso 3.
-   `family`  el nombre del modelo tal como lo escribe el proveedor de
-             imágenes (ver resolveCarImage() en repair.js).
+   `family`  el nombre del modelo tal como lo escribe el proveedor de fotos
+             de pago (ver carPhotoUrl() en repair.js).
+
+   La foto de cada modelo no se declara: el archivo se llama
+   `<marca>-<modelo>.jpg` dentro de imgs/assets/stock-models/, así que sale
+   sola de los dos ids (photoFor(), abajo). Un modelo nuevo solo necesita
+   que se deje ahí su foto con ese nombre; si falta, la ficha del paso 1
+   cae al logo de la marca en vez de quedarse en blanco.
    ========================================================================== */
 
 (function () {
@@ -237,6 +243,14 @@
         }
     ];
 
+    // Las fotos son de Wikimedia Commons y cada una conserva su licencia y su
+    // autor en imgs/assets/stock-models/CREDITS.md.
+    var PHOTO_DIR = "../imgs/assets/stock-models/";
+
+    function photoFor(brandId, modelId) {
+        return PHOTO_DIR + brandId + "-" + modelId + ".jpg";
+    }
+
     function findBrand(brandId) {
         for (var i = 0; i < BRANDS.length; i++) {
             if (BRANDS[i].id === brandId) return BRANDS[i];
@@ -257,6 +271,7 @@
         brands: BRANDS,
         bodyTypes: BODY_TYPES,
         findBrand: findBrand,
-        findModel: findModel
+        findModel: findModel,
+        photoFor: photoFor
     };
 })();

@@ -24,15 +24,17 @@ window.AUTOCOLOR_API_BASE = "";
    Fotos de los vehículos (paso 1)
 
    La ficha del paso 1 muestra el vehículo que el cliente acaba de elegir.
-   Las fotos las entrega imagin.studio, recortadas y sin fondo, a partir de
-   la marca, el modelo y el año — pero es un servicio de pago y cada cliente
-   tiene su propia clave. Aquí va la del taller:
+   Sin tocar nada usa las fotos del propio sitio: una por modelo, en
+   imgs/assets/stock-models/, que no dependen de ningún servicio.
+
+   imagin.studio entrega en cambio fotos recortadas, sin fondo y por año del
+   modelo. Es de pago y cada cliente tiene su clave; poniéndola aquí, la
+   ficha las prefiere a las del sitio:
 
        window.AUTOCOLOR_CAR_IMAGE_CUSTOMER = "autocolor-pe";
 
-   Vacío significa que no hay clave contratada, y entonces la ficha muestra
-   el logo de la marca (imgs/brands/), que es nuestro y no depende de nadie.
-   Es también lo que se ve si una foto puntual no carga.
+   Si la foto que toque no carga —sea del sitio o del servicio—, la ficha
+   muestra el logo de la marca (imgs/brands/) y nunca se queda en blanco.
    ------------------------------------------------------------------------- */
 
 window.AUTOCOLOR_CAR_IMAGE_CUSTOMER = "";

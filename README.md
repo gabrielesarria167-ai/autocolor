@@ -133,17 +133,29 @@ equivalencia está en `BODY_TYPES`, al principio del mismo archivo.
 
 ### Las fotos de los vehículos
 
-La ficha muestra el vehículo elegido. Las fotos —recortadas, sin fondo— las
-entrega [imagin.studio](https://imagin.studio), que es un servicio de pago:
-la clave del taller va en `src/config.js`.
+La ficha muestra el vehículo elegido, y el sitio trae su propia foto de cada
+modelo en `imgs/assets/stock-models/`. El archivo se llama
+`<marca>-<modelo>.jpg` con los ids del catálogo, así que no hay nada que
+declarar: un modelo nuevo solo necesita que se deje ahí su foto con ese
+nombre.
+
+Son fotos de Wikimedia Commons, a 900 px de ancho y sin marcas de agua. Casi
+todas son **CC BY-SA o CC BY, que obligan a dar crédito**: el autor, la
+licencia y el enlace de cada una están en
+[`imgs/assets/stock-models/CREDITS.md`](imgs/assets/stock-models/CREDITS.md).
+Si las fotos se usan fuera del asistente, el crédito tiene que ir con ellas.
+
+Si el taller prefiere fotos recortadas sin fondo y por año del modelo,
+[imagin.studio](https://imagin.studio) las entrega —es de pago— y basta con
+poner la clave en `src/config.js` para que la ficha las use en lugar de las
+del sitio:
 
 ```js
 window.AUTOCOLOR_CAR_IMAGE_CUSTOMER = "la-clave-del-taller";
 ```
 
-Sin clave contratada, y también cuando una foto puntual no carga, la ficha
-muestra el logo de la marca (`imgs/brands/`, uno por marca) recortado con
-máscara y pintado en el color de la marca. No depende de ningún servicio, así
+Cuando una foto no carga, venga de donde venga, la ficha muestra el logo de
+la marca (`imgs/brands/`) recortado con máscara y pintado en su color, así
 que el paso 1 nunca se queda con un hueco.
 
 ## API

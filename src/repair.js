@@ -767,23 +767,30 @@
 
     var NO_CATALOG = function () { return null; };
     var CATALOG = window.CAR_CATALOG ||
-        { brands: [], bodyTypes: {}, findBrand: NO_CATALOG, findModel: NO_CATALOG };
+        { brands: [], bodyTypes: {}, findBrand: NO_CATALOG, findModel: NO_CATALOG,
+          photoFor: function () { return ""; } };
     var VEHICLE_LABELS = { van: "Furgoneta", wagon: "Familiar", pickup: "Pickup" };
 
     var PLATE_PATTERN = /^[A-Z0-9]{3}-[A-Z0-9]{3}$/;
     var YEAR_MIN = 1980;
     var YEAR_MAX = new Date().getFullYear() + 1;
 
-    // Fotos de los vehículos: se piden a imagin.studio, que las entrega
-    // recortadas y sin fondo. Es un servicio de pago y la clave del taller va
-    // en src/config.js; mientras no haya clave —o si la imagen no carga— la
-    // ficha muestra el logo de la marca, que sí es nuestro y siempre está.
+    // La foto del vehículo, por orden de preferencia:
+    //
+    //   1. la que trae el sitio, una por modelo, en imgs/assets/stock-models/;
+    //   2. la de imagin.studio —recortada, sin fondo, por año— si el taller
+    //      tiene clave contratada (ver src/config.js);
+    //   3. el logo de la marca, si cualquiera de las dos no carga.
+    //
+    // Las del sitio son fotos de verdad, con su calle y su fondo detrás, y no
+    // dependen de nadie; la ficha las llama «imagen referencial» porque eso
+    // son: el modelo, no el vehículo del cliente.
     var CAR_IMAGE_CUSTOMER = window.AUTOCOLOR_CAR_IMAGE_CUSTOMER || "";
     // imagin escribe algunas marcas distinto que nosotros.
     var IMAGE_MAKES = { mercedes: "mercedes-benz" };
 
     function carPhotoUrl(brand, model, year) {
-        if (!CAR_IMAGE_CUSTOMER) return "";
+        if (!CAR_IMAGE_CUSTOMER) return CATALOG.photoFor(brand.id, model.id);
         var url = "https://cdn.imagin.studio/getimage" +
             "?customer=" + encodeURIComponent(CAR_IMAGE_CUSTOMER) +
             "&make=" + encodeURIComponent(IMAGE_MAKES[brand.id] || brand.id) +
