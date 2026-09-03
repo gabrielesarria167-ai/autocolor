@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#e1dcbf">
+    <meta name="theme-color" content="#17150f">
     <meta name="robots" content="noindex, nofollow">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -18,16 +18,22 @@
 </head>
 
 <!-- Página interna: sin la cabecera ni el menú del sitio público. Se entra por
-     la dirección directa y lo que la protege es la contraseña que pide la API,
-     no el hecho de que no esté enlazada. -->
+     la dirección directa, y lo que la protege es la contraseña que pide la API
+     (server/auth.js), no el hecho de que no esté enlazada.
+
+     Además queda fuera de la publicación: _config.yml la excluye de GitHub
+     Pages, así que en el sitio público no existe. -->
 
 <body class="staff">
 
+    <header class="staff-topbar">
+        <img class="staff-topbar__logo" src="../imgs/logoDark.png" alt="Autocolor">
+        <span class="staff-topbar__rule" aria-hidden="true"></span>
+        <span class="staff-topbar__label">Taller</span>
+        <button type="button" class="staff-topbar__logout" id="staffLogout" hidden>Salir</button>
+    </header>
+
     <main class="staff-page" id="staffApp">
-        <header class="staff-page__head">
-            <h1>Autocolor · Taller</h1>
-            <p class="staff-page__lede">Monitorea aquí las solicitudes recibidas y actualiza su estado.</p>
-        </header>
 
         <p class="staff-loading" id="staffLoading">Cargando…</p>
 
@@ -48,48 +54,49 @@
         </section>
 
         <section class="staff-panel" id="staffPanel" aria-labelledby="staffPanelTitle" hidden>
-            <div class="staff-toolbar">
-                <h2 id="staffPanelTitle" class="staff-toolbar__title">Solicitudes</h2>
-                <div class="field staff-toolbar__filter">
-                    <label for="staffFilter">Estado</label>
-                    <select id="staffFilter">
-                        <option value="">Todos</option>
-                        <option value="recibido">Recibido</option>
-                        <option value="presupuestado">Presupuestado</option>
-                        <option value="en_taller">En taller</option>
-                        <option value="listo">Listo</option>
-                        <option value="entregado">Entregado</option>
-                        <option value="cancelado">Cancelado</option>
-                    </select>
+
+            <header>
+                <h1 id="staffPanelTitle">Autocolor Taller</h1>
+                <p class="staff-page__count" id="staffCount"></p>
+            </header>
+
+            <div class="staff-tools">
+                <div class="staff-search">
+                    <label class="sr-only" for="staffSearch">Buscar solicitudes</label>
+                    <input type="search" class="staff-search__input" id="staffSearch"
+                        placeholder="Buscar por placa, cliente o código…" autocomplete="off">
                 </div>
-                <button type="button" class="btn btn--ghost btn--sm staff-toolbar__logout" id="staffLogout">Salir</button>
+
+                <!-- Los filtros se generan en src/staff.js a partir de la misma
+                     lista de estados que pinta las píldoras, para que no haya
+                     dos sitios donde agregar un estado nuevo. -->
+                <div class="staff-filters" id="staffFilters" role="group" aria-label="Filtrar por estado"></div>
             </div>
 
-            <p class="staff-count" id="staffCount"></p>
+            <div class="staff-card">
+                <div class="staff-table__scroll">
+                    <table class="staff-table">
+                        <thead>
+                            <tr>
+                                <th scope="col">Código</th>
+                                <th scope="col">Placa</th>
+                                <th scope="col">Cliente</th>
+                                <th scope="col">Teléfono</th>
+                                <th scope="col">Vehículo</th>
+                                <th scope="col">Ingreso</th>
+                                <th scope="col">Piezas</th>
+                                <th scope="col">Acabado</th>
+                                <th scope="col">Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="staffRows"></tbody>
+                    </table>
+                </div>
 
-            <!-- En pantalla angosta la tabla se desplaza dentro de su caja en
-                 vez de reordenarse: son nueve columnas y todas se leen mejor en
-                 fila. -->
-            <div class="staff-table__scroll">
-                <table class="staff-table">
-                    <thead>
-                        <tr>
-                            <th scope="col">Código</th>
-                            <th scope="col">Fecha</th>
-                            <th scope="col">Cliente</th>
-                            <th scope="col">Teléfono</th>
-                            <th scope="col">Vehículo</th>
-                            <th scope="col">Placa</th>
-                            <th scope="col">Piezas</th>
-                            <th scope="col">Acabado</th>
-                            <th scope="col">Estado</th>
-                        </tr>
-                    </thead>
-                    <tbody id="staffRows"></tbody>
-                </table>
+                <p class="staff-empty" id="staffEmpty" hidden>No se encontraron solicitudes con esos criterios.</p>
             </div>
 
-            <p class="staff-empty" id="staffEmpty" hidden>No hay solicitudes con ese estado.</p>
+            <p class="staff-note">Los cambios de estado se guardan solos.</p>
         </section>
 
         <p class="form-error" id="staffError" role="alert" hidden></p>

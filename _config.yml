@@ -1,0 +1,23 @@
+# Qué NO se publica en GitHub Pages.
+#
+# El repositorio se publica entero desde la rama main, así que todo archivo
+# versionado queda accesible por su URL salvo que aparezca aquí. El panel del
+# taller no tiene por qué existir en la web pública:
+#
+#   - pgs/taller.html lista nombres y teléfonos de clientes. Los datos vienen
+#     de la API, que en Pages no existe, así que allí la página nunca mostraría
+#     nada; pero tampoco hay motivo para publicar la herramienta interna.
+#   - server/ es el servidor y el esquema de la base. Nada de eso se sirve como
+#     sitio, y schema.sql enseña la forma de la base a quien pase por ahí.
+#
+# Lo que protege los datos sigue siendo la contraseña de la API (server/auth.js),
+# no esta lista: excluir la página la esconde, no la cierra.
+exclude:
+  - pgs/taller.html
+  - src/staff.js
+  - server/
+  - node_modules/
+  - package.json
+  - package-lock.json
+  - .env.example
+  - README.md

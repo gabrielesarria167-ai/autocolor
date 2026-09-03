@@ -3104,150 +3104,452 @@ body.wizard {
    Panel del taller (pgs/taller.html)
 
    Es una herramienta interna, no una página del sitio: no lleva la cabecera ni
-   el menú, así que trae su propio envoltorio. Todo lo demás —tarjeta de
-   acceso, campos, botones, píldoras de estado— se reutiliza tal cual.
+   el menú público, así que trae su propio envoltorio. La diferencia con el
+   resto del sitio es deliberada —una barra oscura, tipografía más chica, todo
+   más apretado— porque aquí no se está convenciendo a nadie: se está mirando
+   una cola de trabajo durante toda la jornada, y lo que sirve es densidad y
+   contraste, no aire.
    ========================================================================== */
+
+/* -----------------------------------------------------------------------------
+   Barra superior
+   -------------------------------------------------------------------------- */
+
+/* El degradado crema del sitio es para vender; aquí estorba. Detrás de una
+   tabla que se mira durante horas va un fondo plano y quieto, y que además no
+   cambia de color según cuánto se haya bajado. */
+body.staff {
+    background: #f6f4ee;
+}
+
+/* .staff-panel es flex, y el `display` de una clase le gana al atributo
+   hidden: sin esto el panel se vería por debajo del formulario de acceso, con
+   la tabla vacía y todo. Va acotado a esta página en vez de arreglar [hidden]
+   para todo el sitio, que es un cambio mucho más grande de lo que pide el
+   síntoma. */
+.staff [hidden] {
+    display: none !important;
+}
+
+.staff-topbar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 13px 24px;
+    background: var(--ink);
+    color: #f6f2e6;
+}
+
+.staff-topbar__logo {
+    display: block;
+    height: 30px;
+    width: auto;
+}
+
+.staff-topbar__rule {
+    width: 1px;
+    height: 22px;
+    background: rgba(246, 242, 230, 0.22);
+}
+
+.staff-topbar__label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: rgba(246, 242, 230, 0.68);
+}
+
+.staff-topbar__logout {
+    margin-left: auto;
+    padding: 6px 14px;
+    border: 1px solid rgba(246, 242, 230, 0.28);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: #f6f2e6;
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s var(--ease-out), border-color 0.15s var(--ease-out);
+}
+
+.staff-topbar__logout:hover {
+    background: rgba(246, 242, 230, 0.1);
+    border-color: rgba(246, 242, 230, 0.45);
+}
+
+/* -----------------------------------------------------------------------------
+   Cuerpo
+   -------------------------------------------------------------------------- */
 
 .staff-page {
     max-width: var(--shell);
     margin: 0 auto;
-    padding: 40px 20px 64px;
+    padding: 26px 24px 48px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
 }
 
-.staff-page__head {
-    margin-bottom: 28px;
+/* El panel entero es un hijo flex de .staff-page, así que reparte su propio
+   espacio: título, herramientas, tarjeta y nota. */
+.staff-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
 }
 
 .staff-page h1 {
+    margin: 0;
     font-family: var(--font-display);
-    font-size: clamp(1.6rem, 4vw, 2.1rem);
+    font-size: clamp(1.6rem, 1.2rem + 1.6vw, 2.1rem);
     line-height: 1.2;
+    color: var(--ink);
 }
 
-.staff-page__lede {
-    margin-top: 6px;
+/* El recuento va pegado al título y no en la tarjeta: es lo primero que se
+   mira al volver a la pantalla —cuántas hay, y cuántas de todas— y desde
+   arriba no compite con los datos. */
+.staff-page__count {
+    margin: 5px 0 0;
+    font-size: 0.85rem;
     color: var(--text-dim);
 }
 
 .staff-loading {
-    color: var(--text-faint);
-}
-
-.staff-login {
     margin: 0;
+    color: var(--text-dim);
 }
 
-.staff-toolbar {
+/* -----------------------------------------------------------------------------
+   Buscador y filtros
+   -------------------------------------------------------------------------- */
+
+.staff-tools {
     display: flex;
     flex-wrap: wrap;
-    align-items: flex-end;
-    gap: 16px;
-    margin-bottom: 8px;
+    align-items: center;
+    gap: 12px;
 }
 
-.staff-toolbar__title {
-    font-family: var(--font-display);
-    font-size: 1.2rem;
-    margin-right: auto;
+.staff-search {
+    position: relative;
+    flex: 1 1 240px;
+    max-width: 360px;
 }
 
-.staff-toolbar__filter {
-    min-width: 180px;
+/* La lupa es fondo del propio campo y no un elemento aparte: así no hay nada
+   encima que pueda robarle el clic al input. */
+.staff-search__input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 9px 12px 9px 34px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%237a7266' stroke-width='1.6'%3E%3Ccircle cx='7' cy='7' r='4.3'/%3E%3Cpath d='M10.4 10.4 14 14' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat 11px 50% / 14px 14px;
+    font: inherit;
+    font-size: 0.9rem;
+    color: var(--ink);
 }
 
-.staff-count,
-.staff-empty {
-    margin: 0 0 12px;
-    font-size: 0.85rem;
+.staff-search__input::placeholder {
     color: var(--text-faint);
 }
 
-/* Ocho columnas no caben en un teléfono. En vez de reordenarlas en tarjetas,
-   la tabla se desplaza dentro de su caja: se lee igual y es una regla en vez
-   de veinte. */
-.staff-table__scroll {
-    overflow-x: auto;
+.staff-search__input:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 1px;
+    border-color: transparent;
+}
+
+.staff-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+/* Los filtros son rectángulos y los estados son píldoras. La forma distinta
+   es a propósito: en una misma fila conviven un filtro «Listo» y el estado
+   «Listo» de una solicitud, y no deben poder confundirse. */
+.staff-chip {
+    padding: 7px 13px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    font: inherit;
+    font-size: 0.83rem;
+    font-weight: 600;
+    color: var(--text-dim);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background 0.15s var(--ease-out), color 0.15s var(--ease-out),
+                border-color 0.15s var(--ease-out);
+}
+
+.staff-chip:hover {
+    border-color: var(--border-strong);
+    color: var(--ink);
+}
+
+.staff-chip[aria-pressed="true"] {
+    background: var(--ink);
+    border-color: transparent;
+    color: #f6f2e6;
+}
+
+/* -----------------------------------------------------------------------------
+   Tarjeta y tabla
+   -------------------------------------------------------------------------- */
+
+.staff-card {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
+    overflow: hidden;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+/* En pantalla angosta la tabla se desplaza dentro de su tarjeta en vez de
+   reordenarse: son nueve columnas que se leen en fila, y una regla de scroll
+   sale más barata que veinte de reacomodo. */
+.staff-table__scroll {
+    overflow-x: auto;
 }
 
 .staff-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.88rem;
+    min-width: 900px;
+    font-size: 0.875rem;
 }
 
-/* Solo las columnas que se leen de corrido —código, fecha, teléfono, placa—
-   se niegan a partirse. El nombre y el vehículo sí pueden repartirse en dos
-   líneas, y así la tabla entra entera en una pantalla de escritorio en vez de
-   pedir scroll por doscientos píxeles. */
-.staff-table th,
-.staff-table__nowrap,
-.staff-table__code {
-    white-space: nowrap;
+.staff-table thead tr {
+    background: var(--surface-tint);
 }
 
 .staff-table th {
-    padding: 12px 14px;
-    background: var(--surface-tint);
-    border-bottom: 1px solid var(--border-strong);
+    padding: 11px 14px;
     text-align: left;
-    font-size: 0.78rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
     color: var(--text-dim);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
 }
 
 .staff-table td {
-    padding: 12px 14px;
-    border-bottom: 1px solid var(--border);
+    padding: 10px 14px;
     vertical-align: middle;
+    border-bottom: 1px solid rgba(28, 26, 23, 0.07);
+    color: var(--ink);
 }
 
-.staff-table tr:last-child td {
-    border-bottom: 0;
+.staff-table tbody tr:last-child td {
+    border-bottom: none;
 }
 
 .staff-table tbody tr:hover {
-    background: var(--surface-tint);
+    background: rgba(225, 220, 191, 0.16);
+}
+
+/* Solo lo que se lee de corrido —código, fecha, teléfono— se niega a partirse.
+   Nombres y vehículos sí pueden ocupar dos renglones: la altura de la fila la
+   fija de todos modos la píldora de estado, así que no cuesta nada. */
+.staff-table__nowrap {
+    white-space: nowrap;
 }
 
 .staff-table__code {
     font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
-    letter-spacing: 0.06em;
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
 }
 
-/* La píldora dice el estado de un vistazo; el desplegable, debajo, es el que
-   lo cambia. Los dos juntos evitan tener que leer la opción seleccionada para
-   saber en qué punto va la solicitud. */
-.staff-status__select {
-    display: block;
-    margin-top: 6px;
-    padding: 5px 8px;
-    max-width: 180px;
-    background: var(--surface);
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
+/* La placa va en su propio recuadro: es el dato con el que se identifica el
+   auto en el patio, y así se encuentra recorriendo la columna con la vista. */
+.staff-table__plate {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: var(--surface-tint);
+    font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+}
+
+.staff-table__muted {
+    color: var(--text-dim);
+    white-space: nowrap;
+}
+
+.staff-table__num {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* -----------------------------------------------------------------------------
+   Estado: píldora con su propio desplegable
+
+   Es un menú hecho a mano y no un <select>, porque el nativo no deja pintar
+   sus opciones: aquí cada estado lleva su punto de color, y ver la lista
+   coloreada al abrirla es la mitad de la utilidad.
+
+   El menú se posiciona `fixed` y no `absolute`. La tabla vive dentro de un
+   contenedor con overflow para poder desplazarse en horizontal, y un elemento
+   absoluto se recortaría contra ese borde: el desplegable de las últimas filas
+   quedaría cortado. Con `fixed` sale del recorte, a cambio de calcular la
+   posición al abrirlo y de cerrarse cuando algo se desplaza (src/staff.js).
+   -------------------------------------------------------------------------- */
+
+.staff-status {
+    position: relative;
+    display: inline-block;
+}
+
+/* Mientras el PATCH está en vuelo la píldora se apaga y no acepta otro clic:
+   el cambio todavía no está en la base y no debe leerse como si lo estuviera. */
+.staff-status[data-saving="1"] {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.staff-status__pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 11px;
+    border: none;
+    border-radius: 999px;
+    background: var(--pill-bg, var(--surface-tint));
+    color: var(--pill-fg, var(--text-dim));
     font: inherit;
     font-size: 0.82rem;
-    color: inherit;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
 }
 
-.staff-status__select:disabled {
+.staff-status__pill:focus-visible,
+.staff-status__option:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+}
+
+.staff-status__dot {
+    flex: none;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--pill-dot, currentColor);
+}
+
+/* El triángulo se dibuja con bordes para que herede el color del estado, que
+   es justo lo que un caret puesto como imagen de fondo no puede hacer. */
+.staff-status__caret {
+    flex: none;
+    width: 0;
+    height: 0;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid currentColor;
     opacity: 0.55;
 }
 
-/* En pantalla estrecha el título deja de competir por la fila: se queda solo
-   arriba y el filtro y el botón se reparten la de abajo. */
+.staff-status__menu {
+    position: fixed;
+    z-index: 40;
+    min-width: 190px;
+    padding: 5px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    box-shadow: 0 10px 26px rgba(15, 23, 42, 0.16);
+}
+
+.staff-status__option {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 11px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    font: inherit;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--ink);
+    text-align: left;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.staff-status__option:hover {
+    background: var(--surface-tint);
+}
+
+/* El estado que ya tiene la solicitud aparece con su propio color, así que al
+   abrir el menú se ve de inmediato dónde está parada. */
+.staff-status__option[aria-selected="true"] {
+    background: var(--pill-bg);
+    color: var(--pill-fg);
+}
+
+/* Los seis estados del CHECK de la tabla (server/schema.sql), cada uno con su
+   tono. Con seis a la vez en pantalla, el color hace de índice: se ve dónde
+   está la carga sin leer una sola palabra.
+
+   Va sobre [data-status] a secas para que sirva igual a la píldora y a cada
+   opción del menú, que es lo que les da su punto de color. */
+.staff [data-status="recibido"]      { --pill-bg: #eef0f2; --pill-fg: #46515c; --pill-dot: #7d8a97; }
+.staff [data-status="presupuestado"] { --pill-bg: #fbf1dc; --pill-fg: #85610f; --pill-dot: #d19b1e; }
+.staff [data-status="en_taller"]     { --pill-bg: #e3f2fb; --pill-fg: #0a5b93; --pill-dot: #299fdf; }
+.staff [data-status="listo"]         { --pill-bg: #e4f3e9; --pill-fg: #1a6d3c; --pill-dot: #2f9e5c; }
+.staff [data-status="entregado"]     { --pill-bg: #ecefe9; --pill-fg: #57604f; --pill-dot: #8d9682; }
+.staff [data-status="cancelado"]     { --pill-bg: #fbe9e8; --pill-fg: #a5241d; --pill-dot: #d94a41; }
+
+/* -----------------------------------------------------------------------------
+   Estados de la página
+   -------------------------------------------------------------------------- */
+
+.staff-empty {
+    margin: 0;
+    padding: 44px 20px;
+    text-align: center;
+    color: var(--text-dim);
+}
+
+.staff-note {
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--text-faint);
+}
+
+/* La tarjeta de acceso no compite con nada: es lo único en pantalla, así que
+   se queda en el centro y estrecha. */
+.staff-login {
+    max-width: 380px;
+    margin: 6vh auto 0;
+}
+
 @media (max-width: 560px) {
-    .staff-toolbar__title {
-        flex-basis: 100%;
-        margin-right: 0;
+    .staff-topbar {
+        padding: 12px 16px;
     }
 
-    .staff-toolbar__filter {
-        flex: 1;
-        min-width: 0;
+    .staff-page {
+        padding: 20px 16px 40px;
+    }
+
+    .staff-search {
+        max-width: none;
     }
 }

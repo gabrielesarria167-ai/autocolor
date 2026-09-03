@@ -4,7 +4,9 @@
    Sesiones del panel del taller.
 
    Una sola contraseña compartida, la del taller, en la variable de entorno
-   AUTOCOLOR_STAFF_PASSWORD:
+   AUTOCOLOR_STAFF_PASSWORD. Lo habitual es dejarla escrita una vez en el .env
+   de la raíz (ver .env.example y server/env.js) y arrancar con `npm start`;
+   ponerla delante del comando sigue funcionando y tiene prioridad:
 
        AUTOCOLOR_STAFF_PASSWORD='...' npm start
 
@@ -16,6 +18,10 @@
    un archivo estático como cualquier otro y su código fuente lo lee todo el
    mundo. Lo que hay que cerrar es la API.
    ========================================================================== */
+
+// Antes que nada: el .env tiene que estar en process.env cuando se lea
+// AUTOCOLOR_STAFF_PASSWORD, unas líneas más abajo.
+require('./env');
 
 const crypto = require('node:crypto');
 

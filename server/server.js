@@ -27,6 +27,10 @@
    Postgres, aparte del general de la máquina — ver server/pgserver.sh.
    ========================================================================== */
 
+// El .env de la raíz, antes de leer cualquier variable de entorno (PORT,
+// PGDATABASE, ALLOWED_ORIGINS y la contraseña del panel salen de ahí si están).
+require('./env');
+
 const http = require('node:http');
 const fs = require('node:fs');
 const fsp = require('node:fs/promises');
@@ -480,9 +484,14 @@ async function start() {
     server.listen(PORT, HOST, () => {
         console.log(`Autocolor en http://localhost:${PORT}`);
         console.log(`Base de datos: ${process.env.PGDATABASE || 'autocolor'}`);
-        console.log(auth.isConfigured()
-            ? 'Panel del taller: /pgs/taller.html'
-            : 'Panel del taller: apagado (falta AUTOCOLOR_STAFF_PASSWORD)');
+        if (auth.isConfigured()) {
+            console.log(`Panel del taller: http://localhost:${PORT}/pgs/taller.html`);
+        } else {
+            // El panel apagado se ve desde dentro como un 503 y desde fuera
+            // como una página rota, así que aquí se dice qué falta y dónde.
+            console.log('Panel del taller: apagado — falta AUTOCOLOR_STAFF_PASSWORD.');
+            console.log('  Escríbela en el .env de la raíz (hay un .env.example al lado).');
+        }
         if (ALLOWED_ORIGINS.size > 0) {
             console.log(`Orígenes permitidos: ${[...ALLOWED_ORIGINS].join(', ')}`);
         }

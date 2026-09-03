@@ -12,9 +12,14 @@ Hace falta Node 18 o más nuevo y los binarios de Postgres instalados
 
 ```bash
 npm install                          # única dependencia: pg
+cp .env.example .env                 # y escribe ahí la contraseña del taller
 npm run db:init                      # crea y levanta el servidor propio
 npm start                            # http://localhost:3000
 ```
+
+El `.env` es opcional para el sitio público, pero **sin él el panel del taller
+queda apagado** (ver «El día a día del taller»). No se versiona: está en
+`.gitignore`, y lo que ya venga en el entorno le gana.
 
 `db:init` es solo la primera vez. Después, cada vez que se trabaja en el
 proyecto:
@@ -77,6 +82,8 @@ lo abre a propósito, por ejemplo para probar el sitio desde el móvil.
 | `src/config.js` | A qué servidor le habla el sitio |
 | `server/db.js` | Acceso a Postgres |
 | `server/auth.js` | La contraseña y las sesiones del panel del taller |
+| `server/env.js` | Lee el `.env` de la raíz al arrancar |
+| `_config.yml` | Qué no se publica en GitHub Pages |
 | `server/pgserver.sh` | Crea y controla el servidor Postgres propio |
 | `server/schema.sql` | Tabla `requests` + consultas útiles para el taller |
 | `imgs/assets/3d-visuals/` | Modelos `.glb` y las páginas donde se prepararon |
@@ -116,9 +123,20 @@ Mientras no haya API detrás, el sitio publicado lo dice con todas sus
 letras en vez de pedir que se reintente: el formulario avisa que el envío no
 está disponible en esa versión del sitio, y la consulta por código, lo mismo.
 
-Ojo: GitHub Pages publica **todo** el repositorio, `server/` incluido. Ahí no
-debe haber contraseñas ni claves; las que haga falta van en variables de
-entorno del servicio que corra la API.
+Ojo: GitHub Pages publica **todo** el repositorio salvo lo que liste
+`_config.yml`. Ahí no debe haber contraseñas ni claves; las que haga falta van
+en variables de entorno del servicio que corra la API, o en el `.env` local,
+que no se versiona.
+
+Lo que queda fuera de la publicación:
+
+| Excluido | Por qué |
+|---|---|
+| `pgs/taller.html`, `src/staff.js` | Es la herramienta interna del taller; no tiene por qué existir en la web pública |
+| `server/` | El servidor y el esquema de la base, que no se sirven como sitio |
+
+Excluir la página la **esconde, no la cierra**: lo que protege los datos sigue
+siendo la contraseña de la API (`server/auth.js`).
 
 ## El catálogo de vehículos
 
@@ -187,10 +205,25 @@ Las del panel del taller, todas detrás de la contraseña compartida:
 
 Las solicitudes llegan a la tabla `requests` de la base `autocolor`, y el
 taller las trabaja desde **`/pgs/taller.html`**: la lista completa —código,
-fecha, cliente, teléfono, vehículo, placa, piezas y acabado— con un
-desplegable por fila para mover el estado.
+placa, cliente, teléfono, vehículo, ingreso, piezas y acabado— con un
+buscador, filtros por estado y una píldora de color por fila que despliega los
+seis estados para mover la solicitud.
 
-El panel solo existe si el servidor arranca con la contraseña del taller:
+El buscador filtra en el navegador sobre lo que ya se trajo (placa, cliente,
+código, marca y teléfono); los filtros de estado, en cambio, se le piden al
+servidor, porque la consulta trae como mucho 200 filas y recortarlas en el
+navegador dejaría fuera las viejas.
+
+El panel solo existe si el servidor encuentra la contraseña del taller. Lo
+normal es dejarla en el `.env` de la raíz:
+
+```bash
+# .env
+AUTOCOLOR_STAFF_PASSWORD=la-del-taller
+```
+
+y arrancar con `npm start` a secas. Ponerla delante del comando sigue
+funcionando y tiene prioridad sobre el archivo:
 
 ```bash
 AUTOCOLOR_STAFF_PASSWORD='la-del-taller' npm start
@@ -205,7 +238,8 @@ horas que vive en la memoria del proceso, de modo que reiniciar el servidor
 obliga a entrar de nuevo. Detrás de https hay que añadir
 `AUTOCOLOR_STAFF_COOKIE_SECURE=1`.
 
-El panel **no funciona en GitHub Pages**: ahí no hay API que consultar.
+El panel **no está en GitHub Pages**: `_config.yml` lo excluye de la
+publicación, y aunque estuviera no tendría API que consultar.
 
 Todo esto también se puede hacer a mano desde psql:
 
