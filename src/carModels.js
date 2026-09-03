@@ -98,7 +98,7 @@
             color: "#003478",
             models: [
                 { id: "fiesta", name: "Fiesta", type: "hatchback", family: "fiesta" },
-                { id: "focus", name: "Focus", type: "sedan", family: "focus" },
+                { id: "focus", name: "Focus", type: "hatchback", family: "focus" },
                 { id: "mustang", name: "Mustang", type: "coupe", family: "mustang" },
                 { id: "ecosport", name: "EcoSport", type: "suv", family: "ecosport" },
                 { id: "escape", name: "Escape", type: "suv", family: "escape" },

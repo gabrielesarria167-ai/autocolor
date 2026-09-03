@@ -380,23 +380,13 @@ svg {
     gap: 10px;
 }
 
-.car-preview__names {
-    display: grid;
-    gap: 2px;
+.car-preview__title {
     margin-right: auto;
     min-width: 0;
-}
-
-.car-preview__title {
     font-family: var(--font-display);
     font-size: 1.05rem;
     font-weight: 600;
     line-height: 1.25;
-}
-
-.car-preview__sub {
-    font-size: 0.8rem;
-    color: var(--text-faint);
 }
 
 .car-preview__type {
@@ -428,20 +418,19 @@ svg {
 .car-preview__media {
     display: grid;
     place-items: center;
-    aspect-ratio: 16 / 9;
-    padding: 10px;
-    border-radius: var(--radius-sm);
-    background: var(--surface-tint);
 }
 
+/* La foto no vive dentro de una caja de proporción fija: cada modelo trae la
+   suya y las que no eran 16/9 se salían del recuadro al cargar. Ahora crece
+   hasta el ancho de la tarjeta y el alto lo pone su propia proporción, con un
+   tope para que una foto vertical no empuje el formulario fuera de pantalla. */
 .car-preview__photo {
     display: block;
     max-width: 100%;
-    max-height: 100%;
-    /* contain y no cover: las fotos traen su propio fondo y encuadre, y
-       recortarlas para llenar la caja dejaría a algún vehículo sin morro. */
-    object-fit: contain;
-    border-radius: 6px;
+    max-height: 260px;
+    height: auto;
+    border-radius: var(--radius-sm);
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.12);
 }
 
 /* Sin foto del modelo, el logo de la marca — recortado con máscara para que
