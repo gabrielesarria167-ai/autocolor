@@ -32,7 +32,8 @@
     // esté mal.
     var API_BASE = window.AUTOCOLOR_API_BASE || "";
     var API_MISSING_STATUS = [404, 405, 501];
-    var API_MISSING_MESSAGE = "La consulta de solicitudes no está disponible en esta versión del sitio.";
+    var API_MISSING_MESSAGE = "Todavía no podemos consultar solicitudes desde esta versión del sitio. " +
+        "Escríbenos por WhatsApp al +51 935 646 304 con tu código y te decimos cómo va.";
 
     // Reserva para las solicitudes que se enviaron cuando el paso 1 solo
     // preguntaba la categoría del vehículo y no la marca y el modelo.

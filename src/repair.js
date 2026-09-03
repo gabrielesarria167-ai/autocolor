@@ -346,8 +346,11 @@
     // un error pasajero, porque decirle a alguien que reintente cuando no hay
     // nada que atienda su solicitud solo le hace perder el tiempo.
     var API_MISSING_STATUS = [404, 405, 501];
-    var API_MISSING_MESSAGE = "El envío de solicitudes no está disponible en esta versión del sitio. " +
-        "Escríbenos desde la página de contacto y preparamos tu presupuesto.";
+    // El número está también en index.html (dos veces) y en lookup.js. Son
+    // cuatro copias; centralizarlas es un cambio aparte y más grande que esto.
+    var API_MISSING_MESSAGE = "Todavía no podemos recibir solicitudes desde esta versión del sitio. " +
+        "Escríbenos por WhatsApp al +51 935 646 304 con la marca, el modelo y las zonas a pintar, " +
+        "y te preparamos el presupuesto.";
 
     function setSubmitError(message) {
         if (!submitError) return;
