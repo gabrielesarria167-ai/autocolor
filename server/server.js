@@ -114,8 +114,12 @@ const YEAR_MIN = 1980;
 const YEAR_MAX = new Date().getFullYear() + 1;
 const MAX_MILEAGE = 2_000_000;
 const QUALITIES = new Set(['standard', 'premium', 'custom']);
-// Los estados por los que el taller mueve una solicitud. Refleja el CHECK de
-// `status` en server/schema.sql: si allí se agrega uno, aquí también.
+// Los estados por los que el taller mueve una solicitud.
+//
+// Hay tres copias de esta lista y ninguna puede leer a las otras: esta, la de
+// src/statuses.js (lo que ve el cliente) y el CHECK de `status` en
+// server/schema.sql, que es la última palabra. Agregar un estado son los tres
+// sitios más la migración que amplíe el CHECK sobre la base existente.
 const STATUSES = new Set(['recibido', 'presupuestado', 'en_taller', 'listo', 'entregado', 'cancelado']);
 const PHONE_RE = /^\+51[0-9]{9}$/;
 const EMAIL_RE = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;

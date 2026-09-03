@@ -38,29 +38,12 @@
     var API_MISSING_MESSAGE = "Este sitio se publicó sin la API detrás, así que el panel no tiene de dónde leer.";
     var NETWORK_MESSAGE = "No pudimos conectar con el servidor. Revisa que esté encendido.";
 
-    // Los mismos estados que la columna `status` de la tabla `requests` (ver
-    // server/schema.sql) y las mismas etiquetas que ve el cliente en la
-    // consulta por código (src/lookup.js). Si allí cambian, aquí también.
-    var STATUS_LABELS = {
-        recibido: "Recibida",
-        presupuestado: "Presupuestada",
-        en_taller: "En el taller",
-        listo: "Lista para recoger",
-        entregado: "Entregada",
-        cancelado: "Cancelada"
-    };
-    var STATUS_ORDER = ["recibido", "presupuestado", "en_taller", "listo", "entregado", "cancelado"];
-
-    // Los filtros van más cortos que las píldoras: en un botón de una fila de
-    // siete, «Lista para recoger» ocuparía el ancho de tres.
-    var FILTER_LABELS = {
-        recibido: "Recibidas",
-        presupuestado: "Presupuestadas",
-        en_taller: "En taller",
-        listo: "Listas",
-        entregado: "Entregadas",
-        cancelado: "Canceladas"
-    };
+    // Los estados, su orden y sus etiquetas viven en src/statuses.js, que esta
+    // página carga antes que este archivo. Son los mismos que admite la
+    // columna `status` de la tabla (ver server/schema.sql).
+    var STATUS_LABELS = window.AUTOCOLOR_STATUSES.LABELS;
+    var STATUS_ORDER = window.AUTOCOLOR_STATUSES.ORDER;
+    var FILTER_LABELS = window.AUTOCOLOR_STATUSES.FILTER_LABELS;
 
     var QUALITY_LABELS = {
         standard: "Económico",

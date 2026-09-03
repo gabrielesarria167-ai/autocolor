@@ -56,6 +56,11 @@ CREATE TABLE IF NOT EXISTS requests (
     email       text,
     notes       text,
 
+    -- Esta lista es la última palabra sobre los estados. Se repite en otros
+    -- dos sitios que no pueden leerla: STATUSES en server/server.js (valida lo
+    -- que entra por PATCH) y src/statuses.js (lo que ve el cliente). Agregar un
+    -- estado son esos dos más una migración que amplíe este CHECK, porque
+    -- CREATE TABLE IF NOT EXISTS no lo toca sobre una tabla que ya existe.
     status      text        NOT NULL DEFAULT 'recibido'
                             CHECK (status IN ('recibido', 'presupuestado', 'en_taller',
                                               'listo', 'entregado', 'cancelado')),

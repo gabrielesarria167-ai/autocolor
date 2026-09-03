@@ -42,17 +42,10 @@
         pickup: "Pickup"
     };
 
-    // Los estados que admite la columna `status` de la tabla `requests`. El
-    // taller los cambia desde su panel (pgs/taller.html); aquí solo se
-    // traducen a algo legible.
-    var STATUS_LABELS = {
-        recibido: "Recibida",
-        presupuestado: "Presupuestada",
-        en_taller: "En el taller",
-        listo: "Lista para recoger",
-        entregado: "Entregada",
-        cancelado: "Cancelada"
-    };
+    // Los estados y sus etiquetas viven en src/statuses.js, que esta página
+    // carga antes que este archivo. El taller los cambia desde su panel
+    // (pgs/taller.html); aquí solo se traducen a algo legible.
+    var STATUSES = window.AUTOCOLOR_STATUSES;
 
     function setError(message) {
         if (!errorEl) return;
@@ -66,7 +59,7 @@
         resultVehicle.textContent = car || VEHICLE_LABELS[request.vehicle] || request.vehicle;
         resultFirstName.textContent = request.firstName;
         resultLastName.textContent = request.lastName;
-        resultStatus.textContent = STATUS_LABELS[request.status] || request.status;
+        resultStatus.textContent = STATUSES.LABELS[request.status] || request.status;
         // El color del distintivo sale del estado en crudo (ver .status-pill
         // en styles.css), no de la etiqueta traducida.
         resultStatus.dataset.status = request.status;
