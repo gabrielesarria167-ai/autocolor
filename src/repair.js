@@ -3,7 +3,6 @@
     var TOTAL_STEPS = 4;
     var CONFIRM_LABELS = { 1: "Guardar y continuar", 4: "Enviar solicitud" };
     var current = 1;
-    var viewMode = "top";
     // `vehicle` ya no lo elige el cliente: sale de la carrocería del modelo
     // que escribe en el paso 1, y es la silueta 3D sobre la que elegirá las
     // piezas en el paso 3.
@@ -47,11 +46,6 @@
     var firstNameInput = document.getElementById("firstName");
     var lastNameInput = document.getElementById("lastName");
     var qualityCards = Array.prototype.slice.call(document.querySelectorAll(".quality-card"));
-    // Scoped to #carView2d: the 3D camera buttons (#carView3dButtons) reuse
-    var viewTabs = Array.prototype.slice.call(document.querySelectorAll("#carView2d .view-tab"));
-    var carView = document.getElementById("carView");
-
-    var carView2d = document.getElementById("carView2d");
     var carView3d = document.getElementById("carView3d");
     var carView3dCanvasWrap = document.getElementById("carView3dCanvasWrap");
     var carView3dCanvas = document.getElementById("carView3dCanvas");
@@ -72,31 +66,20 @@
     var navPanel = document.getElementById("navPanel");
 
     // ==================================================================
-    // Car part art — one set of panels per vehicle, per angle.
-    // Every panel carries a canonical part id shared across angles
-    // (e.g. "hood" appears in both the top view and the front view),
-    // so selecting it anywhere keeps every view in sync.
+    // Part names — the label the client reads for each panel they pick.
+    //
+    // The keys are the GLB node names, exactly as they come out of the three
+    // models (see VEHICLE_MODELS in carVisual.js). One flat map serves all
+    // three vehicles because every id they share names the same panel on
+    // each. A name missing here degrades to showing the raw node name
+    // (renderPartsSummary below), so renaming a node in carVisual.js without
+    // renaming it here is a silent downgrade, not an error.
     // ==================================================================
 
     var PART_LABELS = {
+        // Comunes a los tres modelos:
         "hood": "Capó",
         "roof": "Techo",
-        "trunk": "Maletero",
-        "front-bumper": "Parachoques delantero",
-        "rear-bumper": "Parachoques trasero",
-        "left-fender-front": "Guardabarros delantero izquierdo",
-        "left-fender-rear": "Guardabarros trasero izquierdo",
-        "right-fender-front": "Guardabarros delantero derecho",
-        "right-fender-rear": "Guardabarros trasero derecho",
-        "left-door-front": "Puerta delantera izquierda",
-        "left-door-rear": "Puerta trasera izquierda",
-        "right-door-front": "Puerta delantera derecha",
-        "right-door-rear": "Puerta trasera derecha",
-        // 3D viewer — the GLB node names of every paintable panel across
-        // the three models (see VEHICLE_MODELS in carVisual.js), distinct
-        // from the 2D ids above; hood/roof are reused as-is since they mean
-        // the same thing in both vocabularies. One flat map serves all three
-        // vehicles because every id they share names the same panel on each.
         // Only-on-the-SUV:
         "front_bumper": "Parachoques delantero",
         "tonneau": "Platón y portón",
@@ -127,185 +110,10 @@
         "rear_hatch": "Portón trasero"
     };
 
-    // Side-view lower body (bumper/fenders/doors) is shared across the
-    // three vehicles — only the roofline and wheel size change between
-    // them, which is what actually reads as "van" vs "wagon" vs "pickup"
-    // in profile.
-    var SIDE_LOWER_BODY = [
-        { id: "front-bumper", d: "M35 100 L50 100 L50 170 L35 170 A15 15 0 0 1 20 155 L20 115 A15 15 0 0 1 35 100 Z" },
-        { id: "fender-front", d: "M50 100 L110 100 L110 170 L50 170 Z" },
-        { id: "door-front", d: "M110 100 L200 100 L200 170 L110 170 Z" },
-        { id: "door-rear", d: "M200 100 L290 100 L290 170 L200 170 Z" },
-        { id: "fender-rear", d: "M290 100 L350 100 L350 170 L290 170 Z" },
-        { id: "rear-bumper", d: "M350 100 L365 100 A15 15 0 0 1 380 115 L380 155 A15 15 0 0 1 365 170 L350 170 Z" }
-    ];
-
-    // Front and rear silhouettes share the same bumper/fender shell per
-    // vehicle (only the hood/trunk lid on top differs), so it's defined
-    // once and reused for both angles.
-    var VAN_SHELL = {
-        bumper: "M20 150 L240 150 L240 178 A12 12 0 0 1 228 190 L32 190 A12 12 0 0 1 20 178 L20 150 Z",
-        leftFender: "M20 90 L70 90 L70 150 L20 150 Z",
-        rightFender: "M190 90 L240 90 L240 150 L190 150 Z"
-    };
-    var WAGON_SHELL = {
-        bumper: "M20 150 L240 150 L240 174 A16 16 0 0 1 224 190 L36 190 A16 16 0 0 1 20 174 L20 150 Z",
-        leftFender: "M20 95 L75 95 L75 150 L20 150 Z",
-        rightFender: "M185 95 L240 95 L240 150 L185 150 Z"
-    };
-    var SUV_SHELL = {
-        bumper: "M15 148 L245 148 L245 182 A10 10 0 0 1 235 192 L25 192 A10 10 0 0 1 15 182 L15 148 Z",
-        leftFender: "M15 85 L70 85 L70 148 L15 148 Z",
-        rightFender: "M190 85 L245 85 L245 148 L190 148 Z"
-    };
-
-    var CAR_ART = {
-        van: {
-            top: {
-                viewBox: "0 0 200 420",
-                parts: [
-                    { id: "hood", d: "M40 20 L160 20 A10 10 0 0 1 170 30 L170 110 L30 110 L30 30 A10 10 0 0 1 40 20 Z" },
-                    { id: "roof", d: "M30 110 L170 110 L170 290 L30 290 Z" },
-                    { id: "trunk", d: "M30 290 L170 290 L170 390 A10 10 0 0 1 160 400 L40 400 A10 10 0 0 1 30 390 L30 290 Z" }
-                ]
-            },
-            side: {
-                viewBox: "0 0 400 200",
-                parts: SIDE_LOWER_BODY.concat([
-                    { id: "roof", d: "M112 35 L288 35 A12 12 0 0 1 300 47 L300 100 L100 100 L100 47 A12 12 0 0 1 112 35 Z" }
-                ]),
-                wheels: [{ cx: 80, cy: 172, r: 22, hub: 8 }, { cx: 320, cy: 172, r: 22, hub: 8 }]
-            },
-            front: {
-                viewBox: "0 0 260 200",
-                parts: [
-                    { id: "front-bumper", d: VAN_SHELL.bumper },
-                    { id: "left-fender-front", d: VAN_SHELL.leftFender },
-                    { id: "right-fender-front", d: VAN_SHELL.rightFender },
-                    { id: "hood", d: "M80 50 L180 50 A10 10 0 0 1 190 60 L190 150 L70 150 L70 60 A10 10 0 0 1 80 50 Z" }
-                ]
-            },
-            rear: {
-                viewBox: "0 0 260 200",
-                parts: [
-                    { id: "rear-bumper", d: VAN_SHELL.bumper },
-                    { id: "left-fender-rear", d: VAN_SHELL.leftFender },
-                    { id: "right-fender-rear", d: VAN_SHELL.rightFender },
-                    { id: "trunk", d: "M80 65 L180 65 A10 10 0 0 1 190 75 L190 150 L70 150 L70 75 A10 10 0 0 1 80 65 Z" }
-                ]
-            }
-        },
-        wagon: {
-            top: {
-                viewBox: "0 0 200 420",
-                parts: [
-                    { id: "hood", d: "M58 20 L142 20 A28 28 0 0 1 170 48 L170 100 L30 100 L30 48 A28 28 0 0 1 58 20 Z" },
-                    { id: "roof", d: "M30 100 L170 100 L170 300 L30 300 Z" },
-                    { id: "trunk", d: "M30 300 L170 300 L170 382 A18 18 0 0 1 152 400 L48 400 A18 18 0 0 1 30 382 L30 300 Z" }
-                ]
-            },
-            side: {
-                viewBox: "0 0 400 200",
-                parts: SIDE_LOWER_BODY.concat([
-                    { id: "roof", d: "M145 55 L255 55 A25 25 0 0 1 280 80 L280 100 L120 100 L120 80 A25 25 0 0 1 145 55 Z" }
-                ]),
-                wheels: [{ cx: 80, cy: 172, r: 20, hub: 7 }, { cx: 320, cy: 172, r: 20, hub: 7 }]
-            },
-            front: {
-                viewBox: "0 0 260 200",
-                parts: [
-                    { id: "front-bumper", d: WAGON_SHELL.bumper },
-                    { id: "left-fender-front", d: WAGON_SHELL.leftFender },
-                    { id: "right-fender-front", d: WAGON_SHELL.rightFender },
-                    { id: "hood", d: "M97 65 L163 65 A22 22 0 0 1 185 87 L185 150 L75 150 L75 87 A22 22 0 0 1 97 65 Z" }
-                ]
-            },
-            rear: {
-                viewBox: "0 0 260 200",
-                parts: [
-                    { id: "rear-bumper", d: WAGON_SHELL.bumper },
-                    { id: "left-fender-rear", d: WAGON_SHELL.leftFender },
-                    { id: "right-fender-rear", d: WAGON_SHELL.rightFender },
-                    { id: "trunk", d: "M93 75 L167 75 A18 18 0 0 1 185 93 L185 150 L75 150 L75 93 A18 18 0 0 1 93 75 Z" }
-                ]
-            }
-        },
-        pickup: {
-            top: {
-                viewBox: "0 0 200 420",
-                parts: [
-                    { id: "hood", d: "M40 20 L160 20 A12 12 0 0 1 172 32 L172 115 L28 115 L28 32 A12 12 0 0 1 40 20 Z" },
-                    { id: "roof", d: "M28 115 L172 115 L172 285 L28 285 Z" },
-                    { id: "trunk", d: "M28 285 L172 285 L172 386 A14 14 0 0 1 158 400 L42 400 A14 14 0 0 1 28 386 L28 285 Z" }
-                ]
-            },
-            side: {
-                viewBox: "0 0 400 200",
-                parts: SIDE_LOWER_BODY.concat([
-                    { id: "roof", d: "M115 30 L285 30 A10 10 0 0 1 295 40 L295 100 L105 100 L105 40 A10 10 0 0 1 115 30 Z" }
-                ]),
-                wheels: [{ cx: 80, cy: 174, r: 25, hub: 9 }, { cx: 320, cy: 174, r: 25, hub: 9 }]
-            },
-            front: {
-                viewBox: "0 0 260 200",
-                parts: [
-                    { id: "front-bumper", d: SUV_SHELL.bumper },
-                    { id: "left-fender-front", d: SUV_SHELL.leftFender },
-                    { id: "right-fender-front", d: SUV_SHELL.rightFender },
-                    { id: "hood", d: "M78 42 L182 42 A8 8 0 0 1 190 50 L190 148 L70 148 L70 50 A8 8 0 0 1 78 42 Z" }
-                ]
-            },
-            rear: {
-                viewBox: "0 0 260 200",
-                parts: [
-                    { id: "rear-bumper", d: SUV_SHELL.bumper },
-                    { id: "left-fender-rear", d: SUV_SHELL.leftFender },
-                    { id: "right-fender-rear", d: SUV_SHELL.rightFender },
-                    { id: "trunk", d: "M78 58 L182 58 A8 8 0 0 1 190 66 L190 148 L70 148 L70 66 A8 8 0 0 1 78 58 Z" }
-                ]
-            }
-        }
-    };
-
-    function sidePartId(baseId, side) {
-        if (baseId === "fender-front" || baseId === "fender-rear" || baseId === "door-front" || baseId === "door-rear") {
-            return side + "-" + baseId;
-        }
-        return baseId;
-    }
-
-    function buildPartsSvg(view, parts, wheels, mirrored) {
-        var svg = '<svg viewBox="' + view.viewBox + '" class="car-svg' + (mirrored ? " is-mirrored" : "") + '">';
-        parts.forEach(function (p) {
-            var label = PART_LABELS[p.id] || p.id;
-            svg += '<path class="car-part" data-part="' + p.id + '" d="' + p.d + '" ' +
-                'role="button" tabindex="0" aria-pressed="false" aria-label="' + label + '"></path>';
-        });
-        if (wheels) {
-            wheels.forEach(function (w) {
-                svg += '<circle class="car-wheel" cx="' + w.cx + '" cy="' + w.cy + '" r="' + w.r + '"></circle>';
-                svg += '<circle class="car-wheel-hub" cx="' + w.cx + '" cy="' + w.cy + '" r="' + w.hub + '"></circle>';
-            });
-        }
-        svg += "</svg>";
-        return svg;
-    }
-
-    function syncPartState(id) {
-        if (!carView) return;
-        var selected = state.parts.indexOf(id) !== -1;
-        var matches = carView.querySelectorAll('.car-part[data-part="' + id + '"]');
-        Array.prototype.slice.call(matches).forEach(function (el) {
-            el.classList.toggle("is-selected", selected);
-            el.setAttribute("aria-pressed", selected ? "true" : "false");
-        });
-    }
-
     function toggleCarPart(id) {
         var idx = state.parts.indexOf(id);
         if (idx === -1) state.parts.push(id);
         else state.parts.splice(idx, 1);
-        syncPartState(id);
         if (car3d) car3d.refreshSelection();
         renderPartsSummary();
         refreshConfirm();
@@ -353,7 +161,6 @@
     if (carView3dClear) {
         carView3dClear.addEventListener("click", function () {
             if (!state.parts.length) return;
-            state.parts.forEach(function (id) { syncPartState(id); });
             state.parts = [];
             if (car3d) car3d.refreshSelection();
             renderPartsSummary();
@@ -448,64 +255,6 @@
             showCar3DError("No se pudo cargar el visor 3D. Intenta recargar la página.");
         });
     }
-
-    function wireCarParts() {
-        Array.prototype.slice.call(carView.querySelectorAll(".car-part")).forEach(function (el) {
-            var id = el.dataset.part;
-            var selected = state.parts.indexOf(id) !== -1;
-            el.classList.toggle("is-selected", selected);
-            el.setAttribute("aria-pressed", selected ? "true" : "false");
-            el.addEventListener("click", function () { toggleCarPart(id); });
-            el.addEventListener("keydown", function (e) {
-                if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    toggleCarPart(id);
-                }
-            });
-        });
-    }
-
-    function renderCarView() {
-        if (!carView) return;
-        var vehicle = state.vehicle || "van";
-        var art = CAR_ART[vehicle];
-        var html;
-
-        if (viewMode === "side") {
-            var leftParts = art.side.parts.map(function (p) { return { id: sidePartId(p.id, "left"), d: p.d }; });
-            var rightParts = art.side.parts.map(function (p) { return { id: sidePartId(p.id, "right"), d: p.d }; });
-            html = '<div class="car-view__pair">' +
-                '<div class="car-view__slot"><span class="car-view__label">Izquierda</span>' +
-                buildPartsSvg(art.side, leftParts, art.side.wheels, false) + "</div>" +
-                '<div class="car-view__slot"><span class="car-view__label">Derecha</span>' +
-                buildPartsSvg(art.side, rightParts, art.side.wheels, true) + "</div>" +
-                "</div>";
-        } else if (viewMode === "front") {
-            html = '<div class="car-view__pair">' +
-                '<div class="car-view__slot"><span class="car-view__label">Frente</span>' +
-                buildPartsSvg(art.front, art.front.parts, null, false) + "</div>" +
-                '<div class="car-view__slot"><span class="car-view__label">Atrás</span>' +
-                buildPartsSvg(art.rear, art.rear.parts, null, false) + "</div>" +
-                "</div>";
-        } else {
-            html = buildPartsSvg(art.top, art.top.parts, null, false);
-        }
-
-        carView.innerHTML = html;
-        wireCarParts();
-    }
-
-    viewTabs.forEach(function (tab) {
-        tab.addEventListener("click", function () {
-            viewMode = tab.dataset.view;
-            viewTabs.forEach(function (t) {
-                var active = t === tab;
-                t.classList.toggle("is-active", active);
-                t.setAttribute("aria-selected", active ? "true" : "false");
-            });
-            renderCarView();
-        });
-    });
 
     // ==================================================================
     // Wizard navigation
@@ -732,13 +481,6 @@
         }
         populateProvinceOptions("");
 
-        viewMode = "top";
-        viewTabs.forEach(function (t) {
-            var active = t.dataset.view === "top";
-            t.classList.toggle("is-active", active);
-            t.setAttribute("aria-selected", active ? "true" : "false");
-        });
-        if (carView) carView.innerHTML = "";
 
         if (carView3d) carView3d.hidden = true;
         renderPartsSummary();

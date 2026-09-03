@@ -462,89 +462,6 @@ svg {
     color: var(--text-dim);
 }
 
-/* ===== Car part view (step 3) ===== */
-.car-view {
-    display: flex;
-    justify-content: center;
-    margin-bottom: 18px;
-    min-height: 160px;
-}
-
-.car-view>.car-svg {
-    max-width: 230px;
-    margin: 0 auto;
-}
-
-.car-view__pair {
-    display: flex;
-    gap: 16px;
-    width: 100%;
-    justify-content: center;
-    flex-wrap: wrap;
-}
-
-.car-view__slot {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 6px;
-    flex: 1;
-    min-width: 130px;
-    max-width: 250px;
-}
-
-.car-view__label {
-    font-size: 0.72rem;
-    font-weight: 600;
-    color: var(--text-dim);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-}
-
-.car-svg {
-    width: 100%;
-    height: auto;
-    overflow: visible;
-}
-
-.car-svg.is-mirrored {
-    transform: scaleX(-1);
-}
-
-.car-part {
-    fill: #ffffff;
-    stroke: #1c1a17;
-    stroke-width: 2.5;
-    stroke-linejoin: round;
-    cursor: pointer;
-    transition: fill 0.15s var(--ease-out);
-}
-
-.car-part:hover {
-    fill: #f2f0e8;
-}
-
-.car-part:focus-visible {
-    outline: 2px solid var(--focus);
-    outline-offset: 1px;
-}
-
-.car-part.is-selected {
-    fill: var(--paint-red);
-}
-
-.car-wheel {
-    fill: #2a2a2a;
-    stroke: #1c1a17;
-    stroke-width: 2;
-    pointer-events: none;
-}
-
-.car-wheel-hub {
-    fill: #6b6f78;
-    pointer-events: none;
-}
-
 .view-tabs {
     display: flex;
     gap: 8px;
@@ -712,7 +629,6 @@ svg {
 
 /* ===== 3D car view (step 3, every vehicle) ===== */
 
-.car-view-2d[hidden],
 .car-view-3d[hidden] {
     display: none;
 }
@@ -1194,10 +1110,6 @@ svg {
     .field textarea,
     .phone-input {
         border-width: 2px;
-    }
-
-    .car-part {
-        stroke-width: 3.5;
     }
 }
 /* ==========================================================================
