@@ -47,6 +47,42 @@ const HOST = process.env.HOST || '127.0.0.1';
 const ROOT = path.join(__dirname, '..');
 const MAX_BODY_BYTES = 32 * 1024;
 
+// Lo que este servidor no sirve nunca, pase lo que pase.
+//
+// ROOT es la raíz del repositorio, así que sin esta lista `GET /.env` devuelve
+// el archivo con la contraseña del taller dentro, y `/server/auth.js` o
+// `/.git/config` se leen igual de fácil. Que hoy no se note es solo porque se
+// escucha en 127.0.0.1 (ver HOST arriba) — y el README recomienda 0.0.0.0 para
+// probar desde el móvil, que es justo cuando dejaría de no notarse.
+//
+// Es el equivalente para este servidor de lo que _config.yml hace para GitHub
+// Pages; ninguno de los dos sustituye al otro.
+const DENY_PREFIXES = [
+    '/.env',
+    '/.git/',
+    '/.gitignore',
+    '/.claude/',
+    '/server/',
+    '/node_modules/',
+    '/package.json',
+    '/package-lock.json',
+    '/_config.yml',
+];
+
+// De ruta absoluta en disco a ruta dentro del repositorio, siempre con '/'
+// aunque el sistema use otro separador.
+function repoPath(filePath) {
+    return '/' + path.relative(ROOT, filePath).split(path.sep).join('/');
+}
+
+// 404 y no 403: un 403 confirma que el archivo está ahí, que es justo lo que no
+// hace falta decirle a quien va probando nombres.
+function isDenied(pathname) {
+    return DENY_PREFIXES.some((prefix) => (
+        prefix.endsWith('/') ? pathname.startsWith(prefix) : pathname === prefix
+    ));
+}
+
 // Orígenes que pueden llamar a la API desde otro dominio, separados por comas:
 //
 //     ALLOWED_ORIGINS=https://gabrielesarria167-ai.github.io npm start
@@ -254,6 +290,16 @@ function readJsonBody(req) {
     });
 }
 
+// JSON.parse('null'), 'true' o '3' son JSON válido pero no un objeto, y leerles
+// una propiedad lanza TypeError: un 500 donde el cliente mandó algo mal. Es el
+// mismo guardia que validateRequest ya hace para el formulario público.
+function requireObject(body) {
+    if (body === null || typeof body !== 'object' || Array.isArray(body)) {
+        throw new BadRequest('El cuerpo de la petición no es válido.');
+    }
+    return body;
+}
+
 const MIME = {
     '.html': 'text/html; charset=utf-8',
     '.css': 'text/css; charset=utf-8',
@@ -271,13 +317,29 @@ const MIME = {
 };
 
 async function serveStatic(req, res, pathname) {
-    const decoded = decodeURIComponent(pathname);
+    // Un porcentaje suelto ('/%', '/%zz') hace que decodeURIComponent lance
+    // URIError. Sin esto sube hasta el catch general y sale un 500 con su
+    // rastro en el registro, cuando lo que hubo fue una dirección mal escrita.
+    let decoded;
+    try {
+        decoded = decodeURIComponent(pathname);
+    } catch {
+        throw new BadRequest('La dirección no es válida.');
+    }
+
     const filePath = path.join(ROOT, decoded === '/' ? 'index.html' : decoded);
 
     // path.join ya resuelve los '..', pero un '..' de más saldría de la carpeta
     // del proyecto y serviría cualquier archivo del disco: hay que comprobarlo.
     if (filePath !== ROOT && !filePath.startsWith(ROOT + path.sep)) {
         res.writeHead(403).end('Prohibido');
+        return;
+    }
+
+    // La lista se comprueba sobre la ruta ya resuelta y no sobre la que llegó:
+    // '/server/../.env' no empieza por '/.env', pero apunta ahí igual.
+    if (isDenied(repoPath(filePath))) {
+        res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }).end('No encontrado');
         return;
     }
 
@@ -360,7 +422,7 @@ async function handleStaff(req, res, pathname, ip) {
         if (!rateLimit(`login:${ip}`, 5)) {
             return sendJson(res, 429, { error: 'Demasiados intentos. Espera un minuto.' });
         }
-        const body = await readJsonBody(req);
+        const body = requireObject(await readJsonBody(req));
         if (!auth.verifyPassword(body.password)) {
             console.warn(`[taller] intento fallido desde ${ip}`);
             return sendJson(res, 401, { error: 'Contraseña incorrecta.' });
@@ -386,7 +448,7 @@ async function handleStaff(req, res, pathname, ip) {
         const match = STAFF_PATH.exec(pathname);
         if (match) {
             requireStaff(req);
-            const body = await readJsonBody(req);
+            const body = requireObject(await readJsonBody(req));
             if (!STATUSES.has(body.status)) throw new BadRequest('El estado no es válido.');
             const updated = await updateRequestStatus(match[1], body.status);
             if (!updated) {
@@ -481,6 +543,22 @@ async function start() {
         console.error('    npm run db:start        # o  npm run db:init  la primera vez\n');
         process.exit(1);
     }
+    // El puerto ocupado es el tropiezo más común al arrancar, y sin esto sale
+    // como excepción no capturada con su rastro entero. Mismo trato que se le da
+    // más arriba a la base que no responde.
+    server.on('error', (err) => {
+        if (err.code === 'EADDRINUSE') {
+            console.error(`\nEl puerto ${PORT} ya está ocupado por otro proceso.`);
+            console.error('\nPara ver cuál es y liberarlo:\n');
+            console.error(`    lsof -nP -iTCP:${PORT} -sTCP:LISTEN`);
+            console.error('    kill <PID>\n');
+            console.error(`O arranca en otro puerto:  PORT=3001 npm start\n`);
+        } else {
+            console.error(`\nNo se pudo abrir el servidor: ${err.message}\n`);
+        }
+        process.exit(1);
+    });
+
     server.listen(PORT, HOST, () => {
         console.log(`Autocolor en http://localhost:${PORT}`);
         console.log(`Base de datos: ${process.env.PGDATABASE || 'autocolor'}`);

@@ -26,6 +26,17 @@ const pool = new Pool({
     connectionTimeoutMillis: 5_000,
 });
 
+// node-postgres emite 'error' en el pool cuando se cae una conexión que estaba
+// ociosa —Postgres reiniciado, la red cortada, el servidor reciclándola—. En
+// Node un 'error' de un EventEmitter sin escucha es una excepción no capturada,
+// así que sin estas líneas basta un reinicio de la base para matar el proceso.
+//
+// No se relanza a propósito: la conexión rota ya la descarta el pool solo, y la
+// siguiente consulta abrirá otra. Lo único que hace falta es que quede escrito.
+pool.on('error', (err) => {
+    console.error('[db] conexión ociosa perdida:', err.message);
+});
+
 // Un código de exactamente 10 dígitos, sin cero inicial para que siempre se
 // muestre con sus 10 cifras. Al azar y no correlativo: el código es la única
 // credencial para consultar una solicitud, y uno correlativo dejaría leer los
