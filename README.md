@@ -86,7 +86,7 @@ lo abre a propósito, por ejemplo para probar el sitio desde el móvil.
 | `_config.yml` | Qué no se publica en GitHub Pages |
 | `server/pgserver.sh` | Crea y controla el servidor Postgres propio |
 | `server/schema.sql` | Tabla `requests` + consultas útiles para el taller |
-| `imgs/assets/3d-visuals/` | Modelos `.glb` y las páginas donde se prepararon |
+| `imgs/assets/3d-visuals/` | Modelos `.glb` servidos y las páginas donde se prepararon |
 
 ## Publicar el sitio
 
@@ -137,6 +137,27 @@ Lo que queda fuera de la publicación:
 
 Excluir la página la **esconde, no la cierra**: lo que protege los datos sigue
 siendo la contraseña de la API (`server/auth.js`).
+
+## Fuentes de los modelos 3D
+
+Los `.glb` que están versionados son los que sirve el sitio. Sus fuentes —los
+`.blend` de Blender y los `.glb` sin comprimir— **se quedan en la máquina y no
+en el repositorio**:
+
+| Qué | Dónde | En git |
+|---|---|---|
+| Modelo servido | `imgs/assets/3d-visuals/<modelo>/<modelo>.glb` | sí |
+| `.glb` sin comprimir | `imgs/assets/3d-visuals/<modelo>/src/` | no |
+| Archivo de Blender | junto al modelo, `*.blend` | no |
+
+No están fuera por capricho: pesan cientos de MB, no se sirven nunca, y GitHub
+Pages publica todo lo que esté versionado. Quien clone el repositorio puede
+correr el sitio sin ellos; para volver a exportar un modelo hacen falta los
+originales, que son tuyos y no viajan.
+
+Sacarlos de git detiene el crecimiento, pero **no encoge la historia**: lo que
+ya se subió sigue ahí. Vaciarla del todo necesita `git filter-repo` y un push
+forzado, que es una decisión aparte.
 
 ## El catálogo de vehículos
 

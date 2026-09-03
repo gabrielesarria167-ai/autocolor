@@ -2,3 +2,10 @@ node_modules/
 .DS_Store
 *.log
 .env
+
+# Fuentes 3D. Los .blend y los .glb sin comprimir se quedan en el disco pero
+# no en el repositorio: no se sirven nunca, pesan cientos de MB y GitHub Pages
+# publica todo lo versionado. Ver README, "Fuentes de los modelos 3D".
+*.blend
+*.blend1
+imgs/assets/3d-visuals/**/src/
