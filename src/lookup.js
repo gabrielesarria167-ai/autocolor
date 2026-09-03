@@ -43,7 +43,8 @@
     };
 
     // Los estados que admite la columna `status` de la tabla `requests`. El
-    // taller los cambia desde la base; aquí solo se traducen a algo legible.
+    // taller los cambia desde su panel (pgs/taller.html); aquí solo se
+    // traducen a algo legible.
     var STATUS_LABELS = {
         recibido: "Recibida",
         presupuestado: "Presupuestada",

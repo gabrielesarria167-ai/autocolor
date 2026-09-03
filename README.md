@@ -57,7 +57,10 @@ Todo se puede reubicar con variables de entorno —`AUTOCOLOR_PGDATA`,
 `AUTOCOLOR_PGPORT`, `AUTOCOLOR_PG_BIN`, `AUTOCOLOR_PGDATABASE`— y la
 aplicación acepta las `PG*` de libpq (`PGHOST`, `PGPORT`, `PGUSER`,
 `PGPASSWORD`, `PGDATABASE`) por si en producción la base está en otro lado.
-`PORT` cambia el puerto del sitio.
+`PORT` cambia el puerto del sitio. El servidor escucha solo en `127.0.0.1`,
+porque detrás de la API hay teléfonos de clientes y no corresponde que
+aparezcan en la red del local por tener el servidor encendido; `HOST=0.0.0.0`
+lo abre a propósito, por ejemplo para probar el sitio desde el móvil.
 
 ## Cómo está organizado
 
@@ -67,11 +70,13 @@ aplicación acepta las `PG*` de libpq (`PGHOST`, `PGPORT`, `PGUSER`,
 | `pgs/repair.html`, `src/repair.js` | Asistente de cotización |
 | `src/carVisual.js` | Visor 3D del paso 3 (three.js, un modelo por vehículo) |
 | `src/lookup.js` | Consulta de una solicitud por su código |
+| `pgs/taller.html`, `src/staff.js` | Panel del taller: la cola de trabajo y el cambio de estado |
 | `src/cities.js` | Departamentos y provincias del Perú |
 | `styles.css` | Todos los estilos del sitio |
 | `server/server.js` | Sirve el sitio y la API |
 | `src/config.js` | A qué servidor le habla el sitio |
 | `server/db.js` | Acceso a Postgres |
+| `server/auth.js` | La contraseña y las sesiones del panel del taller |
 | `server/pgserver.sh` | Crea y controla el servidor Postgres propio |
 | `server/schema.sql` | Tabla `requests` + consultas útiles para el taller |
 | `imgs/assets/3d-visuals/` | Modelos `.glb` y las páginas donde se prepararon |
@@ -169,10 +174,40 @@ La consulta devuelve solo eso: el código circula en mensajes y papeles, así
 que no debería alcanzar para sacar el teléfono, el correo ni las notas de un
 cliente.
 
+Las del panel del taller, todas detrás de la contraseña compartida:
+
+| Ruta | Qué hace |
+| --- | --- |
+| `POST /api/staff/login` | Abre sesión con la contraseña del taller |
+| `POST /api/staff/logout` | La cierra |
+| `GET /api/staff/requests?status=` | La cola de trabajo, opcionalmente por estado |
+| `PATCH /api/staff/requests/:id` | Cambia el estado de una solicitud |
+
 ## El día a día del taller
 
-Las solicitudes llegan a la tabla `requests` de la base `autocolor`. Para
-verlas y para mover una de estado:
+Las solicitudes llegan a la tabla `requests` de la base `autocolor`, y el
+taller las trabaja desde **`/pgs/taller.html`**: la lista completa —código,
+fecha, cliente, teléfono, vehículo, placa, piezas y acabado— con un
+desplegable por fila para mover el estado.
+
+El panel solo existe si el servidor arranca con la contraseña del taller:
+
+```bash
+AUTOCOLOR_STAFF_PASSWORD='la-del-taller' npm start
+```
+
+Sin ella las rutas `/api/staff/*` responden `503` y el panel queda apagado,
+que es lo que debe pasar si alguien se olvida de configurarlo. La contraseña
+se comprueba en el servidor, no en el navegador: `pgs/taller.html` es un
+archivo estático como cualquier otro y su código lo lee todo el mundo, así
+que lo que está cerrado es la API. La sesión es una cookie `HttpOnly` de ocho
+horas que vive en la memoria del proceso, de modo que reiniciar el servidor
+obliga a entrar de nuevo. Detrás de https hay que añadir
+`AUTOCOLOR_STAFF_COOKIE_SECURE=1`.
+
+El panel **no funciona en GitHub Pages**: ahí no hay API que consultar.
+
+Todo esto también se puede hacer a mano desde psql:
 
 ```sql
 SELECT id, created_at::date, first_name || ' ' || last_name AS cliente,

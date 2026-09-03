@@ -8,11 +8,19 @@
      POST /api/requests      guarda una solicitud y devuelve su código
      GET  /api/requests/:id  consulta una solicitud por código
 
+   Y las del panel del taller (pgs/taller.html), todas detrás de la contraseña
+   compartida que se configura en server/auth.js:
+
+     POST  /api/staff/login        abre sesión
+     POST  /api/staff/logout       la cierra
+     GET   /api/staff/requests     lista la cola de trabajo
+     PATCH /api/staff/requests/:id cambia el estado de una solicitud
+
    Sin framework a propósito: el sitio es HTML y JS a secas, y el servidor
-   necesita dos rutas y archivos estáticos. La única dependencia es `pg`.
+   necesita un puñado de rutas y archivos estáticos. La única dependencia es `pg`.
 
        npm install
-       npm run db:init           # crea y levanta el Postgres propio (puerto 5433)
+       npm run db:init           # crea y levanta el Postgres propio (puerto 5434)
        npm start                 # http://localhost:3000
 
    PORT cambia el puerto del sitio. La base vive en su propio servidor
@@ -23,9 +31,15 @@ const http = require('node:http');
 const fs = require('node:fs');
 const fsp = require('node:fs/promises');
 const path = require('node:path');
-const { createRequest, findRequest, ping, pool } = require('./db');
+const { createRequest, findRequest, listRequests, updateRequestStatus, ping, pool } = require('./db');
+const auth = require('./auth');
 
 const PORT = Number(process.env.PORT) || 3000;
+
+// Loopback por omisión: detrás de /api/staff hay teléfonos de clientes, y no
+// corresponde que aparezcan solos en la red del local por estar el servidor
+// encendido. HOST=0.0.0.0 lo abre a la red a propósito (probar desde el móvil).
+const HOST = process.env.HOST || '127.0.0.1';
 const ROOT = path.join(__dirname, '..');
 const MAX_BODY_BYTES = 32 * 1024;
 
@@ -60,6 +74,9 @@ const YEAR_MIN = 1980;
 const YEAR_MAX = new Date().getFullYear() + 1;
 const MAX_MILEAGE = 2_000_000;
 const QUALITIES = new Set(['standard', 'premium', 'custom']);
+// Los estados por los que el taller mueve una solicitud. Refleja el CHECK de
+// `status` en server/schema.sql: si allí se agrega uno, aquí también.
+const STATUSES = new Set(['recibido', 'presupuestado', 'en_taller', 'listo', 'entregado', 'cancelado']);
 const PHONE_RE = /^\+51[0-9]{9}$/;
 const EMAIL_RE = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 const PART_RE = /^[A-Za-z0-9_]{1,40}$/;
@@ -149,10 +166,18 @@ function validateRequest(body) {
     };
 }
 
-class BadRequest extends Error {
-    constructor(message) {
+// Errores que sí se le cuentan al cliente, con su código. Cualquier otro se
+// convierte en un 500 genérico (ver el catch del servidor).
+class HttpError extends Error {
+    constructor(status, message) {
         super(message);
-        this.status = 400;
+        this.status = status;
+    }
+}
+
+class BadRequest extends HttpError {
+    constructor(message) {
+        super(400, message);
     }
 }
 
@@ -294,7 +319,7 @@ function applyCors(req, res) {
         // El origen permitido depende de la cabecera Origin, así que las
         // cachés intermedias tienen que saber que la respuesta varía con ella.
         res.setHeader('Vary', 'Origin');
-        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS');
         res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
         res.setHeader('Access-Control-Max-Age', '86400');
     }
@@ -307,9 +332,77 @@ function applyCors(req, res) {
     return false;
 }
 
+const STAFF_PATH = /^\/api\/staff\/requests\/([0-9]{10})$/;
+
+// Todas las rutas del panel pasan por aquí. Sin contraseña configurada no hay
+// panel: responder 503 y no 401 distingue «este servidor no lo tiene» de «tu
+// sesión venció», que es lo que necesita saber quien lo está montando.
+function requireStaff(req) {
+    if (!auth.isConfigured()) {
+        throw new HttpError(503, 'El panel del taller no está configurado en este servidor.');
+    }
+    if (!auth.readSession(req)) {
+        throw new HttpError(401, 'Inicia sesión para ver el panel.');
+    }
+}
+
+async function handleStaff(req, res, pathname, ip) {
+    if (pathname === '/api/staff/login' && req.method === 'POST') {
+        if (!auth.isConfigured()) {
+            return sendJson(res, 503, { error: 'El panel del taller no está configurado en este servidor.' });
+        }
+        // Cinco intentos por minuto: con una sola contraseña compartida, el
+        // límite es lo que hace inviable probarlas a ciegas.
+        if (!rateLimit(`login:${ip}`, 5)) {
+            return sendJson(res, 429, { error: 'Demasiados intentos. Espera un minuto.' });
+        }
+        const body = await readJsonBody(req);
+        if (!auth.verifyPassword(body.password)) {
+            console.warn(`[taller] intento fallido desde ${ip}`);
+            return sendJson(res, 401, { error: 'Contraseña incorrecta.' });
+        }
+        res.setHeader('Set-Cookie', auth.cookieHeader(auth.createSession()));
+        return sendJson(res, 200, { ok: true });
+    }
+
+    if (pathname === '/api/staff/logout' && req.method === 'POST') {
+        auth.destroySession(auth.readToken(req));
+        res.setHeader('Set-Cookie', auth.clearCookieHeader());
+        return res.writeHead(204).end();
+    }
+
+    if (pathname === '/api/staff/requests' && req.method === 'GET') {
+        requireStaff(req);
+        const wanted = new URL(req.url, 'http://localhost').searchParams.get('status');
+        if (wanted && !STATUSES.has(wanted)) throw new BadRequest('El estado no es válido.');
+        return sendJson(res, 200, { requests: await listRequests({ status: wanted }) });
+    }
+
+    if (req.method === 'PATCH') {
+        const match = STAFF_PATH.exec(pathname);
+        if (match) {
+            requireStaff(req);
+            const body = await readJsonBody(req);
+            if (!STATUSES.has(body.status)) throw new BadRequest('El estado no es válido.');
+            const updated = await updateRequestStatus(match[1], body.status);
+            if (!updated) {
+                return sendJson(res, 404, { error: 'No encontramos ninguna solicitud con ese código.' });
+            }
+            console.log(`[taller] ${updated.id} -> ${updated.status}`);
+            return sendJson(res, 200, updated);
+        }
+    }
+
+    return sendJson(res, 404, { error: 'Ruta no encontrada.' });
+}
+
 async function handleApi(req, res, pathname) {
     const ip = req.socket.remoteAddress || 'desconocida';
     if (applyCors(req, res)) return;
+
+    if (pathname.startsWith('/api/staff/')) {
+        return handleStaff(req, res, pathname, ip);
+    }
 
     if (req.method === 'POST' && pathname === '/api/requests') {
         if (!rateLimit(`post:${ip}`, 10)) {
@@ -357,7 +450,7 @@ const server = http.createServer(async (req, res) => {
         }
         sendJson(res, 405, { error: 'Método no permitido.' });
     } catch (err) {
-        if (err instanceof BadRequest) {
+        if (err instanceof HttpError) {
             sendJson(res, err.status, { error: err.message });
             return;
         }
@@ -384,9 +477,12 @@ async function start() {
         console.error('    npm run db:start        # o  npm run db:init  la primera vez\n');
         process.exit(1);
     }
-    server.listen(PORT, () => {
+    server.listen(PORT, HOST, () => {
         console.log(`Autocolor en http://localhost:${PORT}`);
         console.log(`Base de datos: ${process.env.PGDATABASE || 'autocolor'}`);
+        console.log(auth.isConfigured()
+            ? 'Panel del taller: /pgs/taller.html'
+            : 'Panel del taller: apagado (falta AUTOCOLOR_STAFF_PASSWORD)');
         if (ALLOWED_ORIGINS.size > 0) {
             console.log(`Orígenes permitidos: ${[...ALLOWED_ORIGINS].join(', ')}`);
         }

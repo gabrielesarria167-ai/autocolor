@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#e1dcbf">
+    <meta name="robots" content="noindex, nofollow">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="../styles.css">
+    <script src="../src/config.js" defer></script>
+    <script src="../src/staff.js" defer></script>
+    <title>Autocolor · Taller</title>
+</head>
+
+<!-- Página interna: sin la cabecera ni el menú del sitio público. Se entra por
+     la dirección directa y lo que la protege es la contraseña que pide la API,
+     no el hecho de que no esté enlazada. -->
+
+<body class="staff">
+
+    <main class="staff-page" id="staffApp">
+        <header class="staff-page__head">
+            <h1>Autocolor · Taller</h1>
+            <p class="staff-page__lede">Monitorea aquí las solicitudes recibidas y actualiza su estado.</p>
+        </header>
+
+        <p class="staff-loading" id="staffLoading">Cargando…</p>
+
+        <section class="lookup staff-login" id="staffLogin" aria-labelledby="staffLoginTitle" hidden>
+            <div class="lookup__head">
+                <h2 id="staffLoginTitle">Acceso del taller</h2>
+                <p>Ingresa la contraseña del taller para ver las solicitudes.</p>
+            </div>
+
+            <form class="lookup__form" id="staffLoginForm" novalidate>
+                <div class="field">
+                    <label for="staffPassword">Contraseña</label>
+                    <input type="password" id="staffPassword" name="staffPassword" autocomplete="current-password"
+                        aria-describedby="staffError" required>
+                </div>
+                <button type="submit" class="lookup__submit" id="staffLoginSubmit">Entrar</button>
+            </form>
+        </section>
+
+        <section class="staff-panel" id="staffPanel" aria-labelledby="staffPanelTitle" hidden>
+            <div class="staff-toolbar">
+                <h2 id="staffPanelTitle" class="staff-toolbar__title">Solicitudes</h2>
+                <div class="field staff-toolbar__filter">
+                    <label for="staffFilter">Estado</label>
+                    <select id="staffFilter">
+                        <option value="">Todos</option>
+                        <option value="recibido">Recibido</option>
+                        <option value="presupuestado">Presupuestado</option>
+                        <option value="en_taller">En taller</option>
+                        <option value="listo">Listo</option>
+                        <option value="entregado">Entregado</option>
+                        <option value="cancelado">Cancelado</option>
+                    </select>
+                </div>
+                <button type="button" class="btn btn--ghost btn--sm staff-toolbar__logout" id="staffLogout">Salir</button>
+            </div>
+
+            <p class="staff-count" id="staffCount"></p>
+
+            <!-- En pantalla angosta la tabla se desplaza dentro de su caja en
+                 vez de reordenarse: son nueve columnas y todas se leen mejor en
+                 fila. -->
+            <div class="staff-table__scroll">
+                <table class="staff-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Código</th>
+                            <th scope="col">Fecha</th>
+                            <th scope="col">Cliente</th>
+                            <th scope="col">Teléfono</th>
+                            <th scope="col">Vehículo</th>
+                            <th scope="col">Placa</th>
+                            <th scope="col">Piezas</th>
+                            <th scope="col">Acabado</th>
+                            <th scope="col">Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody id="staffRows"></tbody>
+                </table>
+            </div>
+
+            <p class="staff-empty" id="staffEmpty" hidden>No hay solicitudes con ese estado.</p>
+        </section>
+
+        <p class="form-error" id="staffError" role="alert" hidden></p>
+    </main>
+
+</body>
+
+</html>

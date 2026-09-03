@@ -3098,3 +3098,156 @@ body.wizard {
     border-color: rgba(229, 53, 43, 0.3);
     color: #a5241d;
 }
+
+
+/* =============================================================================
+   Panel del taller (pgs/taller.html)
+
+   Es una herramienta interna, no una página del sitio: no lleva la cabecera ni
+   el menú, así que trae su propio envoltorio. Todo lo demás —tarjeta de
+   acceso, campos, botones, píldoras de estado— se reutiliza tal cual.
+   ========================================================================== */
+
+.staff-page {
+    max-width: var(--shell);
+    margin: 0 auto;
+    padding: 40px 20px 64px;
+}
+
+.staff-page__head {
+    margin-bottom: 28px;
+}
+
+.staff-page h1 {
+    font-family: var(--font-display);
+    font-size: clamp(1.6rem, 4vw, 2.1rem);
+    line-height: 1.2;
+}
+
+.staff-page__lede {
+    margin-top: 6px;
+    color: var(--text-dim);
+}
+
+.staff-loading {
+    color: var(--text-faint);
+}
+
+.staff-login {
+    margin: 0;
+}
+
+.staff-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 16px;
+    margin-bottom: 8px;
+}
+
+.staff-toolbar__title {
+    font-family: var(--font-display);
+    font-size: 1.2rem;
+    margin-right: auto;
+}
+
+.staff-toolbar__filter {
+    min-width: 180px;
+}
+
+.staff-count,
+.staff-empty {
+    margin: 0 0 12px;
+    font-size: 0.85rem;
+    color: var(--text-faint);
+}
+
+/* Ocho columnas no caben en un teléfono. En vez de reordenarlas en tarjetas,
+   la tabla se desplaza dentro de su caja: se lee igual y es una regla en vez
+   de veinte. */
+.staff-table__scroll {
+    overflow-x: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+}
+
+.staff-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+}
+
+/* Solo las columnas que se leen de corrido —código, fecha, teléfono, placa—
+   se niegan a partirse. El nombre y el vehículo sí pueden repartirse en dos
+   líneas, y así la tabla entra entera en una pantalla de escritorio en vez de
+   pedir scroll por doscientos píxeles. */
+.staff-table th,
+.staff-table__nowrap,
+.staff-table__code {
+    white-space: nowrap;
+}
+
+.staff-table th {
+    padding: 12px 14px;
+    background: var(--surface-tint);
+    border-bottom: 1px solid var(--border-strong);
+    text-align: left;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-dim);
+}
+
+.staff-table td {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+}
+
+.staff-table tr:last-child td {
+    border-bottom: 0;
+}
+
+.staff-table tbody tr:hover {
+    background: var(--surface-tint);
+}
+
+.staff-table__code {
+    font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+    letter-spacing: 0.06em;
+}
+
+/* La píldora dice el estado de un vistazo; el desplegable, debajo, es el que
+   lo cambia. Los dos juntos evitan tener que leer la opción seleccionada para
+   saber en qué punto va la solicitud. */
+.staff-status__select {
+    display: block;
+    margin-top: 6px;
+    padding: 5px 8px;
+    max-width: 180px;
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    font: inherit;
+    font-size: 0.82rem;
+    color: inherit;
+}
+
+.staff-status__select:disabled {
+    opacity: 0.55;
+}
+
+/* En pantalla estrecha el título deja de competir por la fila: se queda solo
+   arriba y el filtro y el botón se reparten la de abajo. */
+@media (max-width: 560px) {
+    .staff-toolbar__title {
+        flex-basis: 100%;
+        margin-right: 0;
+    }
+
+    .staff-toolbar__filter {
+        flex: 1;
+        min-width: 0;
+    }
+}

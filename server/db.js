@@ -1,8 +1,9 @@
 'use strict';
 
 /* =============================================================================
-   Acceso a la base `autocolor`. Dos operaciones: guardar una solicitud del
-   asistente y buscar una por su código.
+   Acceso a la base `autocolor`: guardar una solicitud del asistente, buscar
+   una por su código, y las dos que usa el panel del taller — listarlas y
+   cambiarle el estado a una.
    ========================================================================== */
 
 const crypto = require('node:crypto');
@@ -114,10 +115,65 @@ async function findRequest(id) {
     };
 }
 
+/**
+ * La cola de trabajo del taller: las solicitudes, la más reciente primero,
+ * opcionalmente filtradas por estado.
+ *
+ * Trae el teléfono, que `findRequest` esconde a propósito. Aquí sí: quien lee
+ * esto ya pasó por la contraseña del taller y llamar al cliente es justamente
+ * el trabajo. El correo y las notas siguen fuera hasta que haga falta.
+ *
+ * El LIMIT no es paginación, es un tope: sin él, el día que la tabla tenga
+ * miles de filas el panel las pediría todas de una vez.
+ */
+async function listRequests(options) {
+    const status = (options || {}).status || null;
+    const { rows } = await pool.query(
+        `SELECT id, created_at, first_name, last_name, phone, brand, model,
+                plate, quality, status, cardinality(parts) AS part_count
+           FROM requests
+          WHERE $1::text IS NULL OR status = $1
+          ORDER BY created_at DESC
+          LIMIT 200`,
+        [status]
+    );
+    return rows.map((row) => ({
+        id: row.id.trim(),
+        createdAt: row.created_at,
+        firstName: row.first_name,
+        lastName: row.last_name,
+        phone: row.phone,
+        brand: row.brand,
+        model: row.model,
+        plate: row.plate,
+        quality: row.quality,
+        status: row.status,
+        partCount: Number(row.part_count),
+    }));
+}
+
+/**
+ * Cambia el estado de una solicitud. Devuelve null si el código no existe,
+ * para poder responder 404 en vez de un éxito que no cambió nada.
+ *
+ * `updated_at` lo pone el trigger de la base (ver server/schema.sql), así que
+ * no hay forma de actualizar una fila y dejar la fecha vieja.
+ */
+async function updateRequestStatus(id, status) {
+    const { rows } = await pool.query(
+        `UPDATE requests SET status = $2
+          WHERE id = $1
+      RETURNING id, status, updated_at`,
+        [id, status]
+    );
+    if (rows.length === 0) return null;
+    return { id: rows[0].id.trim(), status: rows[0].status, updatedAt: rows[0].updated_at };
+}
+
 // Se llama al arrancar, para fallar con un mensaje claro si la base no está
 // levantada en vez de al primer cliente que envíe el formulario.
 async function ping() {
     await pool.query('SELECT 1');
 }
 
-module.exports = { createRequest, findRequest, ping, pool };
+module.exports = { createRequest, findRequest, listRequests, updateRequestStatus, ping, pool };
