@@ -31,6 +31,10 @@
 
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+// Los tres GLB van comprimidos con EXT_meshopt_compression. El decodificador
+// es un módulo ES de unos 25 KB que resuelve por el mismo importmap que three
+// (ver pgs/repair.html), así que no hay una segunda versión que mantener.
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 
 /* -------------------------------------------------------------------------
    Per-vehicle model configuration
@@ -504,6 +508,7 @@ export function mountCar3D(options) {
   let hoveredMesh = null;
 
   const loader = new GLTFLoader();
+  loader.setMeshoptDecoder(MeshoptDecoder);
   loader.load(
     model.url,
     (gltf) => {

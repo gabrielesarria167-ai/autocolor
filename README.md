@@ -159,6 +159,67 @@ Sacarlos de git detiene el crecimiento, pero **no encoge la historia**: lo que
 ya se subió sigue ahí. Vaciarla del todo necesita `git filter-repo` y un push
 forzado, que es una decisión aparte.
 
+### Cómo se comprime un modelo
+
+Los tres modelos servidos van comprimidos con `EXT_meshopt_compression`. Es lo
+que hace usable el paso 3 en un móvil:
+
+| Modelo | Original | Servido |
+|---|---|---|
+| `van.glb` | 91.7 MB | 20.5 MB |
+| `pickup.glb` | 47.8 MB | 12.6 MB |
+| `wagon.glb` | 37.1 MB | 9.5 MB |
+
+Con `@gltf-transform/cli`, sin instalarlo como dependencia del proyecto. Los
+comandos, en este orden y a archivos intermedios aparte —así, si algo se rompe,
+se sabe cuál de los tres pasos fue—:
+
+```bash
+npx --yes @gltf-transform/cli@4.5 prune   src/MODELO.glb s1.glb --keep-attributes false --keep-leaves true
+npx --yes @gltf-transform/cli@4.5 reorder s1.glb         s2.glb --target size
+npx --yes @gltf-transform/cli@4.5 webp    s2.glb         s3.glb                    # solo pickup
+npx --yes @gltf-transform/cli@4.5 meshopt s3.glb         MODELO.glb --level medium
+```
+
+Cuatro cosas que no son gusto personal:
+
+- **`meshopt` va último.** Corrido antes que `webp`, el paso de texturas
+  descomprime la geometría para poder tocarla y el archivo termina *más grande*
+  que sin comprimir (24.6 MB en la pickup, contra 12.6 MB en el orden correcto).
+- **`--keep-leaves true`** impide que `prune` borre nodos sin hijos. No es una
+  optimización, es un seguro: las piezas se buscan por nombre, y un nodo que
+  desaparece es una pieza que ya no se puede pintar.
+- **`--level medium`**, no `high`. La selección se dibuja como una malla
+  superpuesta que comparte la `BufferGeometry` del panel, así que una grieta de
+  cuantización saldría a la vez en la chapa y en su marca roja.
+- **Nunca `optimize` ni `gltfpack`.** Los dos incluyen pasos que aplanan la
+  jerarquía, fusionan mallas y renombran nodos. El archivo carga igual de bien
+  y el selector de piezas deja de funcionar, sin un solo error en consola.
+
+Del lado del visor son dos líneas —el `MeshoptDecoder` importado y
+`loader.setMeshoptDecoder(...)`, en `src/carVisual.js` y en las tres páginas
+prototipo—. El decodificador resuelve por el mismo importmap que three, así que
+no hay una segunda versión que mantener.
+
+### Comprobar que un modelo comprimido sigue sirviendo
+
+```bash
+node tools/verify-3d.mjs                                   # línea base de los tres
+node tools/verify-3d.mjs src/MODELO.glb MODELO.glb         # antes contra después
+```
+
+Compara el original con el comprimido y afirma lo que el visor necesita: que no
+falte ningún nombre de nodo, que ninguno quede duplicado tras la normalización
+de `GLTFLoader` —un `hood` repetido se carga como `hood_1` y la pieza se pinta
+en el lugar equivocado—, que cada pieza configurada conserve sus primitivas y
+sus materiales, y que no haya aparecido `EXT_mesh_gpu_instancing`. Lee lo que
+espera de `src/carVisual.js`, no de una copia a mano. Sale con código 1 si algo
+falla; no se commitea un modelo que no pase.
+
+Pasar esa comprobación no exime de abrir el paso 3 en el navegador con los tres
+vehículos: es donde se ve si aparecieron grietas en las juntas, si el vidrio
+sigue siendo transparente y si el barniz sigue brillando.
+
 ## El catálogo de vehículos
 
 En el paso 1 el cliente escribe qué vehículo tiene —marca, modelo, año y

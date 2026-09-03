@@ -98,14 +98,32 @@ function describe(file, expected) {
     // Por cada pieza: cuántas primitivas tiene y con qué materiales, en orden.
     // Si dos primitivas se fusionan, el material deja de ser el de la pintura y
     // la pieza se vuelve no pintable sin que nada avise.
+    // La malla de una pieza no siempre cuelga del nodo con nombre. Al cuantizar,
+    // gltf-transform deja la animación en el nodo animado y le mueve la malla a
+    // un hijo sin nombre (transformMeshParents), así que el nodo con nombre
+    // queda como un grupo vacío. El visor lo tolera: resolvePaintMesh() hace
+    // getObjectByName() y, si eso no es una malla, un traverse() hacia abajo.
+    // Esto mira igual que él —la malla del nodo, o la de su descendencia— y no
+    // menos: encontrar más de una sí es un cambio, y se reporta como tal.
+    function meshesUnder(node) {
+        const found = [];
+        (function walk(n) {
+            if (!n) return;
+            if (n.mesh !== undefined) found.push(n.mesh);
+            for (const child of n.children || []) walk(nodes[child]);
+        })(node);
+        return found;
+    }
+
     const parts = {};
     for (const id of [...expected.parts, ...expected.hiddenNodes]) {
         const node = byName.get(id);
         if (!node) { parts[id] = null; continue; }
-        const mesh = node.mesh !== undefined ? meshes[node.mesh] : null;
-        parts[id] = mesh
-            ? (mesh.primitives || []).map((p) => (p.material !== undefined ? materials[p.material]?.name : null))
-            : [];
+        const found = meshesUnder(node);
+        if (found.length === 0) { parts[id] = []; continue; }
+        if (found.length > 1) { parts[id] = ['<varias mallas bajo el nodo>']; continue; }
+        const mesh = meshes[found[0]];
+        parts[id] = (mesh.primitives || []).map((p) => (p.material !== undefined ? materials[p.material]?.name : null));
     }
 
     const paint = materials.find((m) => m.name === expected.paintMaterial);

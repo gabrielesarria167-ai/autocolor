@@ -315,6 +315,9 @@
 <script type="module">
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+// El GLB va comprimido con EXT_meshopt_compression; sin esta línea la página
+// carga una escena vacía. Ver README, «Fuentes de los modelos 3D».
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 
 /* =========================================================================
    Configuration
@@ -605,6 +608,7 @@ const selected = new Set();
 let hoveredMesh = null;
 
 const loader = new GLTFLoader();
+loader.setMeshoptDecoder(MeshoptDecoder);
 loader.load(
   MODEL_URL,
   (gltf) => {
