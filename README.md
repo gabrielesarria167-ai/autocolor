@@ -73,7 +73,7 @@ lo abre a propósito, por ejemplo para probar el sitio desde el móvil.
 | --- | --- |
 | `index.html`, `src/home.js` | Portada |
 | `pgs/repair.html`, `src/repair.js` | Asistente de cotización |
-| `src/carVisual.js` | Visor 3D del paso 3 (three.js, un modelo por vehículo) |
+| `src/carVisual.js` | Visor 3D del paso 3 (three.js, un modelo por carrocería) |
 | `src/lookup.js` | Consulta de una solicitud por su código |
 | `pgs/taller.html`, `src/staff.js` | Panel del taller: la cola de trabajo y el cambio de estado |
 | `src/cities.js` | Departamentos y provincias del Perú |
@@ -161,23 +161,24 @@ forzado, que es una decisión aparte.
 
 ### Cómo se comprime un modelo
 
-Los tres modelos servidos van comprimidos con `EXT_meshopt_compression`. Es lo
-que hace usable el paso 3 en un móvil:
+Los cuatro modelos servidos van comprimidos con `EXT_meshopt_compression`. Es
+lo que hace usable el paso 3 en un móvil:
 
 | Modelo | Original | Servido |
 |---|---|---|
 | `van.glb` | 91.7 MB | 20.5 MB |
 | `pickup.glb` | 47.8 MB | 12.6 MB |
-| `wagon.glb` | 37.1 MB | 9.5 MB |
+| `wagon.glb` | 35.4 MB | 10.0 MB |
+| `suv.glb` | 27.6 MB | 9.5 MB |
 
 Con `@gltf-transform/cli`, sin instalarlo como dependencia del proyecto. Los
 comandos, en este orden y a archivos intermedios aparte —así, si algo se rompe,
-se sabe cuál de los tres pasos fue—:
+se sabe cuál de los pasos fue—:
 
 ```bash
 npx --yes @gltf-transform/cli@4.5 prune   src/MODELO.glb s1.glb --keep-attributes false --keep-leaves true
 npx --yes @gltf-transform/cli@4.5 reorder s1.glb         s2.glb --target size
-npx --yes @gltf-transform/cli@4.5 webp    s2.glb         s3.glb                    # solo pickup
+npx --yes @gltf-transform/cli@4.5 webp    s2.glb         s3.glb                    # pickup y suv
 npx --yes @gltf-transform/cli@4.5 meshopt s3.glb         MODELO.glb --level medium
 ```
 
@@ -197,14 +198,14 @@ Cuatro cosas que no son gusto personal:
   y el selector de piezas deja de funcionar, sin un solo error en consola.
 
 Del lado del visor son dos líneas —el `MeshoptDecoder` importado y
-`loader.setMeshoptDecoder(...)`, en `src/carVisual.js` y en las tres páginas
+`loader.setMeshoptDecoder(...)`, en `src/carVisual.js` y en las páginas
 prototipo—. El decodificador resuelve por el mismo importmap que three, así que
 no hay una segunda versión que mantener.
 
 ### Comprobar que un modelo comprimido sigue sirviendo
 
 ```bash
-node tools/verify-3d.mjs                                   # línea base de los tres
+node tools/verify-3d.mjs                                   # línea base de todos
 node tools/verify-3d.mjs src/MODELO.glb MODELO.glb         # antes contra después
 ```
 
@@ -216,9 +217,51 @@ sus materiales, y que no haya aparecido `EXT_mesh_gpu_instancing`. Lee lo que
 espera de `src/carVisual.js`, no de una copia a mano. Sale con código 1 si algo
 falla; no se commitea un modelo que no pase.
 
-Pasar esa comprobación no exime de abrir el paso 3 en el navegador con los tres
-vehículos: es donde se ve si aparecieron grietas en las juntas, si el vidrio
-sigue siendo transparente y si el barniz sigue brillando.
+Pasar esa comprobación no exime de abrir el paso 3 en el navegador con los
+cuatro vehículos: es donde se ve si aparecieron grietas en las juntas, si el
+vidrio sigue siendo transparente y si el barniz sigue brillando.
+
+### De qué color sale cada pieza
+
+Ninguno de los cuatro modelos viene pintado de fábrica: los cuatro traen su
+chapa en un gris de imprimación —o, en la SUV, en un verde casi negro— y el
+visor la repinta al cargar. `bodyColor` es ese color en `VEHICLE_MODELS`.
+
+La SUV es la única en la que **no todas las piezas seleccionables son chapa**.
+Sus parachoques y sus faldones son plástico negro de fábrica, y su techo, que
+sí es chapa, viene declarado con el mismo material negro que ese plástico. Ni
+el material ni el nombre del nodo bastan para distinguirlos, así que la
+diferencia se declara a mano en `partOverrides`:
+
+| Campo | Para qué |
+|---|---|
+| `material` | Qué material resolver cuando la pieza no lleva `paintMaterial` (el techo, los faldones y el parachoques trasero llevan `blackpaint1`) |
+| `finish: 'trim'` | La pieza se queda negra aunque lleve el material de pintura. Sigue siendo seleccionable: un parachoques rayado es justo el trabajo que se pide |
+
+Repintar exige clonar el material antes de tocarlo. `blackpaint1` lo comparten
+sesenta nodos, desde los discos de freno hasta el tablero, y `CarPaint` todas
+las piezas que sí quedan blancas: pintar cualquiera de los dos en su sitio
+repintaría medio vehículo.
+
+Hay un caso que `partOverrides` no cubre, porque no son piezas: los recortes
+negros que el export separa de un panel. En la SUV, la tapa negra del filo
+inferior de una puerta —o la del parachoques— se cortó del panel y quedó en un
+nodo hermano con el sufijo `_black_part`. Cada recorte se lleva un centenar de
+triángulos del material de pintura, así que la pasada masiva del arranque los
+pintaría del color de la carrocería junto con el panel del que salieron.
+`trimNodes` es la regla que los devuelve al negro; casa por NOMBRE, no por
+lista, para que el siguiente re-export que añada uno no obligue a tocar
+`carVisual.js`.
+
+Hoy esos cinco recortes no se ven desde ninguna de las cinco vistas fijas: se
+quedan detrás del faldón, que ocupa la misma altura. La regla no cambia nada en
+pantalla, entonces; está porque esas superficies no son chapa y no deben salir
+del color del vehículo el día que se vean.
+
+`maxMetalness` existe solo por esta SUV. Su pintura está declarada a 0.553
+—contra 0.0–0.1 en los otros tres— y un metal así de reflectante toma el color
+de lo que refleja: la carrocería salía gris por más claro que se pusiera
+`bodyColor`.
 
 ## El catálogo de vehículos
 
@@ -231,10 +274,15 @@ placa— y el asistente deduce el resto. Las marcas y modelos viven en
 ```
 
 `type` es la carrocería, y de ella sale sola la silueta 3D sobre la que se
-eligen las piezas en el paso 3: hay tres modelos (`van`, `wagon`, `pickup`),
-así que un sedán o un hatchback se pintan sobre la de auto, y una SUV sobre
-la de la pickup. Cuando no coinciden, la ficha del paso 1 lo avisa. La
-equivalencia está en `BODY_TYPES`, al principio del mismo archivo.
+eligen las piezas en el paso 3: hay cuatro modelos (`van`, `wagon`, `pickup`,
+`suv`), así que un sedán o un hatchback se pintan sobre la de auto. Cuando no
+coinciden, la ficha del paso 1 lo avisa. La equivalencia está en `BODY_TYPES`,
+al principio del mismo archivo.
+
+Las SUV tienen silueta propia desde que existe `suv.glb`. Antes se pintaban
+sobre la de la pickup, que era la única alta y con ese volumen; como son 48 de
+los 108 modelos del catálogo, casi la mitad de los clientes elegía piezas sobre
+una carrocería que no era la suya.
 
 ### Las fotos de los vehículos
 

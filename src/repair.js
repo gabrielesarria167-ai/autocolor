@@ -77,12 +77,17 @@
     // ==================================================================
 
     var PART_LABELS = {
-        // Comunes a los tres modelos:
+        // Comunes a los cuatro modelos:
         "hood": "Capó",
         "roof": "Techo",
-        // Only-on-the-SUV:
+        // Only-on-the-pickup:
         "front_bumper": "Parachoques delantero",
         "tonneau": "Platón y portón",
+        // Only-on-the-SUV, which names its tailgate 'tailgate' where the
+        // familiar says 'rear_hatch', and its rear bumper 'rear_bumper'
+        // where the familiar says 'back_bumper':
+        "tailgate": "Portón trasero",
+        "rear_bumper": "Parachoques trasero",
         // Only-on-the-furgoneta (its sliding doors, and its own spelling of
         // the front fenders / rear quarter panels):
         "back_door_left": "Puerta corrediza izquierda",
@@ -92,10 +97,10 @@
         "rear_window_left": "Panel lateral trasero izquierdo",
         "rear_window_right": "Panel lateral trasero derecho",
         // Only-on-the-familiar:
-        "bumper": "Parachoques delantero",
         "back_bumper": "Parachoques trasero",
         "Object_26": "Moldura trasera del techo",
         // Shared by two or more models:
+        "bumper": "Parachoques delantero",
         "front_door_left": "Puerta delantera izquierda",
         "front_door_right": "Puerta delantera derecha",
         "rear_door_left": "Puerta trasera izquierda",
@@ -513,7 +518,7 @@
     var CATALOG = window.CAR_CATALOG ||
         { brands: [], bodyTypes: {}, findBrand: NO_CATALOG, findModel: NO_CATALOG,
           photoFor: function () { return ""; } };
-    var VEHICLE_LABELS = { van: "Furgoneta", wagon: "Familiar", pickup: "Pickup" };
+    var VEHICLE_LABELS = { van: "Furgoneta", wagon: "Familiar", pickup: "Pickup", suv: "SUV" };
 
     var PLATE_PATTERN = /^[A-Z0-9]{3}-[A-Z0-9]{3}$/;
     var YEAR_MIN = 1980;

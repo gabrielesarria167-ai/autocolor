@@ -33,18 +33,22 @@
 (function () {
     "use strict";
 
-    // Cada carrocería se dibuja en el paso 3 con uno de los tres modelos 3D
-    // que existen (van, wagon, pickup), porque son los únicos para los que
-    // hay piezas seleccionables. `vehicle` es esa equivalencia: un sedán y un
-    // hatchback se pintan sobre la silueta de auto (wagon), y una SUV sobre
-    // la de la pickup, que es la única alta y con ese volumen. El cliente ve
-    // el nombre de `label`, que sí es el de su vehículo.
+    // Cada carrocería se dibuja en el paso 3 con uno de los cuatro modelos 3D
+    // que existen (van, wagon, pickup, suv), porque son los únicos para los
+    // que hay piezas seleccionables. `vehicle` es esa equivalencia: un sedán
+    // y un hatchback se pintan sobre la silueta de auto (wagon). El cliente
+    // ve el nombre de `label`, que sí es el de su vehículo.
+    //
+    // Las SUV tienen silueta propia desde que existe el modelo `suv`. Antes
+    // se pintaban sobre la de la pickup, que era la única alta y con ese
+    // volumen; eran 48 de los 108 modelos del catálogo, así que casi la mitad
+    // del catálogo elegía piezas sobre una carrocería que no era la suya.
     var BODY_TYPES = {
         sedan: { label: "Sedán", vehicle: "wagon" },
         hatchback: { label: "Hatchback", vehicle: "wagon" },
         coupe: { label: "Coupé", vehicle: "wagon" },
         wagon: { label: "Station wagon", vehicle: "wagon" },
-        suv: { label: "SUV", vehicle: "pickup" },
+        suv: { label: "SUV", vehicle: "suv" },
         pickup: { label: "Pickup", vehicle: "pickup" },
         minivan: { label: "Minivan", vehicle: "van" },
         van: { label: "Furgoneta", vehicle: "van" }

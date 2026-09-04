@@ -31,8 +31,16 @@ function loadExpectations() {
     const src = readFileSync(path.join(ROOT, 'src/carVisual.js'), 'utf8');
     const models = {};
 
-    // Cada entrada de VEHICLE_MODELS: van: { ... }, wagon: { ... }, pickup: {...}
-    for (const key of ['van', 'wagon', 'pickup']) {
+    // Los nombres de los modelos, tal como los declara VEHICLE_MODELS: las
+    // claves con dos espacios de sangría dentro de ese objeto.
+    const block = src.slice(src.indexOf('export const VEHICLE_MODELS'));
+    for (const m of block.matchAll(/\n  ([a-z][a-zA-Z0-9]*): \{/g)) models[m[1]] = null;
+
+    // Cada entrada de VEHICLE_MODELS: van: { ... }, wagon: { ... }, …
+    // Las claves se leen del propio archivo: una lista aquí se olvida el día
+    // que entra un modelo nuevo, y lo que hace esta herramienta es
+    // justamente comprobar los modelos que hay.
+    for (const key of Object.keys(models)) {
         const start = src.indexOf(`\n  ${key}: {`);
         if (start === -1) throw new Error(`No encontré el modelo '${key}' en carVisual.js`);
         // Hasta el comienzo del siguiente modelo o el fin del objeto.
@@ -45,9 +53,17 @@ function loadExpectations() {
             paintMaterial: (block.match(/paintMaterial:\s*'([^']+)'/) || [])[1],
             parts: listOf(block, 'parts'),
             hiddenNodes: listOf(block, 'hiddenNodes'),
+            trimNodes: regexOf(block, 'trimNodes'),
         };
     }
     return models;
+}
+
+// La expresión regular de un campo del bloque, si la hay. Sirve para
+// trimNodes, que no nombra nodos uno a uno sino por convención de nombre.
+function regexOf(block, field) {
+    const m = block.match(new RegExp(`${field}:\\s*/(.+?)/([a-z]*),`));
+    return m ? new RegExp(m[1], m[2]) : null;
 }
 
 // Los ids de un array del bloque, ignorando lo que haya en comentarios.
@@ -126,6 +142,13 @@ function describe(file, expected) {
         parts[id] = (mesh.primitives || []).map((p) => (p.material !== undefined ? materials[p.material]?.name : null));
     }
 
+    // Los nodos que el export marca como tapa negra por su nombre. Si el
+    // modelo se vuelve a exportar sin esa convención, la regla deja de casar
+    // con nada y esas piezas salen del color de la carrocería sin avisar.
+    const trimNodes = expected.trimNodes
+        ? [...byName.keys()].filter((n) => expected.trimNodes.test(n)).sort()
+        : null;
+
     const paint = materials.find((m) => m.name === expected.paintMaterial);
 
     return {
@@ -133,6 +156,7 @@ function describe(file, expected) {
         nodeNames: [...byName.keys()].sort(),
         duplicates,
         parts,
+        trimNodes,
         paintMaterial: paint ? { name: paint.name, extensions: Object.keys(paint.extensions || {}).sort() } : null,
         extensionsRequired: (json.extensionsRequired || []).slice().sort(),
         counts: { nodes: nodes.length, meshes: meshes.length, materials: materials.length, images: (json.images || []).length },
@@ -163,14 +187,19 @@ function compare(before, after, expected) {
         if (JSON.stringify(a) !== JSON.stringify(b)) problems.push(`'${id}': materiales ${JSON.stringify(b)} -> ${JSON.stringify(a)}`);
     }
 
-    // 4. El material de pintura y sus extensiones.
+    // 4. Los nodos de tapa negra, si el modelo usa esa convención.
+    if (before.trimNodes && after.trimNodes.length !== before.trimNodes.length) {
+        problems.push(`nodos de tapa negra: ${before.trimNodes.length} -> ${after.trimNodes.length}`);
+    }
+
+    // 5. El material de pintura y sus extensiones.
     if (!after.paintMaterial) problems.push(`falta el material de pintura '${expected.paintMaterial}'`);
     else if (before.paintMaterial &&
              JSON.stringify(after.paintMaterial.extensions) !== JSON.stringify(before.paintMaterial.extensions)) {
         problems.push(`extensiones de '${expected.paintMaterial}': ${JSON.stringify(before.paintMaterial.extensions)} -> ${JSON.stringify(after.paintMaterial.extensions)}`);
     }
 
-    // 5. Si corrió `instance`, los nodos con nombre se cambiaron por instancias.
+    // 6. Si corrió `instance`, los nodos con nombre se cambiaron por instancias.
     if (after.extensionsRequired.includes('EXT_mesh_gpu_instancing')) {
         problems.push('apareció EXT_mesh_gpu_instancing: corrió `instance` y los nodos con nombre ya no son de fiar');
     }
@@ -222,8 +251,10 @@ for (const [key, expected] of Object.entries(models)) {
     console.log(`  piezas configuradas: ${expected.parts.length}   sin resolver: ${missing.length ? missing.join(', ') : 'ninguna'}`);
     console.log(`  nombres duplicados: ${d.duplicates.length ? d.duplicates.join(', ') : 'ninguno'}`);
     console.log(`  material de pintura '${expected.paintMaterial}': ${d.paintMaterial ? 'presente [' + (d.paintMaterial.extensions.join(', ') || 'sin extensiones') + ']' : 'NO ENCONTRADO'}`);
+    if (d.trimNodes) console.log(`  nodos de tapa negra (${expected.trimNodes}): ${d.trimNodes.length ? d.trimNodes.join(', ') : 'NINGUNO'}`);
     console.log(`  extensionsRequired: ${d.extensionsRequired.join(', ') || 'ninguna'}`);
     if (missing.length || d.duplicates.length || !d.paintMaterial) bad++;
+    else if (d.trimNodes && d.trimNodes.length === 0) { console.log('  ✗ la convención de tapa negra no casa con ningún nodo'); bad++; }
 }
-console.log(bad ? `\n✗ ${bad} modelo(s) con problemas` : '\n✓ los tres modelos están sanos');
+console.log(bad ? `\n✗ ${bad} modelo(s) con problemas` : `\n✓ los ${Object.keys(models).length} modelos están sanos`);
 process.exit(bad ? 1 : 0);

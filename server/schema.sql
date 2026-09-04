@@ -35,10 +35,10 @@ CREATE TABLE IF NOT EXISTS requests (
     color_code  text,
 
     -- La silueta 3D sobre la que se eligieron las piezas. Se deduce de
-    -- body_type (ver BODY_TYPES en src/carModels.js) porque solo hay tres
-    -- modelos 3D: un sedán se pinta sobre la silueta 'wagon', y una SUV
-    -- sobre la 'pickup'.
-    vehicle     text        NOT NULL CHECK (vehicle IN ('van', 'wagon', 'pickup')),
+    -- body_type (ver BODY_TYPES en src/carModels.js) porque hay cuatro
+    -- modelos 3D y ocho carrocerías: un sedán se pinta sobre la silueta
+    -- 'wagon', y una minivan sobre la 'van'.
+    vehicle     text        NOT NULL CHECK (vehicle IN ('van', 'wagon', 'pickup', 'suv')),
     quality     text        NOT NULL CHECK (quality IN ('standard', 'premium', 'custom')),
     -- Los ids de panel que usa el visor 3D ('hood', 'rear_door_left', …). Son
     -- distintos por modelo, así que se guardan tal cual llegan, como arreglo:
@@ -86,16 +86,26 @@ ALTER TABLE requests ADD COLUMN IF NOT EXISTS mileage    integer
 ALTER TABLE requests ADD COLUMN IF NOT EXISTS color_code text;
 
 
--- La silueta 'suv' pasó a llamarse 'pickup' cuando se separaron las dos
--- carrocerías: el modelo 3D siempre fue el de una pickup (una Hilux doble
--- cabina), así que las solicitudes que decían 'suv' se refieren a este mismo
--- archivo y se renombran en el sitio.
--- El CHECK se retira antes del UPDATE: el de la base vieja todavía nombra
--- 'suv' y rechazaría el valor nuevo.
+-- Hubo una silueta 'suv' que pasó a llamarse 'pickup' cuando se separaron
+-- las dos carrocerías: el modelo 3D de entonces siempre fue el de una pickup
+-- (una Hilux doble cabina), así que aquellas solicitudes se refieren al mismo
+-- archivo y se renombran.
+--
+-- OJO con el corte por fecha, que no es decorativo. Hoy 'suv' vuelve a existir
+-- y esta vez es de verdad: su propio modelo 3D, con sus propias piezas. Sin el
+-- corte, cada `npm run db:schema` reescribiría a 'pickup' todas las
+-- solicitudes nuevas de una SUV, y sus piezas —'tailgate', 'rear_bumper'— no
+-- existen en la pickup, así que el taller vería una lista que no se puede
+-- dibujar. La fecha es la del commit que agregó el modelo: antes de ella no
+-- había ninguna SUV real que proteger.
+--
+-- El CHECK se retira antes del UPDATE: el de la base vieja no nombra 'suv' y
+-- rechazaría las filas nuevas.
 ALTER TABLE requests DROP CONSTRAINT IF EXISTS requests_vehicle_check;
-UPDATE requests SET vehicle = 'pickup' WHERE vehicle = 'suv';
+UPDATE requests SET vehicle = 'pickup'
+ WHERE vehicle = 'suv' AND created_at < timestamptz '2026-09-04';
 ALTER TABLE requests ADD CONSTRAINT requests_vehicle_check
-    CHECK (vehicle IN ('van', 'wagon', 'pickup'));
+    CHECK (vehicle IN ('van', 'wagon', 'pickup', 'suv'));
 
 
 -- La cola de trabajo del taller: lo pendiente, lo más antiguo primero.

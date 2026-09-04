@@ -148,6 +148,81 @@ export const VEHICLE_MODELS = {
     ],
     hiddenNodes: [],
   },
+
+  // SUV (Hummer EV). The only model whose nodes were renamed in Blender
+  // before export, so its panels are plainly named for once. What is not
+  // uniform here is the FINISH: on this vehicle the bumpers and the side
+  // skirts are black cladding rather than painted sheet metal, and the roof,
+  // though authored in that same black material, is sheet metal like any
+  // other panel. `partOverrides` below reconciles the two, since neither
+  // fact can be read off the material a node happens to carry.
+  suv: {
+    url: new URL('../imgs/assets/3d-visuals/suv/suv.glb', import.meta.url).href,
+    paintMaterial: 'CarPaint',
+    front: [0, 0, 1],
+    left: [1, 0, 0],
+    // Same story as the other three, in a darker key: 'CarPaint' is authored
+    // as a near-black green (baseColorFactor ~0.043,0.076,0.062), which is
+    // why the vehicle reads as unpainted until this runs.
+    bodyColor: [0.93, 0.93, 0.94],
+    // The cladding black, for panels that carry the paint material but must
+    // not look painted. Not pure black: at 0 the bumper loses its own shape
+    // against the shadow under the car.
+    trimColor: [0.05, 0.05, 0.055],
+    maxRoughness: 0.3,
+    // The only model that needs a metalness CEILING. Its paint is authored
+    // at 0.553 against 0.0–0.1 on the other three, and a metal that
+    // reflective takes its colour from what it reflects: the body came out
+    // grey however light the bodyColor was set.
+    maxMetalness: 0.25,
+    parts: [
+      'hood', 'roof',
+      'front_door_left', 'front_door_right',
+      'rear_door_left', 'rear_door_right',
+      'fender_left', 'fender_right',
+      'quarter_panel_left', 'quarter_panel_right',
+      'side_skirt_left', 'side_skirt_right',
+      'tailgate',
+      'bumper', 'rear_bumper',
+    ],
+    // NOTE: the front bumper comes apart into 'bumper' plus five sibling
+    // nodes, 'bumper.001'–'bumper.005' (dots stripped by GLTFLoader). None of
+    // them is offered: three carry a sliver of the paint material — 1, 18 and
+    // 2 triangles — and the other two only plastic, and all five sit inside
+    // the bumper's own volume. Painting the whole assembly a loud colour and
+    // sweeping every one of the five views for it turns up not one pixel, so
+    // offering them would put panels in the list that nobody can click.
+    // `material` names what to resolve when the node does not carry
+    // `paintMaterial`; `finish: 'trim'` marks a panel that stays black
+    // although it is still selectable — a scraped bumper or skirt is
+    // exactly the job this shop is asked for, it just isn't body colour.
+    partOverrides: {
+      roof: { material: 'blackpaint1' },
+      side_skirt_left: { material: 'blackpaint1', finish: 'trim' },
+      side_skirt_right: { material: 'blackpaint1', finish: 'trim' },
+      rear_bumper: { material: 'blackpaint1', finish: 'trim' },
+      // The front bumper carried a paint-material primitive until its black
+      // cladding was split out in Blender; now it is authored entirely in
+      // 'blackpaint1'. Without naming that here it would resolve to nothing
+      // and quietly drop out of the list of selectable panels.
+      bumper: { material: 'blackpaint1', finish: 'trim' },
+    },
+    // Nodes the export marks as black cladding BY NAME. The convention is
+    // the export's, not this file's: the black trim along a door's lower
+    // edge was cut out of the door and left in a sibling node suffixed
+    // `_black_part`. Each offcut keeps a hundred-odd triangles of the paint
+    // material, so the bulk pass at load would hand it the body colour along
+    // with the panel it came from. Matching on the name means the next
+    // re-export that adds one needs no edit here.
+    //
+    // As exported, none of the five is actually visible: each sits at the
+    // same height as the side skirt and behind it, and painting them a loud
+    // colour shows not one pixel from any of the five views. The rule stays
+    // because those surfaces are cladding, not sheet metal, and must not
+    // take the body colour the day an export or a camera does expose them.
+    trimNodes: /(^|_)black_part$/,
+    hiddenNodes: [],
+  },
 };
 
 const UP_AXIS = new THREE.Vector3(0, 1, 0);
@@ -238,22 +313,93 @@ export function mountCar3D(options) {
   }
   resizeRenderer();
 
+  const partOverrides = model.partOverrides || {};
+
+  // Which material a given panel is authored in. Normally the model's one
+  // paint material; on the SUV a few panels are authored in its black
+  // cladding instead (see partOverrides there).
+  function materialFor(id) {
+    return (partOverrides[id] && partOverrides[id].material) || model.paintMaterial;
+  }
+
   // Returns the actual Mesh to paint for a node name, handling both plain
   // single-primitive nodes (already a Mesh) and multi-primitive ones, which
   // GLTFLoader turns into a Group of child meshes — a door node that bundles
-  // its chrome window trim, for example. The paint-material child is the one
-  // wanted in that case.
+  // its chrome window trim, for example. The child carrying that panel's own
+  // material is the one wanted in that case.
   function resolvePaintMesh(root, name) {
     const obj = root.getObjectByName(name);
     if (!obj) return null;
     if (obj.isMesh) return obj;
+    const wanted = materialFor(name);
     let found = null;
     obj.traverse((child) => {
-      if (!found && child.isMesh && child.material && child.material.name === model.paintMaterial) {
+      if (!found && child.isMesh && child.material && child.material.name === wanted) {
         found = child;
       }
     });
     return found;
+  }
+
+  // Gives a panel the colour its finish calls for, when the material it
+  // happens to carry doesn't already provide it.
+  //
+  // It has to clone before recolouring: both materials involved are shared
+  // far beyond the one panel — the SUV's 'blackpaint1' by sixty nodes from
+  // the brake discs to the dashboard, its 'CarPaint' by every panel that DOES
+  // stay body colour — so painting either in place would repaint most of the
+  // vehicle along with it.
+  // The clamps every material this file recolours gets. The paint is authored
+  // for a showroom render, not for reading panel outlines under a coloured
+  // overlay, and each model needs a different subset of them.
+  function clampMaterial(mat) {
+    if (typeof model.maxRoughness === 'number') {
+      mat.roughness = Math.min(mat.roughness ?? model.maxRoughness, model.maxRoughness);
+    }
+    if (typeof model.minMetalness === 'number') {
+      mat.metalness = Math.max(mat.metalness ?? 0, model.minMetalness);
+    }
+    if (typeof model.maxMetalness === 'number') {
+      mat.metalness = Math.min(mat.metalness ?? model.maxMetalness, model.maxMetalness);
+    }
+  }
+
+  function recolour(mesh, rgb) {
+    mesh.material = mesh.material.clone();
+    mesh.material.color.setRGB(rgb[0], rgb[1], rgb[2]);
+    clampMaterial(mesh.material);
+    mesh.material.needsUpdate = true;
+  }
+
+  function applyFinish(mesh, id) {
+    const wantsTrim = (partOverrides[id] || {}).finish === 'trim';
+    const carriesPaint = !!mesh.material && mesh.material.name === model.paintMaterial;
+
+    // Already right in both matching cases: a body panel carrying the paint
+    // material was recoloured in the bulk pass at load, and a trim panel
+    // carrying the cladding is black as authored.
+    if (wantsTrim !== carriesPaint) return;
+
+    recolour(mesh, wantsTrim ? model.trimColor : model.bodyColor);
+  }
+
+  // Paints the offcuts named by `model.trimNodes` (see the SUV entry above)
+  // back to the cladding colour, undoing the bulk pass for them. Only the
+  // meshes actually carrying the paint material are touched; the rest of such
+  // a node is already authored black and needs nothing.
+  function applyTrimNodes(root) {
+    if (!model.trimNodes) return 0;
+    let painted = 0;
+    root.traverse((obj) => {
+      if (!model.trimNodes.test(obj.name || '')) return;
+      obj.traverse((child) => {
+        if (child.isMesh && child.material && child.material.name === model.paintMaterial) {
+          recolour(child, model.trimColor);
+          painted++;
+        }
+      });
+    });
+    return painted;
   }
 
   function makeOverlay(mesh, color, opacity) {
@@ -554,14 +700,14 @@ export function mountCar3D(options) {
       });
       for (const mat of paintMaterials) {
         mat.color.setRGB(model.bodyColor[0], model.bodyColor[1], model.bodyColor[2]);
-        if (typeof model.maxRoughness === 'number') {
-          mat.roughness = Math.min(mat.roughness ?? model.maxRoughness, model.maxRoughness);
-        }
-        if (typeof model.minMetalness === 'number') {
-          mat.metalness = Math.max(mat.metalness ?? 0, model.minMetalness);
-        }
+        clampMaterial(mat);
         mat.needsUpdate = true;
       }
+
+      // Runs after the bulk pass, which is deliberately indiscriminate: it
+      // recolours the shared paint material itself, so every mesh using it
+      // turns body colour. This puts the black cladding back.
+      applyTrimNodes(root);
 
       // Collect raycast targets from the ORIGINAL meshes only, before any
       // overlay is attached, so overlays can never be picked and occlusion
@@ -574,6 +720,7 @@ export function mountCar3D(options) {
           console.warn('[car3d] Could not resolve paintable panel:', vehicle, id);
           continue;
         }
+        applyFinish(mesh, id);
         const hoverOverlay = makeOverlay(mesh, HOVER_COLOR, HOVER_OPACITY);
         const selectedOverlay = makeOverlay(mesh, SELECTED_COLOR, SELECTED_OPACITY);
         overlayFor.set(mesh, { hoverOverlay, selectedOverlay, id });

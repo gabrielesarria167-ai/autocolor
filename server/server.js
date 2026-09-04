@@ -107,7 +107,7 @@ const ALLOWED_ORIGINS = new Set(
    impide que una solicitud llene la tabla de texto basura.
 -------------------------------------------------------------------------- */
 
-const VEHICLES = new Set(['van', 'wagon', 'pickup']);
+const VEHICLES = new Set(['van', 'wagon', 'pickup', 'suv']);
 const BODY_TYPES = new Set(['sedan', 'hatchback', 'coupe', 'wagon', 'suv', 'pickup', 'minivan', 'van']);
 const PLATE_RE = /^[A-Z0-9]{3}-[A-Z0-9]{3}$/;
 const YEAR_MIN = 1980;
