@@ -92,7 +92,6 @@
         "rear_window_left": "Panel lateral trasero izquierdo",
         "rear_window_right": "Panel lateral trasero derecho",
         // Only-on-the-familiar:
-        "front_door_left001": "Puerta delantera izquierda",
         "bumper": "Parachoques delantero",
         "back_bumper": "Parachoques trasero",
         "Object_26": "Moldura trasera del techo",

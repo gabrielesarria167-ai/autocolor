@@ -105,10 +105,13 @@ export const VEHICLE_MODELS = {
     maxRoughness: 0.3,
     parts: [
       'hood', 'roof',
-      // The plainly-named 'front_door_left' is a hidden interior panel
-      // spanning both sides; the real exterior door is this '.001' node
-      // (dot stripped by GLTFLoader, as above).
-      'front_door_left001',
+      // Both front doors are plainly named since the model was re-exported
+      // with the exterior right-hand door it used to be missing. Before that
+      // the only front door was a '.001' node and this vehicle could not
+      // offer the passenger side at all. 'front_door_left.001' still exists
+      // but is now a chrome strip with no paint surface, so the old id would
+      // resolve to trim.
+      'front_door_left', 'front_door_right',
       'rear_door_left', 'rear_door_right',
       'fender_left', 'fender_right',
       'quarter_panel_left', 'quarter_panel_right',
@@ -122,10 +125,6 @@ export const VEHICLE_MODELS = {
       // the paintable surface.
       'Object_26',
     ],
-    // NOTE: this GLB simply has no exterior front-RIGHT door surface — every
-    // candidate mesh on that side is interior geometry, invisible from any
-    // exterior angle. That panel therefore cannot be offered on this
-    // vehicle until the model itself is fixed.
     hiddenNodes: [],
   },
 
