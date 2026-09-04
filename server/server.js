@@ -120,7 +120,12 @@ const QUALITIES = new Set(['standard', 'premium', 'custom']);
 // src/statuses.js (lo que ve el cliente) y el CHECK de `status` en
 // server/schema.sql, que es la última palabra. Agregar un estado son los tres
 // sitios más la migración que amplíe el CHECK sobre la base existente.
-const STATUSES = new Set(['recibido', 'presupuestado', 'en_taller', 'listo', 'entregado', 'cancelado']);
+const STATUSES = new Set([
+    'recibido',
+    'planchado', 'desmontaje_montaje', 'pintura', 'preparacion',
+    'cuadrada', 'cristales', 'finitura',
+    'listo', 'entregado', 'cancelado'
+]);
 const PHONE_RE = /^\+51[0-9]{9}$/;
 const EMAIL_RE = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 const PART_RE = /^[A-Za-z0-9_]{1,40}$/;

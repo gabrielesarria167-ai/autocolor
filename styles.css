@@ -2990,8 +2990,13 @@ body.wizard {
 }
 
 .status-pill[data-status="recibido"],
-.status-pill[data-status="presupuestado"],
-.status-pill[data-status="en_taller"] {
+.status-pill[data-status="planchado"],
+.status-pill[data-status="desmontaje_montaje"],
+.status-pill[data-status="pintura"],
+.status-pill[data-status="preparacion"],
+.status-pill[data-status="cuadrada"],
+.status-pill[data-status="cristales"],
+.status-pill[data-status="finitura"] {
     background: var(--brand-soft);
     border-color: var(--brand-line);
     color: var(--brand-dark);
@@ -3414,18 +3419,24 @@ body.staff {
     color: var(--pill-fg);
 }
 
-/* Los seis estados del CHECK de la tabla (server/schema.sql), cada uno con su
-   tono. Con seis a la vez en pantalla, el color hace de índice: se ve dónde
-   está la carga sin leer una sola palabra.
+/* Los once estados del CHECK de la tabla (server/schema.sql), cada uno con su
+   tono. Con la tabla entera en pantalla, el color hace de índice: se ve dónde
+   está la carga sin leer una sola palabra, y por eso las siete etapas del
+   taller llevan siete matices distintos y no siete veces el mismo azul.
 
    Va sobre [data-status] a secas para que sirva igual a la píldora y a cada
    opción del menú, que es lo que les da su punto de color. */
-.staff [data-status="recibido"]      { --pill-bg: #eef0f2; --pill-fg: #46515c; --pill-dot: #7d8a97; }
-.staff [data-status="presupuestado"] { --pill-bg: #fbf1dc; --pill-fg: #85610f; --pill-dot: #d19b1e; }
-.staff [data-status="en_taller"]     { --pill-bg: #e3f2fb; --pill-fg: #0a5b93; --pill-dot: #299fdf; }
-.staff [data-status="listo"]         { --pill-bg: #e4f3e9; --pill-fg: #1a6d3c; --pill-dot: #2f9e5c; }
-.staff [data-status="entregado"]     { --pill-bg: #ecefe9; --pill-fg: #57604f; --pill-dot: #8d9682; }
-.staff [data-status="cancelado"]     { --pill-bg: #fbe9e8; --pill-fg: #a5241d; --pill-dot: #d94a41; }
+.staff [data-status="recibido"]           { --pill-bg: #eef0f2; --pill-fg: #46515c; --pill-dot: #7d8a97; }
+.staff [data-status="planchado"]          { --pill-bg: #fbf1dc; --pill-fg: #85610f; --pill-dot: #d19b1e; }
+.staff [data-status="desmontaje_montaje"] { --pill-bg: #ece7f7; --pill-fg: #55458a; --pill-dot: #8a76c8; }
+.staff [data-status="pintura"]            { --pill-bg: #e3f2fb; --pill-fg: #0a5b93; --pill-dot: #299fdf; }
+.staff [data-status="preparacion"]        { --pill-bg: #fdeee4; --pill-fg: #8f4a1e; --pill-dot: #dd7b38; }
+.staff [data-status="cuadrada"]           { --pill-bg: #f2eee6; --pill-fg: #6b5b3e; --pill-dot: #a8916a; }
+.staff [data-status="cristales"]          { --pill-bg: #e4f5f3; --pill-fg: #0f6a63; --pill-dot: #26a89c; }
+.staff [data-status="finitura"]           { --pill-bg: #fbe9f2; --pill-fg: #8e2a5b; --pill-dot: #d1508f; }
+.staff [data-status="listo"]              { --pill-bg: #e4f3e9; --pill-fg: #1a6d3c; --pill-dot: #2f9e5c; }
+.staff [data-status="entregado"]          { --pill-bg: #ecefe9; --pill-fg: #57604f; --pill-dot: #8d9682; }
+.staff [data-status="cancelado"]          { --pill-bg: #fbe9e8; --pill-fg: #a5241d; --pill-dot: #d94a41; }
 
 /* -----------------------------------------------------------------------------
    Estados de la página

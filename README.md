@@ -381,9 +381,13 @@ SELECT id, created_at::date, first_name || ' ' || last_name AS cliente,
  WHERE status NOT IN ('entregado', 'cancelado')
  ORDER BY created_at DESC;
 
-UPDATE requests SET status = 'presupuestado' WHERE id = '1234567890';
+UPDATE requests SET status = 'pintura' WHERE id = '1234567890';
 ```
 
-Estados posibles: `recibido`, `presupuestado`, `en_taller`, `listo`,
-`entregado`, `cancelado`. Es lo que ve el cliente al consultar su código.
+Estados posibles, en el orden en que los muestra el panel: `recibido`,
+`planchado`, `desmontaje_montaje`, `pintura`, `preparacion`, `cuadrada`,
+`cristales`, `finitura`, `listo`, `entregado`, `cancelado`. Los siete de en
+medio son las etapas del taller, y en la barra de filtros aparecen con su
+sigla (PL, D/M, PI, PRE, CU, CRI, FI) porque doce botones con el nombre
+completo no caben en una fila. Es lo que ve el cliente al consultar su código.
 Hay más consultas de ejemplo al final de `server/schema.sql`.

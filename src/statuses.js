@@ -23,27 +23,54 @@
 (function () {
     "use strict";
 
-    // El orden es el del recorrido real de un trabajo, no alfabético: así se
-    // lee el desplegable del taller como una línea de tiempo.
-    var ORDER = ["recibido", "presupuestado", "en_taller", "listo", "entregado", "cancelado"];
+    // Entre «recibido» y «listo» ya no hay un solo estado de «en taller», sino
+    // las siete etapas por las que pasa el trabajo dentro del local. El orden
+    // es el que dio el taller al pedirlas, para que el desplegable se lea como
+    // se nombran allí.
+    var ORDER = [
+        "recibido",
+        "planchado",
+        "desmontaje_montaje",
+        "pintura",
+        "preparacion",
+        "cuadrada",
+        "cristales",
+        "finitura",
+        "listo",
+        "entregado",
+        "cancelado"
+    ];
 
     // Lo que ve el cliente al consultar su código, y lo que lleva la píldora
-    // del panel. En femenino porque el sujeto es «la solicitud».
+    // del panel. Los cuatro estados de siempre van en femenino porque el sujeto
+    // es «la solicitud»; las siete etapas del taller llevan su propio nombre,
+    // que es un sustantivo y no concuerda con nada.
     var LABELS = {
         recibido: "Recibida",
-        presupuestado: "Presupuestada",
-        en_taller: "En el taller",
+        planchado: "Planchado",
+        desmontaje_montaje: "Desmontaje y montaje",
+        pintura: "Pintura",
+        preparacion: "Preparación",
+        cuadrada: "Cuadrada",
+        cristales: "Cristales",
+        finitura: "Finitura",
         listo: "Lista para recoger",
         entregado: "Entregada",
         cancelado: "Cancelada"
     };
 
-    // Los filtros del panel van más cortos: en una fila de siete botones,
-    // «Lista para recoger» ocuparía el ancho de tres.
+    // Los filtros del panel van más cortos: en una fila de doce botones,
+    // «Lista para recoger» ocuparía el ancho de tres. Las siete etapas usan la
+    // sigla con la que las nombra el taller, que es además la que cabe.
     var FILTER_LABELS = {
         recibido: "Recibidas",
-        presupuestado: "Presupuestadas",
-        en_taller: "En taller",
+        planchado: "PL",
+        desmontaje_montaje: "D/M",
+        pintura: "PI",
+        preparacion: "PRE",
+        cuadrada: "CU",
+        cristales: "CRI",
+        finitura: "FI",
         listo: "Listas",
         entregado: "Entregadas",
         cancelado: "Canceladas"

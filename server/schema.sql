@@ -56,13 +56,19 @@ CREATE TABLE IF NOT EXISTS requests (
     email       text,
     notes       text,
 
-    -- Esta lista es la última palabra sobre los estados. Se repite en otros
-    -- dos sitios que no pueden leerla: STATUSES en server/server.js (valida lo
-    -- que entra por PATCH) y src/statuses.js (lo que ve el cliente). Agregar un
-    -- estado son esos dos más una migración que amplíe este CHECK, porque
-    -- CREATE TABLE IF NOT EXISTS no lo toca sobre una tabla que ya existe.
+    -- Esta lista es la última palabra sobre los estados: los cuatro que ve el
+    -- cliente ('recibido', 'listo', 'entregado', 'cancelado') y las siete
+    -- etapas por las que el taller mueve el trabajo entre medias. Se repite en
+    -- otros dos sitios que no pueden leerla: STATUSES en server/server.js
+    -- (valida lo que entra por PATCH) y src/statuses.js (lo que ve el
+    -- cliente). Tocar la lista son esos dos más una migración sobre este
+    -- CHECK, porque CREATE TABLE IF NOT EXISTS no lo toca sobre una tabla que
+    -- ya existe.
     status      text        NOT NULL DEFAULT 'recibido'
-                            CHECK (status IN ('recibido', 'presupuestado', 'en_taller',
+                            CHECK (status IN ('recibido',
+                                              'planchado', 'desmontaje_montaje',
+                                              'pintura', 'preparacion', 'cuadrada',
+                                              'cristales', 'finitura',
                                               'listo', 'entregado', 'cancelado')),
 
     created_at  timestamptz NOT NULL DEFAULT now(),
@@ -108,6 +114,29 @@ ALTER TABLE requests ADD CONSTRAINT requests_vehicle_check
     CHECK (vehicle IN ('van', 'wagon', 'pickup', 'suv'));
 
 
+-- 'presupuestado' y 'en_taller' se retiraron cuando el taller pidió nombrar
+-- sus siete etapas reales. Las solicitudes que quedaron paradas en uno de los
+-- dos se mueven al estado nuevo más cercano: lo presupuestado todavía no había
+-- entrado al local, así que vuelve a 'recibido'; lo que estaba «en el taller»
+-- pasa a 'desmontaje_montaje', que es por donde empieza el trabajo dentro.
+--
+-- Aquí no hace falta el corte por fecha que sí lleva el renombrado de vehículo
+-- de arriba: aquellos dos nombres no van a volver a existir, así que un
+-- `npm run db:schema` repetido no tiene nada que pisar.
+--
+-- El CHECK se retira antes del UPDATE porque el de la base vieja no nombra
+-- ninguna de las siete etapas y rechazaría las filas nuevas.
+ALTER TABLE requests DROP CONSTRAINT IF EXISTS requests_status_check;
+UPDATE requests SET status = 'recibido'           WHERE status = 'presupuestado';
+UPDATE requests SET status = 'desmontaje_montaje' WHERE status = 'en_taller';
+ALTER TABLE requests ADD CONSTRAINT requests_status_check
+    CHECK (status IN ('recibido',
+                      'planchado', 'desmontaje_montaje',
+                      'pintura', 'preparacion', 'cuadrada',
+                      'cristales', 'finitura',
+                      'listo', 'entregado', 'cancelado'));
+
+
 -- La cola de trabajo del taller: lo pendiente, lo más antiguo primero.
 CREATE INDEX IF NOT EXISTS requests_status_created_at_idx
     ON requests (status, created_at DESC);
@@ -146,7 +175,7 @@ CREATE TRIGGER requests_touch_updated_at
 --
 -- Cambiar el estado (es lo que verá el cliente al consultar su código):
 --
---   UPDATE requests SET status = 'presupuestado' WHERE id = '1234567890';
+--   UPDATE requests SET status = 'pintura' WHERE id = '1234567890';
 --
 -- Cuántas solicitudes hay por estado:
 --
