@@ -41,11 +41,19 @@
     }
 
     /* ===== Hero colour preview =====
-       The tint layer is masked with the vehicle silhouette and blended in
-       `color` mode, so it repaints the bodywork while keeping the original
-       highlights and shadows. Neutral finishes (pearl white, onyx) can't be
-       produced that way — a grey in `color` mode just desaturates — so those
-       swatches drive a filter on the image instead. */
+       Two layers stacked on the photo, both cut to the bodywork by the same
+       mask (see .hero__vehicle-paint in styles.css):
+
+         data-filter        light/dark and saturation of the paint
+         data-tint          the hue, blended in `color` mode
+         data-tint-opacity  how much of that hue lands
+
+       Chromatic finishes need both — the tint alone over light beige comes out
+       pink rather than red, so the filter darkens the panel first. The neutral
+       finishes need only the filter: a grey in `color` mode has no hue to give.
+
+       Whatever an attribute doesn't say falls back to the neutral value, so a
+       swatch that sets nothing shows the original paint. */
     var vehicle = document.getElementById("heroVehicle");
     var swatchRow = document.querySelector(".swatches__row");
 
@@ -55,12 +63,11 @@
         var apply = function (button) {
             var tint = button.getAttribute("data-tint") || "";
             var filter = button.getAttribute("data-filter") || "";
-            var boost = button.getAttribute("data-boost") || "";
+            var opacity = button.getAttribute("data-tint-opacity") || "";
 
             vehicle.style.setProperty("--vehicle-tint", tint || "transparent");
-            vehicle.style.setProperty("--vehicle-tint-opacity", tint ? "1" : "0");
+            vehicle.style.setProperty("--vehicle-tint-opacity", tint ? (opacity || "1") : "0");
             vehicle.style.setProperty("--vehicle-filter", filter || "none");
-            vehicle.style.setProperty("--vehicle-boost", boost || "none");
 
             swatches.forEach(function (other) {
                 var active = other === button;

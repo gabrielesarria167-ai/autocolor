@@ -1529,43 +1529,65 @@ body.home {
 
 .hero__vehicle {
     position: relative;
+    /* isolation, so the `color` blend of the tint sees the vehicle as its
+       backdrop and not the hero behind it. */
     isolation: isolate;
     width: min(100%, 520px);
     line-height: 0;
-    /* Applied after the tint has been composited, so it saturates the
-       finished paint rather than the beige photo underneath it. */
-    filter: var(--vehicle-boost, none);
-    transition: filter 0.45s var(--ease-out);
 }
 
 .hero__vehicle-img {
     display: block;
     width: 100%;
     height: auto;
-    filter: var(--vehicle-filter, none);
-    transition: filter 0.45s var(--ease-out);
 }
 
+/* Las dos capas de pintura se recortan con la misma máscara: un PNG del mismo
+   tamaño cuyo canal alfa vale 1 sobre la chapa y 0 sobre cristales, neumáticos,
+   llantas, cromados, faros, placa y logo. Se generó a partir de la propia foto
+   (ver README) porque la carrocería beige es lo único de tono cálido que hay
+   en ella; lo demás es gris o negro.
+
+   Antes se usaba la foto misma como máscara de luminancia, y por eso el color
+   se comía el coche entero: la luminancia solo distingue claro de oscuro, así
+   que la parrilla cromada y los faros —que son claros— se pintaban igual que
+   la chapa, y los neumáticos quedaban de un rojo apagado en vez de negros. */
+.hero__vehicle-paint,
 .hero__vehicle-tint {
     position: absolute;
     inset: 0;
-    background: var(--vehicle-tint, transparent);
-    mix-blend-mode: color;
-    opacity: var(--vehicle-tint-opacity, 0);
-    -webkit-mask-image: url("imgs/assets/suv.png");
-    mask-image: url("imgs/assets/suv.png");
+    pointer-events: none;
+    -webkit-mask-image: url("imgs/assets/suv-paint-mask.png");
+    mask-image: url("imgs/assets/suv-paint-mask.png");
     -webkit-mask-size: 100% 100%;
     mask-size: 100% 100%;
     -webkit-mask-repeat: no-repeat;
     mask-repeat: no-repeat;
-    /* Luminance masking is what keeps the tyres, glass and roof rails dark:
-       the mask strength follows the brightness of each pixel, so only the
-       light bodywork takes the colour. Browsers without it fall back to the
-       alpha mask, which still works — the whole silhouette just tints. */
-    -webkit-mask-source-type: luminance;
-    mask-mode: luminance;
+}
+
+/* Copia de la foto encima de sí misma, recortada a la chapa y filtrada: es lo
+   que cambia el claro/oscuro. Con el filtro en `none` dibuja exactamente los
+   mismos píxeles que hay debajo, así que el estado inicial no se ve alterado
+   ni siquiera en el borde suave de la máscara.
+
+   El filtro va aquí y no sobre la foto entera, que es lo que hacía que el
+   blanco perla y el negro onyx apagaran también los pilotos traseros. */
+.hero__vehicle-paint {
+    background-image: url("imgs/assets/suv.png");
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+    filter: var(--vehicle-filter, none);
+    transition: filter 0.45s var(--ease-out);
+}
+
+/* El color plano en modo `color` toma el tono y la saturación del swatch y
+   respeta la luminancia que dejó la capa de abajo, que es lo que conserva
+   reflejos, sombras y las juntas entre piezas. */
+.hero__vehicle-tint {
+    background: var(--vehicle-tint, transparent);
+    mix-blend-mode: color;
+    opacity: var(--vehicle-tint-opacity, 0);
     transition: background 0.45s var(--ease-out), opacity 0.45s var(--ease-out);
-    pointer-events: none;
 }
 
 .swatches {

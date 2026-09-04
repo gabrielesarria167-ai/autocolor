@@ -136,6 +136,7 @@
                         <div class="hero__vehicle" id="heroVehicle">
                             <img src="imgs/assets/suv.png" alt="Vehículo pintado en Autocolor"
                                 class="hero__vehicle-img" id="heroVehicleImg" width="1024" height="1024">
+                            <span class="hero__vehicle-paint" aria-hidden="true"></span>
                             <span class="hero__vehicle-tint" aria-hidden="true"></span>
                         </div>
                     </div>
@@ -144,32 +145,32 @@
                         <p class="swatches__label" id="swatchesLabel">Previsualiza el color</p>
                         <div class="swatches__row" role="radiogroup" aria-labelledby="swatchesLabel">
                             <button type="button" class="swatch is-active" role="radio" aria-checked="true"
-                                data-tint="" data-filter="" data-boost="" style="--sw:#cbbda4"
+                                data-tint="" data-filter="" data-tint-opacity="" style="--sw:#cbbda4"
                                 title="Color original">
                                 <span class="sr-only">Color original</span>
                             </button>
                             <button type="button" class="swatch" role="radio" aria-checked="false"
-                                data-tint="#d61f14" data-filter="brightness(0.72)" data-boost="saturate(2.4) contrast(1.06)"
-                                style="--sw:#e5352b" title="Rojo Fuego">
+                                data-tint="#d61f14" data-filter="brightness(0.74)" data-tint-opacity="0.92"
+                                style="--sw:#d61f14" title="Rojo Fuego">
                                 <span class="sr-only">Rojo Fuego</span>
                             </button>
                             <button type="button" class="swatch" role="radio" aria-checked="false"
-                                data-tint="#1f6feb" data-filter="brightness(0.76)" data-boost="saturate(2.1)"
+                                data-tint="#1f6feb" data-filter="brightness(0.78)" data-tint-opacity="0.92"
                                 style="--sw:#1f6feb" title="Azul Océano">
                                 <span class="sr-only">Azul Océano</span>
                             </button>
                             <button type="button" class="swatch" role="radio" aria-checked="false"
-                                data-tint="#0f7a4f" data-filter="brightness(0.74)" data-boost="saturate(2.3)"
+                                data-tint="#0f7a4f" data-filter="brightness(0.80)" data-tint-opacity="0.92"
                                 style="--sw:#0f7a4f" title="Verde Bosque">
                                 <span class="sr-only">Verde Bosque</span>
                             </button>
                             <button type="button" class="swatch" role="radio" aria-checked="false" data-tint=""
-                                data-filter="saturate(0.07) brightness(1.2) contrast(0.98)" data-boost=""
-                                style="--sw:#dcdcdc" title="Blanco Perla">
+                                data-filter="saturate(0.05) brightness(1.22)" data-tint-opacity=""
+                                style="--sw:#e8e8e6" title="Blanco Perla">
                                 <span class="sr-only">Blanco Perla</span>
                             </button>
-                            <button type="button" class="swatch" role="radio" aria-checked="false" data-tint=""
-                                data-filter="saturate(0.06) brightness(0.3) contrast(1.3)" data-boost=""
+                            <button type="button" class="swatch" role="radio" aria-checked="false" data-tint="#2a2f3a"
+                                data-filter="saturate(0.30) brightness(0.30)" data-tint-opacity="0.55"
                                 style="--sw:#22242a" title="Negro Onyx">
                                 <span class="sr-only">Negro Onyx</span>
                             </button>
