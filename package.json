@@ -4,6 +4,9 @@
   "private": true,
   "description": "Autocolor — sitio y asistente de cotización de pintura automotriz",
   "type": "commonjs",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "start": "node server/server.js",
     "db:init": "./server/pgserver.sh init",
@@ -11,7 +14,8 @@
     "db:stop": "./server/pgserver.sh stop",
     "db:status": "./server/pgserver.sh status",
     "db:psql": "./server/pgserver.sh psql",
-    "db:schema": "./server/pgserver.sh schema"
+    "db:schema": "./server/pgserver.sh schema",
+    "db:migrate": "node server/migrate.js"
   },
   "dependencies": {
     "pg": "^8.13.1"

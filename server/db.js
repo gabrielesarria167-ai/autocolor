@@ -9,22 +9,42 @@
 const crypto = require('node:crypto');
 const { Pool } = require('pg');
 
-// Autocolor tiene su propio servidor Postgres, en su propio puerto — no
-// comparte clúster con los demás proyectos de la máquina (ver
-// server/pgserver.sh). El puerto va escrito aquí y no se deja en manos de
-// libpq justamente por eso: sin él, el valor por omisión es el 5432 del
-// Postgres general, y la aplicación terminaría escribiendo en el clúster
-// compartido sin que nadie lo note.
-const pool = new Pool({
-    host: process.env.PGHOST || 'localhost',
-    port: Number(process.env.PGPORT) || 5434,
-    database: process.env.PGDATABASE || 'autocolor',
-    user: process.env.PGUSER,          // por omisión, el usuario del sistema
-    password: process.env.PGPASSWORD,
-    max: 10,
-    idleTimeoutMillis: 30_000,
-    connectionTimeoutMillis: 5_000,
-});
+// Un servicio alojado entrega la base como una sola URL. Cuando DATABASE_URL
+// está puesta manda entera —host, puerto, base, usuario, contraseña y TLS
+// salen de ahí— y el bloque local de abajo no se toca.
+//
+// Son dos ramas y no una configuración mezclada a propósito:
+// `new Pool({ connectionString, port: 5434 })` no combina las dos cosas. pg
+// hace `Object.assign({}, config, parse(connectionString))`, así que la URL
+// pisa lo que haya al lado, y el 5434 quedaría escrito sin significar nada.
+const DATABASE_URL = process.env.DATABASE_URL || '';
+
+const pool = new Pool(DATABASE_URL
+    ? {
+        connectionString: DATABASE_URL,
+        max: 10,
+        idleTimeoutMillis: 30_000,
+        // Más holgado que en local: la base gestionada suspende el cómputo
+        // cuando nadie la usa, y la primera conexión después de eso paga el
+        // arranque además de la red y el TLS.
+        connectionTimeoutMillis: 15_000,
+    }
+    : {
+        // Autocolor tiene su propio servidor Postgres, en su propio puerto — no
+        // comparte clúster con los demás proyectos de la máquina (ver
+        // server/pgserver.sh). El puerto va escrito aquí y no se deja en manos de
+        // libpq justamente por eso: sin él, el valor por omisión es el 5432 del
+        // Postgres general, y la aplicación terminaría escribiendo en el clúster
+        // compartido sin que nadie lo note.
+        host: process.env.PGHOST || 'localhost',
+        port: Number(process.env.PGPORT) || 5434,
+        database: process.env.PGDATABASE || 'autocolor',
+        user: process.env.PGUSER,          // por omisión, el usuario del sistema
+        password: process.env.PGPASSWORD,
+        max: 10,
+        idleTimeoutMillis: 30_000,
+        connectionTimeoutMillis: 5_000,
+    });
 
 // node-postgres emite 'error' en el pool cuando se cae una conexión que estaba
 // ociosa —Postgres reiniciado, la red cortada, el servidor reciclándola—. En
@@ -33,6 +53,10 @@ const pool = new Pool({
 //
 // No se relanza a propósito: la conexión rota ya la descarta el pool solo, y la
 // siguiente consulta abrirá otra. Lo único que hace falta es que quede escrito.
+//
+// Contra una base gestionada esto deja de ser una precaución y pasa a ser el
+// caso normal: suspende el cómputo cuando nadie la usa y corta las conexiones
+// ociosas ella misma, así que la línea se ve en el registro cada tanto.
 pool.on('error', (err) => {
     console.error('[db] conexión ociosa perdida:', err.message);
 });
@@ -181,10 +205,50 @@ async function updateRequestStatus(id, status) {
     return { id: rows[0].id.trim(), status: rows[0].status, updatedAt: rows[0].updated_at };
 }
 
-// Se llama al arrancar, para fallar con un mensaje claro si la base no está
-// levantada en vez de al primer cliente que envíe el formulario.
-async function ping() {
-    await pool.query('SELECT 1');
+/**
+ * Se llama al arrancar, para fallar con un mensaje claro si la base no está
+ * levantada en vez de al primer cliente que envíe el formulario.
+ *
+ * `attempts` existe por las bases gestionadas, que suspenden el cómputo cuando
+ * nadie las usa: el primer intento después de eso se agota mientras la base
+ * despierta. Sin reintento, arrancar contra una base dormida mata el proceso
+ * antes de abrir el puerto, y el alojamiento da el despliegue por fallido.
+ *
+ * Por omisión un solo intento, que es lo que corresponde en local: allí una
+ * base que no responde es una base apagada, y esperar no la va a encender.
+ */
+async function ping(options) {
+    const attempts = (options || {}).attempts || 1;
+    for (let attempt = 1; ; attempt++) {
+        try {
+            await pool.query('SELECT 1');
+            return;
+        } catch (err) {
+            if (attempt >= attempts) throw err;
+            await new Promise((resolve) => setTimeout(resolve, 1_000 * attempt));
+        }
+    }
 }
 
-module.exports = { createRequest, findRequest, listRequests, updateRequestStatus, ping, pool };
+/**
+ * A qué base se conectó, para los mensajes de arranque.
+ *
+ * Nunca la contraseña: DATABASE_URL la lleva dentro, y estas líneas terminan
+ * en el registro del alojamiento, que es justo donde no debe quedar escrita.
+ */
+function describe() {
+    if (!DATABASE_URL) {
+        return `${process.env.PGDATABASE || 'autocolor'} en localhost:${Number(process.env.PGPORT) || 5434}`;
+    }
+    try {
+        const url = new URL(DATABASE_URL);
+        return `${url.pathname.slice(1) || '(sin nombre)'} en ${url.host}`;
+    } catch {
+        return '(DATABASE_URL no se pudo leer)';
+    }
+}
+
+module.exports = {
+    createRequest, findRequest, listRequests, updateRequestStatus,
+    ping, describe, pool, DATABASE_URL,
+};
