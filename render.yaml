@@ -40,11 +40,26 @@ services:
       - key: HOST
         value: "0.0.0.0"
 
-      # Un proxy de confianza delante: el borde de Render, que termina el TLS y
-      # añade X-Forwarded-For. Sin esto, los límites por IP cuentan a todos los
-      # visitantes como uno solo — ver clientIp() en server/server.js.
+      # TRES proxies de confianza delante, no uno. Medido con
+      # /api/staff/whoami contra el sitio ya desplegado, que para esto es la
+      # única fuente fiable:
+      #
+      #     x-forwarded-for: 151.62.162.119, 172.70.34.4, 10.26.204.136
+      #                      ^el cliente     ^Cloudflare  ^el router de Render
+      #
+      # clientIp() cuenta desde la derecha, así que con TRUST_PROXY=3 sale el
+      # primero — el cliente de verdad — y sigue saliendo aunque alguien mande
+      # su propia cabecera, porque los tres saltos de la derecha los escriben
+      # los proxies y no él.
+      #
+      # Con 1 salía el router interno de Render, que rota entre tres
+      # direcciones: los límites por IP se repartían en tres cubos y no
+      # frenaban nada. Y no se veía desde fuera — de ahí /api/staff/whoami.
+      #
+      # Si algún día cambia la topología del alojamiento, este número cambia
+      # con ella. Comprobarlo con whoami después de tocarlo.
       - key: TRUST_PROXY
-        value: "1"
+        value: "3"
 
       # El sitio se sirve por https, así que la cookie del panel viaja Secure.
       - key: AUTOCOLOR_STAFF_COOKIE_SECURE
