@@ -1,0 +1,72 @@
+# Despliegue en Render (https://render.com), un solo servicio.
+#
+# El mismo proceso sirve el sitio y la API. No son dos —el sitio en un
+# alojamiento estático y la API aparte— porque el panel del taller no
+# funcionaría: src/staff.js manda sus peticiones con credentials:
+# "same-origin", la cookie de sesión es SameSite=Strict y el servidor no emite
+# Access-Control-Allow-Credentials. Desde otro dominio, el panel respondería 401
+# para siempre. Por eso ALLOWED_ORIGINS se queda vacío: no hay peticiones entre
+# dominios que permitir.
+#
+# La base es Neon (https://neon.tech), aparte de Render. La de Render caduca a
+# los 30 días en el plan gratuito; la de Neon, no.
+#
+# El esquema NO se aplica desde aquí. Ver server/migrate.js: schema.sql toca
+# filas vivas, y un fallo suyo en buildCommand tumbaría el sitio entero por un
+# problema de la base. Se corre a mano, una vez, desde la máquina de trabajo.
+
+services:
+  - type: web
+    name: autocolor
+    runtime: node
+    plan: free
+    # La misma región de nube que el proyecto de Neon: lo que domina el tiempo
+    # de respuesta son las idas y vueltas entre la aplicación y la base.
+    region: virginia
+    branch: main
+    buildCommand: npm ci
+    startCommand: npm start
+    # Ver el manejador de /healthz en server/server.js: contesta sin tocar la
+    # base, a propósito.
+    healthCheckPath: /healthz
+    autoDeploy: true
+
+    envVars:
+      # Render escucha en el puerto que anuncia por PORT —que ya lee
+      # server/server.js— y necesita que el proceso ate 0.0.0.0. El 127.0.0.1
+      # por omisión es deliberado (ver el comentario junto a HOST en
+      # server/server.js) y se queda como está: esto es una decisión de este
+      # despliegue, no del programa. PORT no se pone aquí; lo da Render.
+      - key: HOST
+        value: "0.0.0.0"
+
+      # Un proxy de confianza delante: el borde de Render, que termina el TLS y
+      # añade X-Forwarded-For. Sin esto, los límites por IP cuentan a todos los
+      # visitantes como uno solo — ver clientIp() en server/server.js.
+      - key: TRUST_PROXY
+        value: "1"
+
+      # El sitio se sirve por https, así que la cookie del panel viaja Secure.
+      - key: AUTOCOLOR_STAFF_COOKIE_SECURE
+        value: "1"
+
+      # Explícito para que se lea que está vacío a propósito, y no por olvido.
+      - key: ALLOWED_ORIGINS
+        value: ""
+
+      # Los dos secretos se escriben a mano en el panel de Render y no viven en
+      # el repositorio, que se publica entero.
+      #
+      # La URL de Neon: la directa (no la de -pooler), con sslmode=verify-full
+      # y sin channel_binding. La que Neon da para copiar trae
+      # 'sslmode=require', que en esta versión de pg significa verify-full
+      # igual, pero imprime un aviso de obsolescencia y cambiará a algo más
+      # débil en pg 9; 'channel_binding' pg lo ignora.
+      - key: DATABASE_URL
+        sync: false
+
+      # Sin ella, /api/staff/* responde 503 y el panel queda apagado. Se lee una
+      # sola vez al arrancar (server/auth.js), así que cambiarla exige reiniciar
+      # el servicio.
+      - key: AUTOCOLOR_STAFF_PASSWORD
+        sync: false

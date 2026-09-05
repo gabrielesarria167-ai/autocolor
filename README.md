@@ -84,8 +84,10 @@ lo abre a propósito, por ejemplo para probar el sitio desde el móvil.
 | `server/auth.js` | La contraseña y las sesiones del panel del taller |
 | `server/env.js` | Lee el `.env` de la raíz al arrancar |
 | `_config.yml` | Qué no se publica en GitHub Pages |
+| `render.yaml`, `.nvmrc` | El despliegue en Render |
 | `server/pgserver.sh` | Crea y controla el servidor Postgres propio |
 | `server/schema.sql` | Tabla `requests` + consultas útiles para el taller |
+| `server/migrate.js` | Aplica `schema.sql` a la base local o a la alojada |
 | `imgs/assets/3d-visuals/` | Modelos `.glb` servidos y las páginas donde se prepararon |
 
 ## Publicar el sitio
@@ -96,28 +98,21 @@ Pages, Netlify sin funciones, S3) sirve el HTML pero no puede correr ese
 servidor — ahí el formulario responde `405` al enviar, porque no hay nada
 que atienda el `POST`.
 
-Hay dos formas de publicarlo:
+**Un solo servicio sirve el sitio y la API**, desde el mismo origen. Un
+servicio que corra Node (Render, Railway, Fly.io, un VPS) con una base Postgres
+al lado; `AUTOCOLOR_API_BASE` se queda vacío y el sitio le habla a su propio
+origen. Ver «Desplegar en Render» más abajo, que es lo que está configurado.
 
-1. **Todo junto.** Un servicio que corra Node (Render, Railway, Fly.io, un
-   VPS) sirve el sitio y la API desde el mismo dominio, con una base
-   Postgres al lado. No hay nada que configurar: `AUTOCOLOR_API_BASE` se
-   queda vacío y el sitio le habla a su propio origen.
-
-2. **Separados.** El sitio en GitHub Pages y la API en otro servicio. Ahí
-   hacen falta dos cosas:
-
-   - En `src/config.js`, el origen de la API:
-
-     ```js
-     window.AUTOCOLOR_API_BASE = "https://api-de-autocolor.example";
-     ```
-
-   - En el servidor, el origen del sitio, o el navegador bloqueará las
-     peticiones por CORS:
-
-     ```bash
-     ALLOWED_ORIGINS=https://gabrielesarria167-ai.github.io npm start
-     ```
+Separarlos —el sitio en GitHub Pages y la API en otro servicio— **no es una
+opción mientras el panel del taller exista tal como está**. El asistente
+público sí funcionaría, poniendo el origen de la API en `src/config.js` y el
+del sitio en `ALLOWED_ORIGINS`; el panel, no: `src/staff.js` manda sus
+peticiones con `credentials: "same-origin"`, la cookie de sesión es
+`SameSite=Strict` y el servidor no emite `Access-Control-Allow-Credentials`.
+Desde otro dominio la cookie no viaja y el panel responde 401 para siempre.
+Son tres cambios en tres archivos, y ninguno es gratis: `SameSite=Strict` está
+puesto justamente para que la cookie no salga en peticiones nacidas en otro
+sitio.
 
 Mientras no haya API detrás, el sitio publicado lo dice con todas sus
 letras en vez de pedir que se reintente: el formulario avisa que el envío no
@@ -137,6 +132,89 @@ Lo que queda fuera de la publicación:
 
 Excluir la página la **esconde, no la cierra**: lo que protege los datos sigue
 siendo la contraseña de la API (`server/auth.js`).
+
+## Desplegar en Render
+
+`render.yaml` describe el despliegue: un servicio web que sirve el sitio y la
+API, con la base en [Neon](https://neon.tech) aparte. La de Render caduca a los
+30 días en el plan gratuito; la de Neon, no.
+
+La primera vez, en este orden:
+
+1. **Crear el proyecto en Neon** y copiar la URL de conexión **directa** (no la
+   de `-pooler`). Editarla a mano: `?sslmode=verify-full`, y fuera
+   `channel_binding`. La que dan para copiar trae `sslmode=require`, que en
+   esta versión de `pg` significa lo mismo pero imprime un aviso de
+   obsolescencia y en `pg` 9 pasará a comprobar menos.
+
+2. **Aplicar el esquema**, desde esta máquina y una sola vez:
+
+   ```bash
+   DATABASE_URL='postgresql://…?sslmode=verify-full' npm run db:migrate
+   ```
+
+   No se aplica en el despliegue a propósito: `schema.sql` toca filas vivas
+   (ver las migraciones de `vehicle` y de `status`), y un fallo suyo dentro del
+   `buildCommand` tumbaría el sitio entero por un problema de la base. Correrlo
+   a mano es también poder mirar qué hizo.
+
+3. **Crear el Blueprint en Render** apuntando al repositorio, y escribir en su
+   panel los dos secretos que `render.yaml` deja marcados `sync: false`:
+   `DATABASE_URL` y `AUTOCOLOR_STAFF_PASSWORD`. La contraseña se lee una sola
+   vez al arrancar, así que cambiarla exige reiniciar el servicio.
+
+Después, cada `push` a `main` vuelve a desplegar solo. Cuando `schema.sql`
+cambie, repetir el paso 2.
+
+### `npm run db:migrate` y `npm run db:schema`
+
+Hacen lo mismo y no son intercambiables:
+
+| | Qué usa | Sirve para |
+|---|---|---|
+| `db:schema` | `psql` y los binarios de Postgres.app, con el puerto 5434 escrito | Solo la base de esta máquina |
+| `db:migrate` | El mismo pool que la aplicación (`server/db.js`) | La de esta máquina **y** la de cualquier servicio alojado |
+
+`db:migrate` manda el archivo entero en una sola consulta sin parámetros, que
+es lo que hace que Postgres acepte varias sentencias seguidas —partirlo por
+`;` rompería los cuerpos `plpgsql` entre `$$`— y las ejecute en una única
+transacción, de modo que un fallo no deja media migración aplicada.
+
+### Lo que hace falta detrás de un proxy
+
+Tres variables, y `render.yaml` ya las trae puestas:
+
+| Variable | Por qué |
+|---|---|
+| `HOST=0.0.0.0` | Render da el despliegue por vivo escaneando el puerto y solo ve lo atado a `0.0.0.0`. Con la dirección de bucle el despliegue se cuelga sin más explicación que un tiempo agotado |
+| `TRUST_PROXY=1` | Sin ella, todas las peticiones parecen venir del proxy y **los tres límites por IP se funden en uno solo**: cinco contraseñas erradas de cualquier visitante y el taller no puede entrar. Ver `clientIp()` en `server/server.js`, que lee `X-Forwarded-For` desde la derecha justamente para que nadie pueda inventarse la suya |
+| `AUTOCOLOR_STAFF_COOKIE_SECURE=1` | El sitio va por https y la cookie de sesión tiene que viajar `Secure` |
+
+El servidor avisa por consola al arrancar si está en Render y le falta alguna
+de las dos primeras.
+
+### Lo que el plan gratuito significa
+
+Conviene saberlo antes de repartir el enlace:
+
+- **El servicio se duerme a los 15 minutos sin visitas.** El siguiente visitante
+  espera entre medio minuto y uno mientras arranca, más lo que tarde Neon en
+  despertar su cómputo.
+- **Las sesiones del panel y los contadores del límite viven en memoria** y se
+  pierden con el proceso. `SESSION_MS` dice ocho horas; en el plan gratuito su
+  valor real es «hasta el próximo cuarto de hora tranquilo». Cada `push` a
+  `main` también cierra la sesión del taller.
+- **No poner un cron que lo despierte.** 24/7 son unas 730 horas contra un tope
+  de 750 al mes: se gastaría la cuota entera en comprar el problema del
+  arranque en frío.
+- **100 GB de salida al mes.** Cada primera visita que llega al paso 3 se lleva
+  un `.glb` de entre 9.5 y 20.5 MB, así que son del orden de 5 000 a 10 000
+  primeras visitas. Las repetidas dentro del día no cuentan, por el
+  `Cache-Control` de `/imgs/`.
+
+El instante gratuito se quita con el plan de pago de Render. Lo que arregla las
+sesiones en cualquier plan —incluso al desplegar, que el plan de pago no cubre—
+es guardarlas en una tabla en vez de en memoria.
 
 ## Fuentes de los modelos 3D
 

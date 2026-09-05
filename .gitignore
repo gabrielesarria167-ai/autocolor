@@ -9,3 +9,6 @@ node_modules/
 *.blend
 *.blend1
 imgs/assets/3d-visuals/**/src/
+
+# Notas de trabajo, con datos del taller que no tienen por qué publicarse.
+LAUNCH-CHECKLIST.md
