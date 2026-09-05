@@ -2085,15 +2085,6 @@ body.home {
     line-height: 1.65;
 }
 
-.faq__todo {
-    padding: 10px 12px;
-    border-left: 3px solid var(--brand);
-    background: var(--brand-soft);
-    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-    color: var(--brand-dark);
-    font-size: 0.86rem;
-}
-
 /* ===== Home: contact ===== */
 .contact {
     display: grid;
