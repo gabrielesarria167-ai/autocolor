@@ -244,7 +244,7 @@ lo que hace usable el paso 3 en un móvil:
 
 | Modelo | Original | Servido |
 |---|---|---|
-| `van.glb` | 91.7 MB | 20.5 MB |
+| `van.glb` | 91.7 MB | 6.9 MB |
 | `pickup.glb` | 47.8 MB | 12.6 MB |
 | `wagon.glb` | 35.4 MB | 10.0 MB |
 | `suv.glb` | 27.6 MB | 9.5 MB |
@@ -255,12 +255,13 @@ se sabe cuál de los pasos fue—:
 
 ```bash
 npx --yes @gltf-transform/cli@4.5 prune   src/MODELO.glb s1.glb --keep-attributes false --keep-leaves true
-npx --yes @gltf-transform/cli@4.5 reorder s1.glb         s2.glb --target size
-npx --yes @gltf-transform/cli@4.5 webp    s2.glb         s3.glb                    # pickup y suv
-npx --yes @gltf-transform/cli@4.5 meshopt s3.glb         MODELO.glb --level medium
+node tools/weld-smooth-normals.mjs        s1.glb         s2.glb                    # solo el van; ver abajo
+npx --yes @gltf-transform/cli@4.5 reorder s2.glb         s3.glb --target size
+npx --yes @gltf-transform/cli@4.5 webp    s3.glb         s4.glb                    # pickup y suv
+npx --yes @gltf-transform/cli@4.5 meshopt s4.glb         MODELO.glb --level medium
 ```
 
-Cuatro cosas que no son gusto personal:
+Cinco cosas que no son gusto personal:
 
 - **`meshopt` va último.** Corrido antes que `webp`, el paso de texturas
   descomprime la geometría para poder tocarla y el archivo termina *más grande*
@@ -271,6 +272,20 @@ Cuatro cosas que no son gusto personal:
 - **`--level medium`**, no `high`. La selección se dibuja como una malla
   superpuesta que comparte la `BufferGeometry` del panel, así que una grieta de
   cuantización saldría a la vez en la chapa y en su marca roja.
+- **El paso de soldadura, solo en el van.** Su export de Blender daba a cada
+  esquina de triángulo su propio vértice: 2 574 420 vértices para 953 000
+  triángulos, contra 0.8–1.0 por triángulo en los otros tres. No era más
+  detalle —el familiar tiene más triángulos y pesaba la mitad—, eran copias del
+  mismo punto sin compartir, y se llevaban 19 de los 20.5 MB. `weld` a secas no
+  las une (cada copia trae su propia normal, así que ninguna es bitwise igual a
+  otra: sobre 2.5 millones unía mil) y `simplify` tampoco puede hacer nada,
+  porque cada vértice es una costura y no hay aristas que colapsar. Quitando
+  las normales, soldando y recalculándolas suaves: 550 046 vértices y 6.9 MB.
+  Vale para este modelo porque sus normales ya eran suaves —recalcularlas mueve
+  el render 0.3–0.6 sobre 255 de media, y menos del 0.33 % de los píxeles del
+  vehículo lo bastante como para verse—; en un modelo con aristas duras de
+  verdad las redondearía. Ver la cabecera de `tools/weld-smooth-normals.mjs`.
+
 - **Nunca `optimize` ni `gltfpack`.** Los dos incluyen pasos que aplanan la
   jerarquía, fusionan mallas y renombran nodos. El archivo carga igual de bien
   y el selector de piezas deja de funcionar, sin un solo error en consola.
