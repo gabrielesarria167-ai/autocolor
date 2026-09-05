@@ -23,8 +23,12 @@
      la dirección directa, y lo que la protege es la contraseña que pide la API
      (server/auth.js), no el hecho de que no esté enlazada.
 
-     Además queda fuera de la publicación: _config.yml la excluye de GitHub
-     Pages, así que en el sitio público no existe. -->
+     Esta página SÍ se sirve en el sitio público: el despliegue es Render (ver
+     render.yaml) y ahí la sirve el servidor de server/server.js, que no la
+     excluye —ni podría, porque es la que hay que abrir para entrar—. El
+     `exclude` de _config.yml solo manda en GitHub Pages, que ya no es el
+     alojamiento. Sin la contraseña esta página no enseña nada: los datos los
+     da la API, no el HTML. -->
 
 <body class="staff">
 

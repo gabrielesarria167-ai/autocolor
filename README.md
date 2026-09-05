@@ -478,8 +478,11 @@ horas que vive en la memoria del proceso, de modo que reiniciar el servidor
 obliga a entrar de nuevo. Detrás de https hay que añadir
 `AUTOCOLOR_STAFF_COOKIE_SECURE=1`.
 
-El panel **no está en GitHub Pages**: `_config.yml` lo excluye de la
-publicación, y aunque estuviera no tendría API que consultar.
+El panel **sí se sirve en el sitio público** —`https://…/pgs/taller.html`—,
+porque el despliegue es Render y ahí el mismo servidor sirve el sitio y la API.
+El `exclude` de `_config.yml` solo manda en GitHub Pages, que ya no es el
+alojamiento. No está enlazado desde ninguna página y lleva `noindex`, pero eso
+lo esconde, no lo cierra: lo que lo cierra es la contraseña de la API.
 
 Todo esto también se puede hacer a mano desde psql:
 

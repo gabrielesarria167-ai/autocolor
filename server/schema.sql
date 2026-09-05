@@ -105,11 +105,17 @@ ALTER TABLE requests ADD COLUMN IF NOT EXISTS color_code text;
 -- dibujar. La fecha es la del commit que agregó el modelo: antes de ella no
 -- había ninguna SUV real que proteger.
 --
+-- Lleva el huso escrito. Sin él, Postgres resuelve la fecha en el TimeZone de
+-- la sesión, y el corte cae cinco horas más tarde aplicando esto desde la
+-- máquina de trabajo (America/Lima) que contra Neon (UTC): una SUV de verdad
+-- creada en esa franja se reescribiría a 'pickup', que es exactamente lo que
+-- el corte existe para impedir.
+--
 -- El CHECK se retira antes del UPDATE: el de la base vieja no nombra 'suv' y
 -- rechazaría las filas nuevas.
 ALTER TABLE requests DROP CONSTRAINT IF EXISTS requests_vehicle_check;
 UPDATE requests SET vehicle = 'pickup'
- WHERE vehicle = 'suv' AND created_at < timestamptz '2026-09-04';
+ WHERE vehicle = 'suv' AND created_at < timestamptz '2026-09-04 00:00+00';
 ALTER TABLE requests ADD CONSTRAINT requests_vehicle_check
     CHECK (vehicle IN ('van', 'wagon', 'pickup', 'suv'));
 

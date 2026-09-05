@@ -83,7 +83,6 @@
                                 <path d="M5 12h14M13 6l6 6-6 6" />
                             </svg>
                         </a>
-                        <!-- TODO: reemplaza el número por el WhatsApp real del taller (formato 51987654321) -->
                         <a class="btn btn--ghost btn--lg" href="https://wa.me/51935646304" target="_blank"
                             rel="noopener">
                             <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -577,7 +576,6 @@
 
                         <div class="hero__actions">
                             <a class="btn btn--primary btn--lg" href="pgs/repair.html">Cotizar mi vehículo</a>
-                            <!-- TODO: reemplaza el número por el WhatsApp real del taller -->
                             <a class="btn btn--ghost btn--lg" href="https://wa.me/51935646304" target="_blank"
                                 rel="noopener">WhatsApp</a>
                         </div>
@@ -586,12 +584,10 @@
                     <ul class="contact__details reveal">
                         <li>
                             <span class="contact__label">Dirección</span>
-                            <!-- TODO: dirección real del taller -->
                             <span class="contact__value">Jr. San Juan Masias, Ayacucho 05002</span>
                         </li>
                         <li>
                             <span class="contact__label">Teléfono</span>
-                            <!-- TODO: teléfono real -->
                             <a class="contact__value" href="tel:+51935646304">+51 935 646 304</a>
                         </li>
                         <li>
@@ -601,15 +597,17 @@
                         </li>
                         <li>
                             <span class="contact__label">Horario</span>
-                            <!-- TODO: horario real -->
                             <span class="contact__value">Lun - Sab 07:30 - 20:00</span>
                         </li>
                     </ul>
                 </div>
 
-                <!-- TODO: insertar el iframe de Google Maps con la ubicación real del taller -->
-                <div class="map" role="img" aria-label="Espacio reservado para el mapa de ubicación">
-                    <iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d31080.88673974247!2d-74.21019465437527!3d-13.155407725701286!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x91128790c16e17ff%3A0xd81214e28b51d731!2sAUTOCOLOR%20AYACUCHO!5e0!3m2!1sit!2sit!4v1788461765187!5m2!1sit!2sit" 
+                <!-- Sin role="img" en el contenedor: con el mapa de verdad
+                     dentro, ese papel esconde todo lo que cuelga de él y el
+                     iframe deja de existir para un lector de pantalla. El
+                     nombre va en el title del propio iframe. -->
+                <div class="map">
+                    <iframe title="Ubicación del taller en Google Maps" src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d31080.88673974247!2d-74.21019465437527!3d-13.155407725701286!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x91128790c16e17ff%3A0xd81214e28b51d731!2sAUTOCOLOR%20AYACUCHO!5e0!3m2!1sit!2sit!4v1788461765187!5m2!1sit!2sit"
                     width="600" height="450" style="border:0;border-radius: 10px;" allowfullscreen="" loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></iframe>
                 </div>
             </div>

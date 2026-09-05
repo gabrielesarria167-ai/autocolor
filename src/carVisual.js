@@ -651,6 +651,11 @@ export function mountCar3D(options) {
   const pickable = [];
   const overlayFor = new Map(); // mesh -> { hoverOverlay, selectedOverlay, id }
   let hoveredMesh = null;
+  // The GLB fetch happens after mountCar3D has already returned its controller,
+  // so a failure has no other way to reach the host page. Without this the host
+  // sees a mounted viewer and skips the remount, and step 3 stays dead until a
+  // reload — see ensureCar3D() in repair.js.
+  let loadFailed = false;
 
   const loader = new GLTFLoader();
   loader.setMeshoptDecoder(MeshoptDecoder);
@@ -746,6 +751,7 @@ export function mountCar3D(options) {
     },
     (err) => {
       if (destroyed) return;
+      loadFailed = true;
       console.error('[car3d] GLTFLoader error:', err);
       showError('No se pudo cargar el visor 3D. Verifica tu conexión e inténtalo nuevamente.');
     }
@@ -839,6 +845,11 @@ export function mountCar3D(options) {
   ----------------------------------------------------------------------- */
   return {
     vehicle,
+    // True once the GLB failed to load. The host page asks before deciding
+    // whether a viewer already mounted for this vehicle can be reused.
+    loadFailed() {
+      return loadFailed;
+    },
     // Call after un-hiding the container — its dimensions are 0 while
     // hidden, so sizing (and the framing that depends on it) has to happen
     // once it's actually visible again.

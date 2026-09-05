@@ -124,8 +124,8 @@
         });
     }
 
-    // El texto sobre el que busca el buscador. Se arma una vez por fila en vez
-    // de recomponerlo en cada tecla.
+    // El texto sobre el que busca el buscador. Se arma una vez por fila, al
+    // recibirla del servidor (ver loadRequests), y no en cada tecla.
     function haystack(request) {
         return [
             request.id,
@@ -136,14 +136,6 @@
             request.model,
             request.phone
         ].filter(Boolean).join(" ").toLowerCase();
-    }
-
-    function visibleRequests() {
-        var term = searchTerm.trim().toLowerCase();
-        if (!term) return allRequests;
-        return allRequests.filter(function (request) {
-            return haystack(request).indexOf(term) !== -1;
-        });
     }
 
     /* ---------------------------------------------------------------------
@@ -308,6 +300,16 @@
                     if (statusFilter && statusFilter !== updated.status) loadRequests();
                 })
                 .catch(function (err) {
+                    // Sesión vencida —o servidor reiniciado, que se lleva las
+                    // que tiene en memoria—: sin esto el listado se quedaba a
+                    // la vista con los teléfonos de los clientes y cada clic
+                    // repetía el mismo error, sin manera de saber que lo que
+                    // hace falta es volver a entrar.
+                    if (err.unauthorized) {
+                        showLogin();
+                        setError("Tu sesión venció. Vuelve a entrar para guardar el cambio.");
+                        return;
+                    }
                     // El cambio no llegó a la base: la píldora se queda como
                     // estaba y el error sale arriba.
                     setError(err.message);
@@ -364,7 +366,11 @@
         }).then(function (response) {
             return response.json().catch(function () { return null; }).then(function (body) {
                 if (!response.ok) {
-                    throw new Error((body && body.error) || "No pudimos guardar el estado.");
+                    var error = new Error((body && body.error) || "No pudimos guardar el estado.");
+                    // Marcado para que quien llama saque el formulario de
+                    // acceso, como hace loadRequests con su propio 401.
+                    if (response.status === 401) error.unauthorized = true;
+                    throw error;
                 }
                 return body;
             });
@@ -377,15 +383,42 @@
        Listado
     --------------------------------------------------------------------- */
 
-    function render() {
-        var requests = visibleRequests();
+    // El buscador solo esconde y muestra las filas que ya están hechas. Antes
+    // llamaba a render(), que las rehace todas: con doscientas solicitudes eran
+    // unas dos mil doscientas opciones de estado —cada una con su escucha— por
+    // cada carácter escrito.
+    function applySearch() {
+        // Un menú abierto en una fila que se acaba de esconder quedaría
+        // flotando: es `fixed` y no acompaña a su fila.
+        closeMenu(false);
 
+        var term = searchTerm.trim().toLowerCase();
+        var shown = 0;
+        allRequests.forEach(function (request) {
+            var visible = !term || request.searchText.indexOf(term) !== -1;
+            if (request.row) request.row.hidden = !visible;
+            if (visible) shown++;
+        });
+
+        show(emptyEl, shown === 0);
+
+        // «N de M» solo cuando el buscador recorta; con todo a la vista,
+        // repetir el número dos veces no dice nada. M es lo que trajo la
+        // consulta, que ya viene filtrada por el estado elegido.
+        var total = allRequests.length;
+        var noun = total === 1 ? "solicitud" : "solicitudes";
+        countEl.textContent = shown === total
+            ? total + " " + noun
+            : shown + " de " + total + " " + noun;
+    }
+
+    function render() {
         // Las filas se rehacen enteras: un menú abierto quedaría apuntando a
         // un nodo que ya no está en la página.
         closeMenu(false);
 
         rowsEl.textContent = "";
-        requests.forEach(function (request) {
+        allRequests.forEach(function (request) {
             var row = document.createElement("tr");
             cell(row, request.id, "staff-table__code");
 
@@ -407,19 +440,12 @@
             cell(row, request.partCount, "staff-table__num");
             cell(row, QUALITY_LABELS[request.quality] || request.quality, "staff-table__nowrap");
             buildStatusCell(row, request);
+            // Guardada para que el buscador la esconda en vez de rehacerla.
+            request.row = row;
             rowsEl.appendChild(row);
         });
 
-        show(emptyEl, requests.length === 0);
-
-        // «N de M» solo cuando el buscador recorta; con todo a la vista,
-        // repetir el número dos veces no dice nada. M es lo que trajo la
-        // consulta, que ya viene filtrada por el estado elegido.
-        var total = allRequests.length;
-        var noun = total === 1 ? "solicitud" : "solicitudes";
-        countEl.textContent = requests.length === total
-            ? total + " " + noun
-            : requests.length + " de " + total + " " + noun;
+        applySearch();
     }
 
     function showLogin() {
@@ -451,6 +477,9 @@
                     show(logoutBtn, true);
                     setError("");
                     allRequests = body.requests || [];
+                    allRequests.forEach(function (request) {
+                        request.searchText = haystack(request);
+                    });
                     render();
                     return body;
                 });
@@ -503,18 +532,22 @@
     });
 
     logoutBtn.addEventListener("click", function () {
+        // El listado se quita llegue o no la petición al servidor: el clic es
+        // para dejar de tener los datos de los clientes a la vista, y una red
+        // caída no es razón para dejarlos ahí creyendo que se salió.
+        var clear = function () {
+            allRequests = [];
+            rowsEl.textContent = "";
+            setError("");
+            showLogin();
+        };
         fetch(API_BASE + "/api/staff/logout", { method: "POST", credentials: "same-origin" })
-            .then(function () {
-                allRequests = [];
-                rowsEl.textContent = "";
-                setError("");
-                showLogin();
-            });
+            .then(clear, clear);
     });
 
     searchEl.addEventListener("input", function () {
         searchTerm = searchEl.value;
-        render();
+        applySearch();
     });
 
     buildFilters();

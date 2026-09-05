@@ -95,9 +95,18 @@ function repoPath(filePath) {
 
 // 404 y no 403: un 403 confirma que el archivo está ahí, que es justo lo que no
 // hace falta decirle a quien va probando nombres.
+//
+// La comparación va en minúscula porque el sistema de archivos de la máquina de
+// trabajo (APFS) no distingue mayúsculas: `GET /.ENV` abre el mismo archivo que
+// `GET /.env`, y con la lista comparada tal cual llegaba, la primera se servía.
+// Ahí dentro está la contraseña del taller, y el HOST=0.0.0.0 que el README
+// recomienda para probar desde el móvil es justo lo que la pone al alcance.
+// En Linux esos nombres no existen y la respuesta es 404 de todos modos, así
+// que bajar a minúscula no cierra nada que antes estuviera abierto.
 function isDenied(pathname) {
+    const lower = pathname.toLowerCase();
     return DENY_PREFIXES.some((prefix) => (
-        prefix.endsWith('/') ? pathname.startsWith(prefix) : pathname === prefix
+        prefix.endsWith('/') ? lower.startsWith(prefix) : lower === prefix
     ));
 }
 
@@ -129,7 +138,13 @@ const VEHICLES = new Set(['van', 'wagon', 'pickup', 'suv']);
 const BODY_TYPES = new Set(['sedan', 'hatchback', 'coupe', 'wagon', 'suv', 'pickup', 'minivan', 'van']);
 const PLATE_RE = /^[A-Z0-9]{3}-[A-Z0-9]{3}$/;
 const YEAR_MIN = 1980;
-const YEAR_MAX = new Date().getFullYear() + 1;
+// Se calcula en cada solicitud y no una vez al cargar el módulo: el formulario
+// (src/repair.js) lo calcula al abrir la página, así que un proceso que sigue
+// vivo al pasar de año aceptaría en pantalla un año que después rechaza al
+// enviar, con el formulario ya completo y sin manera de seguir.
+function yearMax() {
+    return new Date().getFullYear() + 1;
+}
 const MAX_MILEAGE = 2_000_000;
 const QUALITIES = new Set(['standard', 'premium', 'custom']);
 // Los estados por los que el taller mueve una solicitud.
@@ -155,29 +170,40 @@ function capitalize(field) {
     return field.charAt(0).toUpperCase() + field.slice(1);
 }
 
-function text(value, { max, required = false, field }) {
+// El adjetivo concuerda con el nombre del campo, que es un sintagma con su
+// género y su número: 'la placa' pide «válida», 'las notas' piden «largas» y
+// además el verbo en plural. Con una sola plantilla en masculino singular
+// salían «La placa no es válido.» y «Las notas es demasiado largo.», y estos
+// mensajes se le muestran tal cual al cliente.
+//
+// `agree` va en cada campo que no sea masculino singular, que es lo de por
+// omisión: 'f' femenino singular, 'fp' femenino plural.
+const INVALID = { m: 'no es válido', f: 'no es válida', fp: 'no son válidas' };
+const TOO_LONG = { m: 'es demasiado largo', f: 'es demasiado larga', fp: 'son demasiado largas' };
+
+function text(value, { max, required = false, field, agree = 'm' }) {
     if (value === undefined || value === null || value === '') {
         if (required) throw new BadRequest(`Falta ${field}.`);
         return null;
     }
-    if (typeof value !== 'string') throw new BadRequest(`${capitalize(field)} no es válido.`);
+    if (typeof value !== 'string') throw new BadRequest(`${capitalize(field)} ${INVALID[agree]}.`);
     const trimmed = value.trim();
     if (required && trimmed === '') throw new BadRequest(`Falta ${field}.`);
-    if (trimmed.length > max) throw new BadRequest(`${capitalize(field)} es demasiado largo.`);
+    if (trimmed.length > max) throw new BadRequest(`${capitalize(field)} ${TOO_LONG[agree]}.`);
     return trimmed === '' ? null : trimmed;
 }
 
 // Los números llegan del formulario como texto ('2020', ''). Se convierten
 // aquí, con su rango, para que la base reciba enteros o NULL y nunca la
 // cadena vacía.
-function integer(value, { min, max, required = false, field }) {
+function integer(value, { min, max, required = false, field, agree = 'm' }) {
     if (value === undefined || value === null || value === '' ) {
         if (required) throw new BadRequest(`Falta ${field}.`);
         return null;
     }
     const number = typeof value === 'number' ? value : Number(String(value).trim());
     if (!Number.isInteger(number) || number < min || number > max) {
-        throw new BadRequest(`${capitalize(field)} no es válido.`);
+        throw new BadRequest(`${capitalize(field)} ${INVALID[agree]}.`);
     }
     return number;
 }
@@ -190,7 +216,7 @@ function validateRequest(body) {
     // El catálogo de marcas y modelos vive en el navegador (src/carModels.js),
     // así que aquí no hay contra qué contrastarlos: se comprueba que vengan y
     // que sean texto corto, igual que con las piezas del visor 3D.
-    const plate = text(body.plate, { max: 7, required: true, field: 'la placa' }).toUpperCase();
+    const plate = text(body.plate, { max: 7, required: true, field: 'la placa', agree: 'f' }).toUpperCase();
     if (!PLATE_RE.test(plate)) throw new BadRequest('La placa no es válida.');
     if (!QUALITIES.has(body.quality)) throw new BadRequest('Nivel de acabado no válido.');
 
@@ -213,10 +239,10 @@ function validateRequest(body) {
     if (email && !EMAIL_RE.test(email)) throw new BadRequest('El email no es válido.');
 
     return {
-        brand: text(body.brand, { max: 40, required: true, field: 'la marca' }),
+        brand: text(body.brand, { max: 40, required: true, field: 'la marca', agree: 'f' }),
         model: text(body.model, { max: 60, required: true, field: 'el modelo' }),
         bodyType: body.bodyType,
-        year: integer(body.year, { min: YEAR_MIN, max: YEAR_MAX, required: true, field: 'el año' }),
+        year: integer(body.year, { min: YEAR_MIN, max: yearMax(), required: true, field: 'el año' }),
         plate,
         mileage: integer(body.mileage, { min: 0, max: MAX_MILEAGE, field: 'el kilometraje' }),
         colorCode: text(body.colorCode, { max: 20, field: 'el código de color' }),
@@ -226,10 +252,10 @@ function validateRequest(body) {
         firstName: text(body.firstName, { max: 80, required: true, field: 'el nombre' }),
         lastName: text(body.lastName, { max: 80, required: true, field: 'el apellido' }),
         department: text(body.department, { max: 80, field: 'el departamento' }),
-        province: text(body.province, { max: 80, field: 'la provincia' }),
+        province: text(body.province, { max: 80, field: 'la provincia', agree: 'f' }),
         phone,
         email,
-        notes: text(body.notes, { max: 2000, field: 'las notas' }),
+        notes: text(body.notes, { max: 2000, field: 'las notas', agree: 'fp' }),
     };
 }
 
@@ -297,10 +323,17 @@ function bareIp(value) {
  *
  * Con n proxies de confianza, los n últimos elementos son los que escribieron
  * ellos, y el cliente es el primero de esos n: list[list.length - n]. Leer
- * desde la derecha acierta además cuando un proxy REEMPLAZA la cabecera en vez
- * de añadir, porque entonces la lista tiene un solo elemento. Leer desde la
- * izquierda se equivoca en uno de los dos casos; desde la derecha, en ninguno.
+ * desde la izquierda se lo regala a quien inventa la cabecera; desde la
+ * derecha, no, y sigue acertando aunque le pongan elementos de más delante.
+ *
+ * Lo que NO cubre: un proxy que REEMPLACE la cabecera en vez de añadir. Con
+ * TRUST_PROXY=3 la lista quedaría con un solo elemento, la comprobación de
+ * largo de más abajo salta y todos los visitantes vuelven a compartir la
+ * dirección del socket —y con ella un único cubo de límite—, que es justo lo
+ * que esto existe para evitar. Falla del lado seguro, pero en silencio: por eso
+ * el aviso, que se escribe una vez y no en cada petición.
  */
+let warnedShortChain = false;
 function clientIp(req) {
     const socketIp = req.socket.remoteAddress || 'desconocida';
     if (TRUST_PROXY <= 0) return socketIp;
@@ -313,7 +346,17 @@ function clientIp(req) {
     // Menos saltos de los declarados: la petición no pasó por los proxies que
     // se esperaban —una comprobación de salud interna, o alguien hablándole al
     // contenedor directamente—. La del socket no la escribe nadie de fuera.
-    if (forwarded.length < TRUST_PROXY) return socketIp;
+    if (forwarded.length < TRUST_PROXY) {
+        // Si esto sale con una cabecera puesta, la topología dejó de ser la que
+        // dice TRUST_PROXY y el límite por IP está contando a todos como uno.
+        // Comprobarlo con /api/staff/whoami y ajustar el número.
+        if (forwarded.length > 0 && !warnedShortChain) {
+            warnedShortChain = true;
+            console.warn(`\nAviso: x-forwarded-for trae ${forwarded.length} salto(s) y TRUST_PROXY=${TRUST_PROXY}.`);
+            console.warn('El límite de peticiones cuenta a todos los visitantes como uno solo. Revísalo con /api/staff/whoami.\n');
+        }
+        return socketIp;
+    }
 
     const candidate = forwarded[forwarded.length - TRUST_PROXY];
 
@@ -454,13 +497,27 @@ async function serveStatic(req, res, pathname) {
     }
 
     const ext = path.extname(filePath).toLowerCase();
+    // Los modelos 3D pesan decenas de MB y no cambian; el resto se revalida en
+    // cada carga para no servir código viejo mientras se trabaja en el sitio.
+    const cacheControl = decoded.startsWith('/imgs/') ? 'public, max-age=86400' : 'no-cache';
+
+    // Sin validador, «revalidar» es volver a mandar el archivo entero: styles.css
+    // son 78 KB en cada visita, y van.glb 20 MB cada vez que se le vence el día.
+    // La fecha ya la trae el stat de arriba, así que el 304 no cuesta nada. Se
+    // compara truncada al segundo, que es la resolución de una fecha HTTP.
+    const mtimeSec = Math.floor(stat.mtimeMs / 1000) * 1000;
+    const lastModified = new Date(mtimeSec).toUTCString();
+    const since = Date.parse(req.headers['if-modified-since'] || '');
+    if (!Number.isNaN(since) && since >= mtimeSec) {
+        res.writeHead(304, { 'Cache-Control': cacheControl, 'Last-Modified': lastModified }).end();
+        return;
+    }
+
     res.writeHead(200, {
         'Content-Type': MIME[ext] || 'application/octet-stream',
         'Content-Length': stat.size,
-        // Los modelos 3D pesan decenas de MB y no cambian; el resto se
-        // revalida en cada carga para no servir código viejo mientras se
-        // trabaja en el sitio.
-        'Cache-Control': decoded.startsWith('/imgs/') ? 'public, max-age=86400' : 'no-cache',
+        'Last-Modified': lastModified,
+        'Cache-Control': cacheControl,
     });
     if (req.method === 'HEAD') {
         res.end();

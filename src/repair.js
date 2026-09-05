@@ -60,6 +60,7 @@
     var car3d = null;        // controller for the currently mounted viewer
     var car3dVehicle = null; // vehicle it is mounted (or being mounted) for
     var car3dModule = null;  // cached import() of the viewer module
+    var car3dRetries = 0;    // bumped per failed import, to get a fresh URL
     var car3dMountId = 0;    // guards against a superseded mount finishing last
 
     var menuToggle = document.getElementById("menuToggle");
@@ -217,8 +218,12 @@
 
     function ensureCar3D(vehicle) {
         if (!vehicle || !carView3dCanvas) return;
-        // Already mounted — or still mounting — for this vehicle.
-        if (car3dVehicle === vehicle) return;
+        // Already mounted — or still mounting — for this vehicle. A viewer
+        // whose GLB never arrived does not count: it is torn down and mounted
+        // again, because otherwise the error sits there for good and step 3
+        // can never be completed (no panel is clickable, so the Continue
+        // button stays disabled) short of reloading the page.
+        if (car3dVehicle === vehicle && !(car3d && car3d.loadFailed())) return;
 
         if (car3d) {
             car3d.destroy();
@@ -230,7 +235,17 @@
 
         // The module is fetched once; only the viewer inside it is rebuilt
         // per vehicle.
-        if (!car3dModule) car3dModule = import("../src/carVisual.js");
+        //
+        // A retry needs a URL the browser has not already written off. Its
+        // module map remembers a failed fetch, so re-importing the same
+        // specifier fails again without touching the network — measured, not
+        // assumed: after a 404 the retry logged no request at all. The query
+        // string is what makes the retry an actual retry. It is only ever
+        // added after a failure, so the module is never loaded twice.
+        if (!car3dModule) {
+            car3dModule = import("../src/carVisual.js" +
+                (car3dRetries ? "?reintento=" + car3dRetries : ""));
+        }
         var mountId = ++car3dMountId;
         var canvasEl = carView3dCanvas;
 
@@ -253,7 +268,12 @@
             });
         }).catch(function (err) {
             if (mountId !== car3dMountId) return;
-            // Cleared so a later visit to step 3 retries the mount.
+            // All three cleared so a later visit to step 3 retries the mount.
+            // The module promise too: holding on to a rejected one means the
+            // retry re-runs this handler without fetching anything, and the
+            // viewer stays broken for the life of the page.
+            car3dModule = null;
+            car3dRetries++;
             car3dVehicle = null;
             console.error("[repair] No se pudo cargar el visor 3D:", err);
             showCar3DError("No se pudo cargar el visor 3D. Intenta recargar la página.");

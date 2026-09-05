@@ -40,7 +40,8 @@
     var VEHICLE_LABELS = {
         van: "Furgoneta",
         wagon: "Familiar",
-        pickup: "Pickup"
+        pickup: "Pickup",
+        suv: "SUV"
     };
 
     // Los estados y sus etiquetas viven en src/statuses.js, que esta página
