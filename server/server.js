@@ -510,7 +510,36 @@ function requireStaff(req) {
     }
 }
 
+// Qué dirección de cliente ve el servidor, y de qué cabecera la sacó.
+//
+// El límite por IP no se puede comprobar desde fuera: si falla, falla
+// pareciendo que todo va bien. Y qué cabecera trae la dirección de verdad
+// depende del alojamiento, no de lo que uno suponga — averiguarlo a ciegas,
+// mirando si el límite salta o no, lleva a conclusiones equivocadas.
+//
+// Detrás de la contraseña del taller porque enseña la cadena de proxies. No
+// dice nada que quien la consulta no sepa ya: su propia dirección.
+function whoami(req, ip) {
+    const forwarding = {};
+    for (const [name, value] of Object.entries(req.headers)) {
+        if (/^(x-forwarded|x-real-ip|forwarded|cf-|true-client-ip|fly-|x-render|x-client)/i.test(name)) {
+            forwarding[name] = value;
+        }
+    }
+    return {
+        clientIp: ip,                                  // lo que usa el límite
+        socket: req.socket.remoteAddress,              // el último salto
+        trustProxy: TRUST_PROXY,
+        forwarding,                                    // de dónde podría salir
+    };
+}
+
 async function handleStaff(req, res, pathname, ip) {
+    if (pathname === '/api/staff/whoami' && req.method === 'GET') {
+        requireStaff(req);
+        return sendJson(res, 200, whoami(req, ip));
+    }
+
     if (pathname === '/api/staff/login' && req.method === 'POST') {
         if (!auth.isConfigured()) {
             return sendJson(res, 503, { error: 'El panel del taller no está configurado en este servidor.' });
