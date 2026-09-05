@@ -314,17 +314,23 @@ que el paso 1 nunca se queda con un hueco.
 ### La previsualización de color de la portada
 
 El vehículo de la portada (`imgs/assets/suv.png`) cambia de color al tocar los
-swatches. La chapa se recorta con `imgs/assets/suv-paint-mask.png`, que no se
-edita a mano: lo genera
+swatches. La chapa se recorta con `imgs/assets/suv-paint-mask.png`, un PNG
+blanco cuyo canal alfa vale 1 sobre la carrocería pintable y 0 sobre cristales,
+neumáticos, llantas, cromados, faros, placa y logo.
 
 ```bash
 python3 tools/build-paint-mask.py
 ```
 
-a partir de la propia foto, aprovechando que la carrocería beige es lo único
-de tono cálido que hay en ella —cristales, neumáticos, llantas, cromados,
-faros, placa y logo son grises o negros— y escribiendo el resultado en el
-canal alfa de un PNG blanco.
+genera un punto de partida a partir de la propia foto, aprovechando que la
+carrocería beige es lo único de tono cálido que hay en ella. El umbral por
+color no separa del todo bien algunas piezas — el espejo (del color de la
+carrocería, dentro del recorte oscuro del cristal), el paragolpes bajo las
+antinieblas y el zócalo bajo las puertas salían mal cortados o con manchas —
+así que la máscara final se retoca a mano sobre la salida del script (capa
+`suv-paint-mask.png` en un `.xcf` con la foto debajo, para pintar/borrar
+guiándose por el panel real). Si se vuelve a ejecutar el script hay que
+reaplicar esos retoques a mano antes de exportar, no usar su salida tal cual.
 
 Sobre esa máscara van dos capas (ver `.hero__vehicle-paint` en `styles.css`):
 una copia filtrada de la foto, que pone el claro/oscuro, y un color plano en
@@ -332,9 +338,10 @@ modo `color`, que pone el tono. Hacen falta las dos: el tono solo, sobre un
 beige claro, sale rosa y no rojo; y los acabados neutros (blanco perla, negro
 onyx) no tienen tono que dar, así que se resuelven únicamente con el filtro.
 
-Si se cambia la foto de la portada hay que volver a ejecutar el script **y
-mirar la máscara que sale**: los umbrales están puestos para este beige y este
-fondo, y el script solo avisa si la cobertura se va de lo razonable.
+Si se cambia la foto de la portada hay que volver a ejecutar el script, mirar
+la máscara que sale y retocarla a mano: los umbrales están puestos para este
+beige y este fondo, y el script solo avisa si la cobertura se va de lo
+razonable.
 
 ## API
 
