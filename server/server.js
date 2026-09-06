@@ -628,7 +628,10 @@ async function handleStaff(req, res, pathname, ip) {
             console.warn(`[taller] intento fallido desde ${ip}`);
             return sendJson(res, 401, { error: 'Código de trabajador o contraseña incorrectos.' });
         }
-        console.warn(`[taller] entró ${workerId} desde ${ip}`);
+        // console.log y no console.warn: aquí no ha pasado nada raro. En el
+        // resto del archivo un warn marca una anomalía, y mezclar con ellos el
+        // renglón más frecuente del registro los entierra.
+        console.log(`[taller] entró ${workerId} desde ${ip}`);
         res.setHeader('Set-Cookie', auth.cookieHeader(auth.createSession(workerId)));
         return sendJson(res, 200, { ok: true, workerId });
     }

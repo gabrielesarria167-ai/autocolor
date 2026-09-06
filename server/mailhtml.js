@@ -88,8 +88,8 @@ function escapeMultiline(value) {
 -------------------------------------------------------------------------- */
 
 /** El antetítulo rojo en versalitas espaciadas que abre cada sección. */
-function eyebrow(text, color) {
-    return `<div style="font-family:${FONT}; font-size:11px; line-height:14px; letter-spacing:3px; color:${color || RED}; text-transform:uppercase; padding-bottom:12px;">${escapeHtml(text)}</div>`;
+function eyebrow(text) {
+    return `<div style="font-family:${FONT}; font-size:11px; line-height:14px; letter-spacing:3px; color:${RED}; text-transform:uppercase; padding-bottom:12px;">${escapeHtml(text)}</div>`;
 }
 
 /** La línea fina que separa secciones. Es una tabla porque un <hr> se pinta
