@@ -35,6 +35,8 @@
    una cuenta para probar el asistente.
    ========================================================================== */
 
+const dns = require('node:dns').promises;
+const net = require('node:net');
 const nodemailer = require('nodemailer');
 
 // La cuenta que manda. La contraseña NO es la del correo: es una «contraseña
@@ -83,6 +85,39 @@ function isConfigured() {
     return SMTP_USER.length > 0 && SMTP_PASS.length > 0;
 }
 
+/**
+ * Resuelve el servidor de correo a una dirección IPv4.
+ *
+ * Hace falta porque Render no tiene salida IPv6 y smtp.gmail.com responde con
+ * las dos familias. nodemailer pide los registros A y los AAAA, los junta y
+ * ELIGE UNO AL AZAR (shared/index.js: `addresses[Math.floor(Math.random() *
+ * …)]`), así que sin esto, una de cada dos solicitudes salía con:
+ *
+ *     connect ENETUNREACH 2607:f8b0:4004:c19::6c:465 - Local (:::0)
+ *
+ * Tiene una lista de reserva para reintentar con otra dirección, pero solo
+ * durante el saludo inicial, y el tope de diez segundos la cortaba: el segundo
+ * correo de la misma solicitud terminaba en «Connection timeout».
+ *
+ * Dándole una IP ya resuelta se salta su resolución entera —`net.isIP()` la
+ * ataja— y solo quedan direcciones alcanzables. El nombre viaja aparte, en
+ * `servername`, para que el certificado se siga comprobando contra
+ * smtp.gmail.com y no contra un número.
+ *
+ * Si el servidor no tuviera registros A —un servidor solo IPv6—, se devuelve
+ * el nombre sin tocar y que nodemailer resuelva como sabe: forzar IPv4 no
+ * puede convertirse en no poder conectar nunca.
+ */
+async function resolveIpv4(host) {
+    if (net.isIP(host)) return host;
+    try {
+        const addresses = await dns.resolve4(host);
+        return addresses.length > 0 ? addresses[0] : host;
+    } catch {
+        return host;
+    }
+}
+
 // Un solo transporte para todo el proceso, con su pool: nodemailer reaprovecha
 // la conexión TLS en vez de rehacer el saludo y la autenticación en cada
 // correo, y los dos de una solicitud salen casi siempre seguidos.
@@ -91,12 +126,16 @@ function isConfigured() {
 // arranca sin cuenta configurada y no manda ningún correo.
 let transport = null;
 
-function getTransport() {
+async function getTransport() {
     if (transport) return transport;
+    const host = await resolveIpv4(SMTP_HOST);
     transport = nodemailer.createTransport({
-        host: SMTP_HOST,
+        host,
         port: SMTP_PORT,
         secure: SMTP_PORT === 465,   // 465 es TLS directo; 587 sube con STARTTLS
+        // El certificado se comprueba contra el nombre, no contra la IP que
+        // se acaba de resolver.
+        tls: { servername: SMTP_HOST },
         auth: { user: SMTP_USER, pass: SMTP_PASS },
         pool: true,
         maxConnections: 1,
@@ -144,7 +183,17 @@ function block(title, rows) {
  */
 async function send(message) {
     if (!isConfigured()) throw new Error('Faltan AUTOCOLOR_SMTP_USER y AUTOCOLOR_SMTP_PASS');
-    await getTransport().sendMail(message);
+    try {
+        await (await getTransport()).sendMail(message);
+    } catch (err) {
+        // El transporte guarda la IP con la que se creó y una conexión del
+        // pool. Si el envío falló, cualquiera de las dos puede haber quedado
+        // inservible —Gmail rota direcciones y cierra conexiones ociosas—, así
+        // que se tira: la próxima solicitud vuelve a resolver y a conectar en
+        // vez de repetir el mismo fallo para siempre.
+        close();
+        throw err;
+    }
 }
 
 /* -----------------------------------------------------------------------------
@@ -288,9 +337,10 @@ async function notifyNewRequest(created, data) {
 async function verify() {
     if (!isConfigured()) return { ok: false, error: 'faltan AUTOCOLOR_SMTP_USER y AUTOCOLOR_SMTP_PASS' };
     try {
-        await getTransport().verify();
+        await (await getTransport()).verify();
         return { ok: true };
     } catch (err) {
+        close();
         return { ok: false, error: err.message };
     }
 }
@@ -301,6 +351,11 @@ function describe() {
         configured: isConfigured(),
         host: SMTP_HOST,
         port: SMTP_PORT,
+        // La dirección con la que se conectó de verdad, que es distinta del
+        // nombre de arriba: tiene que ser IPv4 (ver resolveIpv4). Es lo que
+        // habría dicho a la primera de qué iba el ENETUNREACH de Render.
+        // `null` mientras no se haya mandado nada todavía.
+        address: transport ? transport.options.host : null,
         from: FROM,
         shop: SHOP,
     };

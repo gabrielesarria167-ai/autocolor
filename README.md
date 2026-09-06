@@ -517,7 +517,34 @@ Lo que suele ser, en orden:
 | --- | --- |
 | `apagados — faltan AUTOCOLOR_SMTP_USER…` | Las variables no están puestas en el alojamiento, o el servicio no se reinició después de ponerlas |
 | `Invalid login: 535-5.7.8` | La contraseña no es una *contraseña de aplicación*, o se revocó |
+| `ENETUNREACH` con una dirección tipo `2607:f8b0:…` | IPv6. Ya no debería pasar: ver abajo |
 | `ECONNREFUSED` / `ETIMEDOUT` | El alojamiento bloquea la salida SMTP. Toca un proveedor por HTTP, y entonces hace falta un dominio |
+
+`GET /api/staff/whoami` trae en su bloque `mail` la dirección con la que se
+conectó de verdad (`address`), que es lo que distingue estos dos casos.
+
+#### IPv6: por qué se fuerza IPv4
+
+Render no tiene salida IPv6, y `smtp.gmail.com` contesta con las dos familias
+—hoy, un registro A y uno AAAA—. nodemailer pide las dos, las junta y **elige
+una al azar**, así que la mitad de los envíos salía contra una dirección
+inalcanzable:
+
+```
+connect ENETUNREACH 2607:f8b0:4004:c19::6c:465 - Local (:::0)
+```
+
+Tiene una lista de reserva para reintentar con otra dirección, pero solo
+durante el saludo inicial, y el tope de diez segundos la cortaba: el segundo
+correo de la misma solicitud moría en `Connection timeout`. Por eso
+`server/mail.js` resuelve el registro A por su cuenta y le pasa a nodemailer
+una IP ya elegida —`net.isIP()` le ataja la resolución entera—, con el nombre
+aparte en `tls.servername` para que el certificado se siga comprobando contra
+`smtp.gmail.com`.
+
+Si un envío falla se tira el transporte, de modo que el siguiente vuelve a
+resolver: Gmail rota direcciones y una IP guardada para siempre acabaría
+caducando.
 
 El panel también lo enseña sin entrar al registro: `GET /api/staff/whoami`
 devuelve un bloque `mail` con la cuenta y el servidor configurados (nunca la
