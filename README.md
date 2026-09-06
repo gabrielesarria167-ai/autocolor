@@ -555,6 +555,31 @@ de «llego y me rechazan»:
 [mail] no salió el aviso al taller de 7822278010: Connection timeout (smtp.gmail.com 142.251.127.108:587, tras 60.0 s)
 ```
 
+#### Un fallo se reintenta una vez
+
+Los dos correos salen a la vez y comparten **un pool de una sola conexión**. Si
+la primera vuelta falla, se tira el transporte —puede haber quedado con una IP
+vieja o una conexión muerta— y se reintenta, una vez. Una instancia dormida
+tarda en abrir su primera conexión de salida, y un envío que falla por eso
+vuelve a funcionar enseguida.
+
+Un fallo de la primera vuelta se registra como aviso y dice «reintentando»;
+solo el de la segunda se registra como error. Si en el registro hay un
+`reintentando` sin un `no salió` detrás, el correo salió.
+
+**El transporte se cierra cuando los dos correos han terminado, nunca dentro de
+uno.** Cerrarlo desde el fallo de uno se llevaba por delante al otro, que
+estaba en la cola del mismo pool:
+
+```
+[mail] no salió el aviso al taller de 9816859188: Greeting never received (…, tras 30.0 s)
+[mail] no salió la confirmación de 9816859188: Connection pool was closed (smtp.gmail.com ?:587, tras 60.0 s)
+```
+
+El segundo no falló por nada suyo. El `?` en lugar de la dirección es la
+señal: `close()` la olvida, así que un `?` ahí quiere decir que alguien cerró
+el transporte por debajo.
+
 #### Los topes de tiempo no son cortos a propósito
 
 Estuvieron en 10 s los tres y se quedaban cortos. Render duerme las instancias

@@ -335,12 +335,17 @@ async function send(message) {
         // alojamiento no llega, y uno de 0,2 s con un 535 dice que sí llega y
         // que lo que está mal es la cuenta.
         err.message = `${err.message} (${SMTP_HOST} ${resolvedAddress || '?'}:${SMTP_PORT}, tras ${((Date.now() - started) / 1000).toFixed(1)} s)`;
-        // El transporte guarda la IP con la que se creó y una conexión del
-        // pool. Si el envío falló, cualquiera de las dos puede haber quedado
-        // inservible —Gmail rota direcciones y cierra conexiones ociosas—, así
-        // que se tira: la próxima solicitud vuelve a resolver y a conectar en
-        // vez de repetir el mismo fallo para siempre.
-        close();
+        // AQUÍ NO SE CIERRA EL TRANSPORTE. Los dos correos de una solicitud
+        // comparten un pool de una sola conexión, así que cerrarlo por haber
+        // fallado uno se lleva por delante al otro, que estaba en la cola:
+        //
+        //   no salió el aviso al taller: Greeting never received (…, tras 30 s)
+        //   no salió la confirmación:    Connection pool was closed (…)
+        //
+        // El segundo no falló por nada suyo. Tirar el transporte sigue siendo
+        // lo correcto —puede haber quedado con una IP vieja o una conexión
+        // muerta—, pero cuando no queda nadie usándolo: lo hace
+        // notifyNewRequest() con los dos ya terminados.
         throw err;
     }
 }
@@ -456,27 +461,54 @@ function shopMessage(created, data) {
 async function notifyNewRequest(created, data) {
     if (!isConfigured()) return;
 
-    const jobs = [
-        send(shopMessage(created, data))
-            .then(() => { console.log(`[mail] aviso al taller de ${created.id}`); })
-            .catch((err) => { console.error(`[mail] no salió el aviso al taller de ${created.id}: ${err.message}`); }),
+    const tasks = [
+        { what: 'aviso al taller', message: shopMessage(created, data) },
     ];
 
     // El asistente ya lo exige, pero la guarda se queda: en la base hay
     // solicitudes anteriores a que el correo fuera obligatorio, y sin ella
     // reenviar una de esas mandaría un mensaje a `undefined`.
     if (data.email) {
-        jobs.push(
-            send(customerMessage(created, data))
-                // La dirección no se registra: el registro del alojamiento no
-                // es sitio para los datos de contacto de un cliente. El código
-                // basta para seguir el rastro en la base.
-                .then(() => { console.log(`[mail] confirmación al cliente de ${created.id}`); })
-                .catch((err) => { console.error(`[mail] no salió la confirmación de ${created.id}: ${err.message}`); })
-        );
+        tasks.push({ what: 'confirmación al cliente', message: customerMessage(created, data) });
     }
 
-    await Promise.all(jobs);
+    const failed = await sendAll(tasks, created.id, false);
+    if (failed.length === 0) return;
+
+    // UN SEGUNDO INTENTO, Y UNO SOLO. Render duerme las instancias del plan
+    // gratuito y la primera conexión de salida de un contenedor recién
+    // despierto a veces no llega a tiempo: un envío que falla así vuelve a
+    // funcionar enseguida. Antes se tiran el transporte y la IP resuelta, que
+    // es lo que puede haber quedado inservible; con los dos correos ya
+    // terminados no hay nadie a quien cerrarle el pool por debajo.
+    close();
+    await sendAll(failed, created.id, true);
+}
+
+/**
+ * Manda las tareas a la vez y devuelve las que fallaron.
+ *
+ * Un fallo de la primera vuelta se registra como aviso y no como error: si el
+ * reintento sale bien, no ha pasado nada que mirar por la mañana.
+ */
+async function sendAll(tasks, id, isRetry) {
+    const failed = [];
+    await Promise.all(tasks.map((task) => send(task.message)
+        .then(() => {
+            // Las direcciones no se registran: el registro del alojamiento no
+            // es sitio para los datos de contacto de un cliente. El código
+            // basta para seguir el rastro en la base.
+            console.log(`[mail] ${task.what} de ${id}${isRetry ? ' (al segundo intento)' : ''}`);
+        })
+        .catch((err) => {
+            failed.push(task);
+            if (isRetry) {
+                console.error(`[mail] no salió ${task.what} de ${id}: ${err.message}`);
+            } else {
+                console.warn(`[mail] falló ${task.what} de ${id}, reintentando: ${err.message}`);
+            }
+        })));
+    return failed;
 }
 
 /**
