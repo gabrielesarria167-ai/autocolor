@@ -3089,8 +3089,17 @@ body.staff {
     color: rgba(246, 242, 230, 0.68);
 }
 
-.staff-topbar__logout {
+.staff-topbar__clock {
     margin-left: auto;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.95rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: #f6f2e6;
+    white-space: nowrap;
+}
+
+.staff-topbar__logout {
     padding: 6px 14px;
     border: 1px solid rgba(246, 242, 230, 0.28);
     border-radius: var(--radius-sm);

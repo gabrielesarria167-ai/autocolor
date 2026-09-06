@@ -17,7 +17,7 @@ Everything below is committed and pushed to `main`. Nothing is half-applied.
 | Worker codes on login | Password + code, one shared error, code in the session and in `whoami` |
 | Required fields | email, Departamento, Provincia enforced in the wizard and in `validateRequest` |
 | Two emails | Built, laid out on the supplied mock, escaped, plain-text half included |
-| Email delivery | **Retried, not fixed at the source — see §1** |
+| Email delivery | **Still failing on Render after the queue shipped — see §1** |
 | Review findings | 13 of 15 closed; the 2 left are not about email (§2) |
 
 ---
@@ -71,11 +71,25 @@ Correos de aviso: apagados — faltan …                                 ← no
 actually connected to, and `pending` — how many notices are waiting. A `pending`
 that does not fall between two calls is the sign that mail is down.
 
-### If it still is not enough
+### It was not enough — measured
 
-**Needs from you, only if mail keeps not arriving.** The queue turns "lost" into
-"late", but it cannot fix a stretch that lasts longer than 48 minutes. The way
-out is HTTPS on port 443, which no host blocks. Brevo is the one to use: it
+The queue shipped and mail still does not arrive: every attempt times out at
+connect, out to the 900 s retry. So the earlier "it works sometimes" reading
+was wrong. One success in a handful of tries was luck, not a working path.
+
+That leaves three possible causes, which the error message alone cannot tell
+apart, so the next deploy answers it with data. When the boot check fails, the
+server now opens a socket to four destinations and prints which it reaches
+(`server/netcheck.js`, and the README section that goes with it). **Read that
+block in the deploy log before doing anything else** — its verdict line says
+which of the three it is, and only one of them has a fix that is not "stop
+using Gmail".
+
+### The way out if the probe says what it probably says
+
+**Needs from you.** The queue turns "lost" into "late", but it cannot fix a
+path that is closed rather than flaky, and the retries out to 900 s say it is
+closed. The way out is HTTPS on port 443, which no host blocks. Brevo is the one to use: it
 verifies a **single sender address** rather than a whole domain, so your Gmail
 is enough — that is why it beats Resend/SendGrid here, since the shop has no
 domain of its own.
@@ -179,8 +193,8 @@ at. Customers replying there get nothing. Already flagged as item B2 in
 
 ## Suggested order
 
-1. Deploy and send a test request. Watch for `salió … (al intento N)` in the
-   log; N > 1 is the queue doing its job, not a problem.
+1. Deploy and read the `A dónde llega este alojamiento` block in the log. Its
+   verdict decides whether anything else here is worth trying.
 2. Chores §3.1 and §3.2 — quick, and §3.1 is a two-minute config change.
 3. Findings #6 and #7.
 4. Brevo (§1), only if mail is still not arriving after the queue.

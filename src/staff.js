@@ -26,6 +26,7 @@
     var searchEl = document.getElementById("staffSearch");
     var filtersEl = document.getElementById("staffFilters");
     var logoutBtn = document.getElementById("staffLogout");
+    var clockEl = document.getElementById("staffClock");
     var rowsEl = document.getElementById("staffRows");
     var countEl = document.getElementById("staffCount");
     var emptyEl = document.getElementById("staffEmpty");
@@ -59,6 +60,39 @@
     var allRequests = [];
     var statusFilter = "";
     var searchTerm = "";
+
+    /* ---------------------------------------------------------------------
+       Reloj
+
+       Solo aparece con el panel a la vista, para que el trabajador tenga a
+       mano la hora y sepa cuándo cerrar el turno. No es un cronómetro de
+       nada: es la hora del reloj, que se refresca cada segundo.
+    --------------------------------------------------------------------- */
+
+    var clockTimer = null;
+
+    function paintClock() {
+        clockEl.textContent = new Date().toLocaleTimeString("es-PE", {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit"
+        });
+    }
+
+    function startClock() {
+        if (clockTimer) return;
+        paintClock();
+        show(clockEl, true);
+        clockTimer = window.setInterval(paintClock, 1000);
+    }
+
+    function stopClock() {
+        if (clockTimer) {
+            window.clearInterval(clockTimer);
+            clockTimer = null;
+        }
+        show(clockEl, false);
+    }
 
     function setError(message) {
         errorEl.textContent = message || "";
@@ -453,6 +487,7 @@
         show(loadingEl, false);
         show(panelEl, false);
         show(logoutBtn, false);
+        stopClock();
         show(loginEl, true);
         workerIdInput.focus();
     }
@@ -476,6 +511,7 @@
                     show(loginEl, false);
                     show(panelEl, true);
                     show(logoutBtn, true);
+                    startClock();
                     setError("");
                     allRequests = body.requests || [];
                     allRequests.forEach(function (request) {

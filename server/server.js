@@ -43,6 +43,7 @@ const {
 } = require('./db');
 const auth = require('./auth');
 const mail = require('./mail');
+const netcheck = require('./netcheck');
 
 const PORT = Number(process.env.PORT) || 3000;
 
@@ -858,8 +859,22 @@ async function start() {
                     console.error(`\nCorreos de aviso: NO FUNCIONAN — ${result.error}`);
                     console.error('  Las solicitudes se siguen guardando; lo que no sale es el aviso.');
                     console.error('  Repasa AUTOCOLOR_SMTP_USER y AUTOCOLOR_SMTP_PASS (que es la contraseña');
-                    console.error('  de aplicación de 16 caracteres de Google, no la del correo).\n');
+                    console.error('  de aplicación de 16 caracteres de Google, no la del correo).');
+                    // Y se mira a dónde llega este alojamiento, porque «no
+                    // funcionan» tiene tres causas que se arreglan de maneras
+                    // distintas y el motivo de arriba no las distingue: ver
+                    // server/netcheck.js. Solo cuando ya falló: en un
+                    // despliegue sano esto no llega a correr.
+                    return netcheck.run().then(({ lines, verdict }) => {
+                        console.error('\n  A dónde llega este alojamiento:');
+                        console.error(lines.join('\n'));
+                        console.error('');
+                        console.error(verdict.join('\n') + '\n');
+                    });
                 }
+            }).catch((err) => {
+                // El arranque no se cae por un renglón informativo.
+                console.error(`Correos de aviso: no se pudo comprobar — ${err.message}`);
             });
         }
         if (ALLOWED_ORIGINS.size > 0) {

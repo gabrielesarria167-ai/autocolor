@@ -552,6 +552,33 @@ Lo que suele ser, en orden:
 | `Connection timeout` en el 587, tras 15 s | El alojamiento no llega a Gmail en ese momento. Es lo que hace Render a ratos; la cola lo reintenta, así que mira si detrás hay un `salió … (al intento N)` |
 | `ECONNREFUSED` / `ETIMEDOUT` en los dos puertos | El alojamiento bloquea la salida SMTP entera. Toca un proveedor por HTTP, y entonces hace falta un dominio o un remitente verificado |
 
+#### A dónde llega el alojamiento
+
+«Connection timeout» contra Gmail tiene tres causas que se arreglan de maneras
+distintas, y el mensaje solo no las separa. Por eso, **cuando la comprobación
+del arranque falla**, el servidor abre un socket contra cuatro destinos y dice
+cuáles alcanza (`server/netcheck.js`). No habla SMTP ni manda un byte: solo
+mide si el saludo TCP se completa, que es justo lo que está fallando.
+
+```
+  A dónde llega este alojamiento:
+    NO   Gmail por el 587 (el que usamos)     smtp.gmail.com:587 (sin respuesta, tras 8.0 s)
+    NO   Gmail por el 465 (ya descartado)     smtp.gmail.com:465 (sin respuesta, tras 8.0 s)
+    sí   otro SMTP cualquiera por el 587      smtp-relay.brevo.com:587 (41 ms)
+    sí   una API de correo por HTTPS          api.brevo.com:443 (33 ms)
+```
+
+Lo que dice cada resultado:
+
+| Lo que se ve | Qué significa |
+| --- | --- |
+| Gmail 587 **sí** | La red está bien: el fallo es la cuenta, la contraseña o el mensaje |
+| Gmail 587 **no**, otro SMTP **sí** | Google no acepta conexiones desde la IP de salida de este alojamiento. Reintentar no lo arregla; hay que mandar por otro proveedor |
+| los tres SMTP **no**, 443 **sí** | El 587 está bloqueado hacia fuera. Ningún ajuste del SMTP va a servir: toca un proveedor por HTTPS |
+| los cuatro **no** | No es cosa del correo — salida a internet o DNS |
+
+En un despliegue sano esto no llega a correr.
+
 `GET /api/staff/whoami` trae en su bloque `mail` la dirección con la que se
 conectó de verdad (`address`), que es lo que distingue estos dos casos. Cada
 fallo dice además a dónde iba y cuánto tardó, que es lo que separa «no llego»
@@ -599,6 +626,21 @@ bien; solo `no salió` es un correo perdido de verdad.
 contraseña, 550 por la dirección—, repetirlo cinco veces no lo arregla y encima
 le regala a Google cinco intentos fallidos de autenticación desde la misma IP.
 Se registra como `no salió` a la primera.
+
+**Y tampoco se reintenta lo que pudo haber llegado.** Solo se repite un envío
+cuando consta que el mensaje no salió: el saludo TCP no se completó, o el
+servidor no llegó a contestar su `220`. Si en cambio la conexión se corta
+*después* de mandar el cuerpo, Gmail puede haberlo aceptado y ser la respuesta
+lo que se perdió — reintentar entregaría el mismo correo dos veces. Ahí se para
+y se dice:
+
+```
+[mail] aviso al taller de 4820175639: se cortó sin respuesta y puede haber
+       llegado; no se reintenta para no duplicarlo — Timeout (…)
+```
+
+Nunca se ha visto pasar: lo que falla desde Render son todos fallos de
+conexión, que sí se reintentan.
 
 `GET /api/staff/whoami` trae `mail.pending`, cuántos avisos están esperando su
 turno. Un número que no baja entre dos consultas es la señal de que el correo

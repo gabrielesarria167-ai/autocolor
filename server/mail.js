@@ -474,6 +474,46 @@ function isPermanent(err) {
     return Number.isInteger(err.responseCode) && err.responseCode >= 500 && err.responseCode < 600;
 }
 
+/**
+ * ¿Sabemos con certeza que el mensaje NO llegó a entregarse?
+ *
+ * Un fallo de conexión lo dice sin ambigüedad: si el saludo TCP no se
+ * completó, o el servidor no llegó a contestar su 220, no salió ni un byte del
+ * mensaje. Reintentar eso es gratis. Es el caso de TODO lo que está fallando
+ * hoy desde Render.
+ *
+ * La excepción es la ventana entre que se manda el cuerpo y llega el «250 OK»
+ * final. Si ahí se corta la conexión, Gmail puede haberlo aceptado y ser la
+ * respuesta lo que se perdió: reintentar entrega el mismo correo dos veces.
+ * Nunca se ha visto pasar aquí —los fallos son todos de conexión—, pero un
+ * cliente que recibe su código por duplicado es un error visible, y no hay
+ * forma de preguntar después.
+ *
+ * SE DISTINGUE POR EL TEXTO del error, que es lo único que nodemailer deja
+ * fuera: `command` vale 'CONN' tanto para el tope de conexión como para el de
+ * inactividad a media conversación (smtp-connection/index.js: `_onTimeout()`
+ * pasa 'CONN'), así que no sirve para separarlos. Los tres mensajes de la
+ * lista sí son inequívocos.
+ *
+ * Si algún día nodemailer los reescribe, esto deja de reconocerlos y el correo
+ * vuelve a reintentarse siempre: se pierde la protección contra el duplicado,
+ * pero no se pierde ningún correo. Es el lado bueno por el que equivocarse.
+ */
+const NEVER_SENT = new Set([
+    'Connection timeout',      // no se llegó a establecer el TCP
+    'Greeting never received', // conectado, pero sin el 220 del servidor
+    'Connection closed',       // el servidor cortó antes de empezar
+]);
+
+function isDeliveryUnknown(err) {
+    if (err.command === 'DATA') return true;
+    const transient = err.code === 'ETIMEDOUT' || err.code === 'ESOCKET' || err.code === 'ECONNECTION';
+    if (!transient) return false;
+    // El mensaje trae pegado el «(host ip:port, tras N s)» que le añade
+    // withTransport(), así que se compara por el principio.
+    return !Array.from(NEVER_SENT).some((known) => err.message.startsWith(known));
+}
+
 /* -----------------------------------------------------------------------------
    Los dos mensajes
 -------------------------------------------------------------------------- */
@@ -668,6 +708,13 @@ async function drain() {
                 const which = item.attempt > 0 ? ` (al intento ${item.attempt + 1})` : '';
                 console.log(`[mail] salió ${item.what}${which}`);
             } catch (err) {
+                // Se corta la conversación sin saber si el mensaje entró.
+                // Reintentar podría entregarlo dos veces, así que se para y se
+                // dice, que es lo único honesto: puede que haya llegado.
+                if (isDeliveryUnknown(err)) {
+                    console.error(`[mail] ${item.what}: se cortó sin respuesta y puede haber llegado; no se reintenta para no duplicarlo — ${err.message}`);
+                    continue;
+                }
                 // `undefined` cuando se acabaron los intentos.
                 const delay = isPermanent(err) ? undefined : RETRY_DELAYS_MS[item.attempt];
                 if (delay === undefined) {
