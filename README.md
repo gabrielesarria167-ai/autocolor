@@ -83,6 +83,7 @@ lo abre a propósito, por ejemplo para probar el sitio desde el móvil.
 | `server/db.js` | Acceso a Postgres |
 | `server/auth.js` | La contraseña, los códigos y las sesiones del panel del taller |
 | `server/mail.js` | Los dos correos de cada solicitud nueva (SMTP de Gmail) |
+| `server/mailhtml.js` | La maqueta en HTML de esos dos correos |
 | `server/env.js` | Lee el `.env` de la raíz al arrancar |
 | `_config.yml` | Qué no se publica en GitHub Pages |
 | `render.yaml`, `.nvmrc` | El despliegue en Render |
@@ -471,8 +472,31 @@ Cuando alguien termina el asistente salen dos avisos (`server/mail.js`):
 
 | A quién | Qué lleva |
 | --- | --- |
-| Al cliente | Unas líneas y el código de seguimiento |
-| Al taller | Los datos de contacto y el trabajo pedido, con `Reply-To` al cliente |
+| Al cliente | Confirmación con el código de seguimiento y cuatro datos para reconocer su solicitud |
+| Al taller | La ficha para presupuestar: contacto, vehículo, piezas y notas, con `Reply-To` al cliente |
+
+Los dos van maquetados (`server/mailhtml.js`) sobre el mismo diseño —fondo
+gris, tarjeta blanca de 600 px, rojo `#c8102e` de acento— y **los dos llevan
+también su versión en texto plano**, en el mismo mensaje
+(`multipart/alternative`). El texto no es un resto de cuando no había HTML: es
+lo que se ve en los clientes que no lo pintan y en los avisos del móvil, así
+que cuando cambie uno hay que cambiar el otro.
+
+Son dos maquetas y no una porque el trabajo es distinto. La del cliente
+confirma: código grande, cuatro datos, un enlace para consultar. La del taller
+es una ficha de trabajo: el titular es el cliente y la placa —que es como se
+reconoce un trabajo en una bandeja con varios—, el teléfono y el correo van
+arriba y como enlaces porque lo primero que se hace es llamar, y las piezas van
+con su nombre y enumeradas porque son las que hay que presupuestar.
+
+El logotipo viaja **pegado al mensaje** y el HTML lo llama por `cid:`. Ni una
+URL —muchos clientes no bajan imágenes remotas sin permiso— ni un `data:` URI,
+que Gmail borra. Es `imgs/logoEmail.jpg`, una versión de 480 px y 18 KB hecha
+para esto: la del sitio pesa 218 KB y se pagaría en cada correo.
+
+**Todo lo que escribe una persona pasa por `escapeHtml()`.** `notes` admite
+2000 caracteres de texto libre y acaba en un correo que lee el taller, así que
+es la vía por la que alguien podría colar etiquetas.
 
 Salen por el **SMTP de Gmail**, con la cuenta del taller. Hacen falta
 `AUTOCOLOR_SMTP_USER` y `AUTOCOLOR_SMTP_PASS`; sin ellas no se manda nada y el
@@ -596,11 +620,16 @@ que muerde es codificar los mensajes — los asuntos y los cuerpos van con tilde
 y con «ñ», y eso es MIME, *quoted-printable* y cabeceras codificadas.
 Equivocarse ahí no rompe de forma visible: entrega «Solicitud de PÃ©rez».
 
-Para ver cómo quedan los dos cuerpos sin mandar nada:
+Para ver cómo quedan los dos correos sin mandar nada:
 
 ```bash
 node tools/mailpreview.js
 ```
+
+Resume los dos en la terminal y escribe el HTML a disco, con el logotipo
+apuntando al archivo del repositorio para poder abrirlo en un navegador. La
+ruta se elige con `MAILPREVIEW_OUT`. Enseña también la variante sin datos
+opcionales, que es donde se ve si una fila vacía deja un renglón suelto.
 
 ## El día a día del taller
 

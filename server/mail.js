@@ -37,7 +37,9 @@
 
 const dns = require('node:dns').promises;
 const net = require('node:net');
+const path = require('node:path');
 const nodemailer = require('nodemailer');
+const mailhtml = require('./mailhtml');
 
 // La cuenta que manda. La contraseña NO es la del correo: es una «contraseña
 // de aplicación» de 16 caracteres que Google emite aparte (myaccount.google.com
@@ -79,6 +81,16 @@ const SHOP = process.env.AUTOCOLOR_MAIL_SHOP || 'gabrielesarria167@gmail.com';
 const SITE_URL = (process.env.AUTOCOLOR_SITE_URL || process.env.RENDER_EXTERNAL_URL || '')
     .replace(/\/+$/, '');
 
+// El logotipo se manda pegado al mensaje y el HTML lo referencia por su
+// identificador (cid:). Ni una URL —muchos clientes no bajan imágenes remotas
+// sin permiso— ni un data: URI, que Gmail borra. Es una versión de 480 px y
+// 18 KB hecha para esto: la del sitio pesa 218 KB y se pagaría en cada correo.
+const LOGO = {
+    filename: 'autocolor.jpg',
+    path: path.join(__dirname, '..', 'imgs', 'logoEmail.jpg'),
+    cid: mailhtml.LOGO_CID,
+};
+
 // Copia de src/staff.js. Son dos y no pueden leerse entre ellas —una corre en
 // el navegador y la otra aquí—, así que las dos tienen que decir lo mismo, del
 // mismo modo que los estados (ver la nota de src/statuses.js).
@@ -87,6 +99,94 @@ const QUALITY_LABELS = {
     premium: 'Profesional',
     custom: 'Alta gama',
 };
+
+// Copia de src/repair.js, por lo mismo que la de arriba. El taller pide un
+// presupuesto por pieza, y «rear_door_left» no es lo que nadie va a escribir
+// en él. Una pieza que falte aquí sale con su identificador, como en el
+// asistente: se degrada, no se rompe.
+const PART_LABELS = {
+    hood: 'Capó',
+    roof: 'Techo',
+    front_bumper: 'Parachoques delantero',
+    tonneau: 'Platón y portón',
+    tailgate: 'Portón trasero',
+    rear_bumper: 'Parachoques trasero',
+    back_door_left: 'Puerta corrediza izquierda',
+    back_door_right: 'Puerta corrediza derecha',
+    left_fender: 'Guardabarros delantero izquierdo',
+    right_fender: 'Guardabarros delantero derecho',
+    rear_window_left: 'Panel lateral trasero izquierdo',
+    rear_window_right: 'Panel lateral trasero derecho',
+    back_bumper: 'Parachoques trasero',
+    Object_26: 'Moldura trasera del techo',
+    bumper: 'Parachoques delantero',
+    front_door_left: 'Puerta delantera izquierda',
+    front_door_right: 'Puerta delantera derecha',
+    rear_door_left: 'Puerta trasera izquierda',
+    rear_door_right: 'Puerta trasera derecha',
+    fender_left: 'Guardabarros delantero izquierdo',
+    fender_right: 'Guardabarros delantero derecho',
+    quarter_panel_left: 'Guardabarros trasero izquierdo',
+    quarter_panel_right: 'Guardabarros trasero derecho',
+    side_skirt_left: 'Faldón lateral izquierdo',
+    side_skirt_right: 'Faldón lateral derecho',
+    rear_hatch: 'Portón trasero',
+};
+
+// Copia de src/carModels.js (BODY_TYPES) y de src/lookup.js (VEHICLE_LABELS).
+// Sin ellas el correo del taller decía «sedan» y «wagon» —los identificadores
+// del catálogo— donde el resto del sitio dice «Sedán» y «Familiar».
+const BODY_TYPE_LABELS = {
+    sedan: 'Sedán',
+    hatchback: 'Hatchback',
+    coupe: 'Coupé',
+    wagon: 'Station wagon',
+    suv: 'SUV',
+    pickup: 'Pickup',
+    minivan: 'Minivan',
+    van: 'Furgoneta',
+};
+
+const VEHICLE_LABELS = {
+    van: 'Furgoneta',
+    wagon: 'Familiar',
+    pickup: 'Pickup',
+    suv: 'SUV',
+};
+
+function partLabel(id) {
+    return PART_LABELS[id] || id;
+}
+
+function bodyTypeLabel(id) {
+    return BODY_TYPE_LABELS[id] || id;
+}
+
+function vehicleLabel(id) {
+    return VEHICLE_LABELS[id] || id;
+}
+
+/**
+ * '+51935646304' -> '+51 935 646 304'. Un número de nueve dígitos de corrido
+ * no se lee ni se dicta; el sitio lo enseña así en todas partes.
+ */
+function formatPhone(value) {
+    const match = /^\+51(\d{3})(\d{3})(\d{3})$/.exec(oneLine(value));
+    return match ? `+51 ${match[1]} ${match[2]} ${match[3]}` : oneLine(value);
+}
+
+function qualityLabel(id) {
+    return QUALITY_LABELS[id] || id;
+}
+
+// Lo que mailhtml.js necesita de aquí para armar las dos maquetas. Se pasa en
+// vez de que allí se importe medio módulo: así las etiquetas y la dirección
+// del sitio siguen viviendo en un solo sitio.
+function htmlContext() {
+    return { oneLine, partLabel, qualityLabel, bodyTypeLabel, vehicleLabel,
+             formatPhone, siteUrl: SITE_URL,
+             partsLabel: (parts) => parts.map(partLabel).join(', ') };
+}
 
 function isConfigured() {
     return SMTP_USER.length > 0 && SMTP_PASS.length > 0;
@@ -244,26 +344,32 @@ function customerMessage(created, data) {
         // Solo el código, que lo genera el servidor. Nada que haya escrito
         // quien rellenó el formulario entra en el asunto.
         subject: `Tu solicitud en Autocolor — código ${created.id}`,
+        // Los dos cuerpos viajan juntos (multipart/alternative). El texto no
+        // es un resto: es lo que se ve en los clientes que no pintan HTML y en
+        // los avisos del reloj o del móvil, y lo que salva el mensaje si las
+        // imágenes vienen bloqueadas.
         text: lines.join('\n'),
+        html: mailhtml.customerHtml(created, data, htmlContext()),
+        attachments: [LOGO],
     };
 }
 
 function shopMessage(created, data) {
     const vehicle = [oneLine(data.brand), oneLine(data.model)].filter(Boolean).join(' ');
     const zone = [oneLine(data.department), oneLine(data.province)].filter(Boolean).join(' / ');
-    const quality = QUALITY_LABELS[data.quality] || data.quality;
+    const quality = qualityLabel(data.quality);
 
     const blocks = [
         `Nueva solicitud desde el asistente del sitio.`,
         block('CLIENTE', [
             row('Nombre', `${oneLine(data.firstName)} ${oneLine(data.lastName)}`, 16),
-            row('Teléfono', data.phone, 16),
+            row('Teléfono', formatPhone(data.phone), 16),
             row('Email', data.email || '(no dejó)', 16),
             row('Zona', zone, 16),
         ]),
         block('VEHÍCULO', [
             row('Marca y modelo', vehicle, 16),
-            row('Carrocería', data.bodyType, 16),
+            row('Carrocería', bodyTypeLabel(data.bodyType), 16),
             row('Año', data.year, 16),
             row('Placa', data.plate, 16),
             row('Kilometraje', data.mileage === null ? '' : `${data.mileage.toLocaleString('es-PE')} km`, 16),
@@ -271,11 +377,11 @@ function shopMessage(created, data) {
             // La silueta del visor 3D no siempre coincide con la carrocería
             // real (el catálogo tiene cuatro siluetas y ocho carrocerías), así
             // que va aparte y no en lugar de la de arriba.
-            row('Silueta 3D', data.vehicle, 16),
+            row('Silueta 3D', vehicleLabel(data.vehicle), 16),
         ]),
         block('TRABAJO', [
             row('Acabado', quality, 16),
-            row('Piezas', `(${data.parts.length}) ${data.parts.join(', ')}`, 16),
+            row('Piezas', `(${data.parts.length}) ${data.parts.map(partLabel).join(', ')}`, 16),
         ]),
         // Las notas se dejan como las escribió el cliente, con sus saltos de
         // línea: son lo único del formulario donde el formato dice algo.
@@ -290,6 +396,8 @@ function shopMessage(created, data) {
         // dos son seguros de poner en el asunto.
         subject: `Solicitud ${created.id} — ${data.plate}`,
         text: blocks.filter(Boolean).join('\n\n'),
+        html: mailhtml.shopHtml(created, data, htmlContext()),
+        attachments: [LOGO],
     };
 
     // Responder al correo del taller le escribe al cliente, que es lo que uno

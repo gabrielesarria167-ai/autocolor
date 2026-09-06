@@ -30,7 +30,7 @@ const FULL = {
     colorCode: '1F7',
     vehicle: 'wagon',
     quality: 'premium',
-    parts: ['hood', 'door_front_left', 'roof'],
+    parts: ['hood', 'front_door_left', 'roof'],
     firstName: 'Juan',
     lastName: 'Pérez',
     department: 'Ayacucho',
@@ -53,6 +53,21 @@ const MINIMAL = {
     parts: ['hood'],
 };
 
+// El HTML se escribe a disco además de resumirse: mirarlo en un navegador es
+// la única forma de ver si la maqueta quedó bien, y `node tools/mailpreview.js`
+// no puede enseñar una tarjeta de 600 px en la terminal.
+const OUT_DIR = process.env.MAILPREVIEW_OUT || require('node:os').tmpdir();
+
+function writeHtml(name, message) {
+    if (!message.html) return null;
+    const file = require('node:path').join(OUT_DIR, name);
+    // El logotipo viaja pegado al correo (cid:), que un navegador no resuelve.
+    // Para mirarlo se apunta al archivo del repositorio.
+    const logo = 'file://' + require('node:path').join(__dirname, '..', 'imgs', 'logoEmail.jpg');
+    require('node:fs').writeFileSync(file, message.html.replace(/cid:[^"]+/g, logo));
+    return file;
+}
+
 function show(title, message) {
     console.log(`\n${'='.repeat(72)}\n${title}\n${'='.repeat(72)}`);
     // Sin cuenta configurada el remitente sale vacío, que es exactamente lo
@@ -64,8 +79,22 @@ function show(title, message) {
     console.log(`${'-'.repeat(72)}\n${message.text}`);
 }
 
-show('AL CLIENTE — solicitud completa', mail.customerMessage(CREATED, FULL));
-show('AL TALLER — solicitud completa', mail.shopMessage(CREATED, FULL));
-show('AL TALLER — sin correo ni datos opcionales', mail.shopMessage(CREATED, MINIMAL));
+const cliente = mail.customerMessage(CREATED, FULL);
+const taller = mail.shopMessage(CREATED, FULL);
+const tallerMin = mail.shopMessage(CREATED, MINIMAL);
+
+show('AL CLIENTE — solicitud completa', cliente);
+show('AL TALLER — solicitud completa', taller);
+show('AL TALLER — sin correo ni datos opcionales', tallerMin);
+
+const escritos = [
+    ['cliente', writeHtml('autocolor-cliente.html', cliente)],
+    ['taller', writeHtml('autocolor-taller.html', taller)],
+    ['taller (mínimo)', writeHtml('autocolor-taller-min.html', tallerMin)],
+].filter(([, file]) => file);
+if (escritos.length) {
+    console.log(`\n${'='.repeat(72)}\nHTML para mirar en el navegador\n${'='.repeat(72)}`);
+    for (const [name, file] of escritos) console.log(`  ${name.padEnd(16)} ${file}`);
+}
 console.log(`\n(Con la cuenta de correo puesta, notifyNewRequest() mandaría estos.)`);
 console.log(`Configurado ahora mismo: ${mail.isConfigured() ? 'sí' : 'no'}\n`);
