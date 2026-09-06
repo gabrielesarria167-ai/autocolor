@@ -81,7 +81,8 @@ lo abre a propósito, por ejemplo para probar el sitio desde el móvil.
 | `server/server.js` | Sirve el sitio y la API |
 | `src/config.js` | A qué servidor le habla el sitio |
 | `server/db.js` | Acceso a Postgres |
-| `server/auth.js` | La contraseña y las sesiones del panel del taller |
+| `server/auth.js` | La contraseña, los códigos y las sesiones del panel del taller |
+| `server/mail.js` | Los dos correos de cada solicitud nueva (Resend) |
 | `server/env.js` | Lee el `.env` de la raíz al arrancar |
 | `_config.yml` | Qué no se publica en GitHub Pages |
 | `render.yaml`, `.nvmrc` | El despliegue en Render |
@@ -159,9 +160,16 @@ La primera vez, en este orden:
    a mano es también poder mirar qué hizo.
 
 3. **Crear el Blueprint en Render** apuntando al repositorio, y escribir en su
-   panel los dos secretos que `render.yaml` deja marcados `sync: false`:
-   `DATABASE_URL` y `AUTOCOLOR_STAFF_PASSWORD`. La contraseña se lee una sola
-   vez al arrancar, así que cambiarla exige reiniciar el servicio.
+   panel los secretos que `render.yaml` deja marcados `sync: false`:
+   `DATABASE_URL`, `AUTOCOLOR_STAFF_PASSWORD`, `AUTOCOLOR_WORKER_IDS` y
+   `AUTOCOLOR_RESEND_KEY`. Los tres primeros se leen una sola vez al arrancar,
+   así que cambiarlos exige reiniciar el servicio.
+
+   `render.yaml` solo declara que la variable existe; el valor no puede salir
+   del repositorio y hay que escribirlo a mano. Una variable declarada y
+   vacía es exactamente lo mismo que no tenerla: si falta
+   `AUTOCOLOR_WORKER_IDS`, `/api/staff/login` contesta *«El panel del taller
+   no está configurado en este servidor»* y nadie entra.
 
 Después, cada `push` a `main` vuelve a desplegar solo. Cuando `schema.sql`
 cambie, repetir el paso 2.
@@ -456,6 +464,44 @@ Las del panel del taller, todas detrás de la contraseña compartida:
 | `GET /api/staff/requests?status=` | La cola de trabajo, opcionalmente por estado |
 | `PATCH /api/staff/requests/:id` | Cambia el estado de una solicitud |
 
+## Los correos de cada solicitud
+
+Cuando alguien termina el asistente salen dos avisos (`server/mail.js`):
+
+| A quién | Qué lleva |
+| --- | --- |
+| Al cliente, si dejó su correo | Unas líneas y el código de seguimiento |
+| Al taller | Los datos de contacto y el trabajo pedido, con `Reply-To` al cliente |
+
+El correo del cliente es **opcional** en el asistente. Cuando no lo dejó, solo
+sale la copia del taller, que lleva su teléfono.
+
+Se mandan por la API HTTP de [Resend](https://resend.com) con el `fetch` que ya
+trae Node, a propósito: así `pg` sigue siendo la única dependencia del
+proyecto. Hace falta `AUTOCOLOR_RESEND_KEY`; sin ella no se manda nada y el
+asistente funciona igual, que es lo que pasa en la máquina de trabajo.
+
+**Ningún correo puede tumbar una solicitud.** Para cuando se envían, la fila ya
+está en la base y el cliente ya tiene su código en pantalla, así que
+`POST /api/requests` contesta su `201` y solo después dispara los envíos, sin
+esperarlos. Un fallo de Resend —clave mala, dominio sin verificar, su servicio
+caído— queda en el registro y nada más:
+
+```
+[mail] no salió el aviso al taller de 4820175639: Resend respondió 403: …
+```
+
+El remitente (`AUTOCOLOR_MAIL_FROM`) tiene que ser una dirección de un dominio
+verificado en Resend. Hasta que `autocolorayacucho.com` lo esté, los envíos se
+rechazan con un `403`. La copia del taller va a `AUTOCOLOR_MAIL_SHOP`, hoy un
+Gmail personal mientras nadie tenga las llaves del correo del dominio.
+
+Para ver cómo quedan los dos cuerpos sin mandar nada:
+
+```bash
+node tools/mailpreview.js
+```
+
 ## El día a día del taller
 
 Las solicitudes llegan a la tabla `requests` de la base `autocolor`, y el
@@ -469,13 +515,20 @@ código, marca y teléfono); los filtros de estado, en cambio, se le piden al
 servidor, porque la consulta trae como mucho 200 filas y recortarlas en el
 navegador dejaría fuera las viejas.
 
-El panel solo existe si el servidor encuentra la contraseña del taller. Lo
-normal es dejarla en el `.env` de la raíz:
+El panel solo existe si el servidor encuentra **las dos cosas**: la contraseña
+del taller y la lista de códigos de trabajador. Lo normal es dejarlas en el
+`.env` de la raíz:
 
 ```bash
 # .env
 AUTOCOLOR_STAFF_PASSWORD=la-del-taller
+AUTOCOLOR_WORKER_IDS=JP64723,MG06602,CQ01447
 ```
+
+La contraseña es el secreto que abre; el código —dos letras y cinco dígitos,
+uno por persona— dice quién abrió, y queda en el registro del servidor y en
+`GET /api/staff/whoami`. Entrar pide los dos, y el error no distingue cuál de
+los dos falló, para que probar códigos a ciegas no revele cuáles existen.
 
 y arrancar con `npm start` a secas. Ponerla delante del comando sigue
 funcionando y tiene prioridad sobre el archivo:
@@ -484,8 +537,8 @@ funcionando y tiene prioridad sobre el archivo:
 AUTOCOLOR_STAFF_PASSWORD='la-del-taller' npm start
 ```
 
-Sin ella las rutas `/api/staff/*` responden `503` y el panel queda apagado,
-que es lo que debe pasar si alguien se olvida de configurarlo. La contraseña
+Sin cualquiera de las dos, las rutas `/api/staff/*` responden `503` y el panel
+queda apagado, que es lo que debe pasar si alguien se olvida de configurarlo. La contraseña
 se comprueba en el servidor, no en el navegador: `pgs/taller.html` es un
 archivo estático como cualquier otro y su código lo lee todo el mundo, así
 que lo que está cerrado es la API. La sesión es una cookie `HttpOnly` de ocho

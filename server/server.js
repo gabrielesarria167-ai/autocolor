@@ -41,6 +41,7 @@ const {
     ping, describe, pool, DATABASE_URL,
 } = require('./db');
 const auth = require('./auth');
+const mail = require('./mail');
 
 const PORT = Number(process.env.PORT) || 3000;
 
@@ -673,7 +674,13 @@ async function handleApi(req, res, pathname) {
         const data = validateRequest(await readJsonBody(req));
         const created = await createRequest(data);
         console.log(`[requests] nueva solicitud ${created.id} (${data.vehicle}, ${data.parts.length} piezas)`);
-        return sendJson(res, 201, created);
+        sendJson(res, 201, created);
+        // Los dos correos salen DESPUÉS de contestar y sin `await`: la fila ya
+        // está guardada y el cliente ya tiene su código, así que un tropiezo
+        // del correo no puede convertirse en un error de la solicitud. Ver
+        // server/mail.js: notifyNewRequest() no rechaza nunca.
+        mail.notifyNewRequest(created, data);
+        return;
     }
 
     if (req.method === 'GET') {
@@ -804,14 +811,25 @@ async function start() {
     server.listen(PORT, HOST, () => {
         console.log(`Autocolor en ${process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`}`);
         console.log(`Base de datos: ${describe()}`);
-        if (auth.isConfigured()) {
+        // El panel pide las dos cosas: la contraseña y los códigos de
+        // trabajador. Se nombra la que falte —o las dos—, porque el panel
+        // apagado se ve desde dentro como un 503 y desde fuera como una
+        // página rota, y adivinar cuál de las dos era cuesta una tarde.
+        const faltan = [];
+        if (!auth.isConfigured()) faltan.push('AUTOCOLOR_STAFF_PASSWORD');
+        if (!auth.hasWorkerIds()) faltan.push('AUTOCOLOR_WORKER_IDS');
+        if (faltan.length === 0) {
             const base = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
             console.log(`Panel del taller: ${base}/pgs/taller.html`);
         } else {
-            // El panel apagado se ve desde dentro como un 503 y desde fuera
-            // como una página rota, así que aquí se dice qué falta y dónde.
-            console.log('Panel del taller: apagado — falta AUTOCOLOR_STAFF_PASSWORD.');
-            console.log('  Escríbela en el .env de la raíz (hay un .env.example al lado).');
+            console.log(`Panel del taller: apagado — falta ${faltan.join(' y ')}.`);
+            console.log('  Escríbelo en el .env de la raíz (hay un .env.example al lado).');
+        }
+        // Sin clave de Resend el sitio funciona igual y las solicitudes se
+        // guardan; lo que no sale es el aviso. Se dice para que nadie se
+        // quede esperando un correo que nunca se intentó mandar.
+        if (!mail.isConfigured()) {
+            console.log('Correos de aviso: apagados — falta AUTOCOLOR_RESEND_KEY.');
         }
         if (ALLOWED_ORIGINS.size > 0) {
             console.log(`Orígenes permitidos: ${[...ALLOWED_ORIGINS].join(', ')}`);
