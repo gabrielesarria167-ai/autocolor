@@ -85,3 +85,32 @@ services:
       # el servicio.
       - key: AUTOCOLOR_STAFF_PASSWORD
         sync: false
+
+      # Los códigos de trabajador del panel, separados por comas
+      # (JP64723,MG06602,…). Hacen falta junto con la contraseña: sin ellos
+      # /api/staff/login responde 503 con «El panel del taller no está
+      # configurado en este servidor», igual que sin contraseña. No van en el
+      # repositorio porque dicen quién trabaja en el taller, y como la
+      # contraseña se leen una sola vez al arrancar: cambiarlos exige
+      # reiniciar el servicio.
+      - key: AUTOCOLOR_WORKER_IDS
+        sync: false
+
+      # La clave de Resend, que es quien manda los dos correos de cada
+      # solicitud nueva (server/mail.js). Sin ella el asistente sigue
+      # guardando solicitudes y nadie recibe aviso: el fallo se registra y ya,
+      # porque perder una solicitud por un correo sería mucho peor.
+      - key: AUTOCOLOR_RESEND_KEY
+        sync: false
+
+      # El remitente tiene que ser de un dominio verificado en Resend. Hasta
+      # que autocolorayacucho.com lo esté, Resend rechaza los envíos con un
+      # 403 y se ve en el registro del servicio.
+      - key: AUTOCOLOR_MAIL_FROM
+        value: "Autocolor <info@autocolorayacucho.com>"
+
+      # A dónde va la copia con los datos del cliente. Un Gmail personal
+      # mientras nadie tenga las llaves del correo del dominio; cambiarlo es
+      # esta línea y un reinicio, no un cambio de código.
+      - key: AUTOCOLOR_MAIL_SHOP
+        value: "gabrielesarria167@gmail.com"
