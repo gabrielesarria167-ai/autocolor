@@ -838,8 +838,17 @@
         refreshConfirm();
     });
     emailInput.addEventListener("blur", function () {
-        var valid = emailInput.value === "" || EMAIL_PATTERN.test(emailInput.value);
-        setFieldValidity(emailInput, emailError, valid, "Ingresa un email válido, por ejemplo nombre@dominio.com.");
+        // El correo dejó de ser opcional: es por donde llega la confirmación
+        // con el código de seguimiento. Vacío y mal escrito son dos fallos
+        // distintos y se dicen distinto, porque «ingresa un email válido»
+        // delante de un campo en blanco no dice qué hacer.
+        if (emailInput.value === "") {
+            setFieldValidity(emailInput, emailError, false,
+                "Escribe tu email: ahí te enviamos tu código de seguimiento.");
+            return;
+        }
+        setFieldValidity(emailInput, emailError, EMAIL_PATTERN.test(emailInput.value),
+            "Ingresa un email válido, por ejemplo nombre@dominio.com.");
     });
 
     contactForm.addEventListener("input", refreshConfirm);

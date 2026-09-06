@@ -236,8 +236,11 @@ function validateRequest(body) {
     const phone = text(body.phone, { max: 20, required: true, field: 'el teléfono' });
     if (!PHONE_RE.test(phone)) throw new BadRequest('El teléfono debe tener 9 dígitos.');
 
-    const email = text(body.email, { max: 254, field: 'el email' });
-    if (email && !EMAIL_RE.test(email)) throw new BadRequest('El email no es válido.');
+    // El correo es obligatorio: es por donde sale la confirmación con el
+    // código de seguimiento (server/mail.js), así que una solicitud sin él
+    // deja al cliente sin más forma de recuperarlo que llamar al taller.
+    const email = text(body.email, { max: 254, required: true, field: 'el email' });
+    if (!EMAIL_RE.test(email)) throw new BadRequest('El email no es válido.');
 
     return {
         brand: text(body.brand, { max: 40, required: true, field: 'la marca', agree: 'f' }),
@@ -252,8 +255,8 @@ function validateRequest(body) {
         parts: [...new Set(parts)],
         firstName: text(body.firstName, { max: 80, required: true, field: 'el nombre' }),
         lastName: text(body.lastName, { max: 80, required: true, field: 'el apellido' }),
-        department: text(body.department, { max: 80, field: 'el departamento' }),
-        province: text(body.province, { max: 80, field: 'la provincia', agree: 'f' }),
+        department: text(body.department, { max: 80, required: true, field: 'el departamento' }),
+        province: text(body.province, { max: 80, required: true, field: 'la provincia', agree: 'f' }),
         phone,
         email,
         notes: text(body.notes, { max: 2000, field: 'las notas', agree: 'fp' }),

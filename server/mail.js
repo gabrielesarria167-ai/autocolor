@@ -5,8 +5,8 @@
 
    Cuando alguien termina el asistente (pgs/repair.html) salen dos avisos:
 
-     - al cliente, si dejó su correo: unas líneas y el código de seguimiento,
-       que es lo único que necesita para consultar su estado más tarde.
+     - al cliente: unas líneas y el código de seguimiento, que es lo único que
+       necesita para consultar su estado más tarde.
      - al taller: los datos de contacto y el trabajo pedido, para preparar el
        presupuesto sin tener que abrir el panel.
 
@@ -33,11 +33,20 @@ const TIMEOUT_MS = 10000;
 
 const KEY = process.env.AUTOCOLOR_RESEND_KEY || '';
 
-// El remitente tiene que ser una dirección de un dominio verificado en Resend.
-// Hasta que autocolorayacucho.com lo esté, Resend rechaza el envío con un 403
-// y el fallo queda en el registro. Se deja aquí y no en el código de cada
-// correo para que cambiarlo sea una variable y no un despliegue.
-const FROM = process.env.AUTOCOLOR_MAIL_FROM || 'Autocolor <info@autocolorayacucho.com>';
+// El remitente. Resend solo deja mandar desde un dominio verificado, y el
+// taller todavía no tiene dominio propio: el sitio vive en el subdominio que
+// da Render, cuyo DNS es de Render y no se puede verificar.
+//
+// Mientras tanto queda onboarding@resend.dev, el remitente de prueba que
+// Resend presta a toda cuenta nueva. TIENE UN LÍMITE QUE IMPORTA: solo
+// entrega a la dirección con la que se registró la cuenta. La copia del
+// taller llega; la confirmación del cliente la rechaza Resend con un 403 que
+// explica exactamente eso, y queda en el registro.
+//
+// Se arregla comprando un dominio y verificándolo en resend.com/domains: a
+// partir de ahí esto es una variable de entorno y un reinicio, sin tocar
+// código.
+const FROM = process.env.AUTOCOLOR_MAIL_FROM || 'Autocolor <onboarding@resend.dev>';
 
 // A dónde va la copia del taller. Por ahora un Gmail personal, porque nadie
 // tiene todavía las llaves de info@autocolorayacucho.com; cuando las haya,
@@ -225,8 +234,9 @@ async function notifyNewRequest(created, data) {
             .catch((err) => { console.error(`[mail] no salió el aviso al taller de ${created.id}: ${err.message}`); }),
     ];
 
-    // El correo del cliente es opcional en el asistente. Sin él solo se manda
-    // la copia del taller, que lleva el teléfono para poder responderle.
+    // El asistente ya lo exige, pero la guarda se queda: en la base hay
+    // solicitudes anteriores a que el correo fuera obligatorio, y sin ella
+    // reenviar una de esas mandaría un mensaje a `undefined`.
     if (data.email) {
         jobs.push(
             send(customerMessage(created, data))

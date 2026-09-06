@@ -343,14 +343,14 @@
 
             <form class="contact-form" id="contactForm" novalidate>
                 <div class="field">
-                    <label for="department">Departamento <span class="field__optional">(opcional)</span></label>
-                    <select id="department" name="department" autocomplete="address-level1">
+                    <label for="department">Departamento</label>
+                    <select id="department" name="department" autocomplete="address-level1" required>
                         <option value="" selected disabled hidden>Selecciona tu departamento</option>
                     </select>
                 </div>
                 <div class="field">
-                    <label for="province">Provincia <span class="field__optional">(opcional)</span></label>
-                    <select id="province" name="province" autocomplete="address-level2" disabled>
+                    <label for="province">Provincia</label>
+                    <select id="province" name="province" autocomplete="address-level2" disabled required>
                         <option value="" selected disabled hidden>Selecciona tu provincia</option>
                     </select>
                 </div>
@@ -366,9 +366,10 @@
                     <input type="hidden" id="phoneFull" name="phoneFull" value="">
                 </div>
                 <div class="field">
-                    <label for="email">Email <span class="field__optional">(opcional)</span></label>
+                    <label for="email">Email</label>
                     <input type="email" id="email" name="email" autocomplete="email"
-                        pattern="[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}" aria-describedby="emailError">
+                        pattern="[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}" aria-describedby="emailError"
+                        required>
                     <p class="field__error" id="emailError" role="alert" hidden></p>
                 </div>
                 <div class="field field--full">

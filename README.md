@@ -470,11 +470,8 @@ Cuando alguien termina el asistente salen dos avisos (`server/mail.js`):
 
 | A quién | Qué lleva |
 | --- | --- |
-| Al cliente, si dejó su correo | Unas líneas y el código de seguimiento |
+| Al cliente | Unas líneas y el código de seguimiento |
 | Al taller | Los datos de contacto y el trabajo pedido, con `Reply-To` al cliente |
-
-El correo del cliente es **opcional** en el asistente. Cuando no lo dejó, solo
-sale la copia del taller, que lleva su teléfono.
 
 Se mandan por la API HTTP de [Resend](https://resend.com) con el `fetch` que ya
 trae Node, a propósito: así `pg` sigue siendo la única dependencia del
@@ -491,10 +488,25 @@ caído— queda en el registro y nada más:
 [mail] no salió el aviso al taller de 4820175639: Resend respondió 403: …
 ```
 
-El remitente (`AUTOCOLOR_MAIL_FROM`) tiene que ser una dirección de un dominio
-verificado en Resend. Hasta que `autocolorayacucho.com` lo esté, los envíos se
-rechazan con un `403`. La copia del taller va a `AUTOCOLOR_MAIL_SHOP`, hoy un
-Gmail personal mientras nadie tenga las llaves del correo del dominio.
+### El remitente, mientras no haya dominio
+
+Resend solo deja mandar desde un dominio verificado, y el taller no tiene
+dominio propio: el sitio vive en el subdominio que da Render, cuyo DNS es de
+Render y no se puede verificar. Así que `AUTOCOLOR_MAIL_FROM` usa
+`onboarding@resend.dev`, el remitente de prueba que Resend presta a toda cuenta
+nueva.
+
+**Tiene un límite que importa:** solo entrega a la dirección con la que se abrió
+la cuenta de Resend. En la práctica, hoy:
+
+| | Qué pasa |
+| --- | --- |
+| Copia al taller (`AUTOCOLOR_MAIL_SHOP`) | Llega, si es la dirección de la cuenta de Resend |
+| Confirmación al cliente | **No llega.** Resend la rechaza con un `403` que lo explica, y queda en el registro |
+
+Se arregla comprando un dominio y verificándolo en
+[resend.com/domains](https://resend.com/domains). A partir de ahí es cambiar
+`AUTOCOLOR_MAIL_FROM` y reiniciar: no hay que tocar código.
 
 Para ver cómo quedan los dos cuerpos sin mandar nada:
 

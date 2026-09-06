@@ -103,11 +103,15 @@ services:
       - key: AUTOCOLOR_RESEND_KEY
         sync: false
 
-      # El remitente tiene que ser de un dominio verificado en Resend. Hasta
-      # que autocolorayacucho.com lo esté, Resend rechaza los envíos con un
-      # 403 y se ve en el registro del servicio.
+      # El remitente. Resend solo deja mandar desde un dominio verificado y el
+      # taller no tiene dominio propio todavía —el sitio vive en el subdominio
+      # de Render, cuyo DNS es de Render—, así que queda el remitente de
+      # prueba que Resend presta. Solo entrega a la dirección de la cuenta:
+      # la copia del taller llega y la confirmación del cliente se rechaza con
+      # un 403. Con un dominio verificado, esta línea y un reinicio lo
+      # arreglan.
       - key: AUTOCOLOR_MAIL_FROM
-        value: "Autocolor <info@autocolorayacucho.com>"
+        value: "Autocolor <onboarding@resend.dev>"
 
       # A dónde va la copia con los datos del cliente. Un Gmail personal
       # mientras nadie tenga las llaves del correo del dominio; cambiarlo es
