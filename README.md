@@ -84,6 +84,7 @@ lo abre a propósito, por ejemplo para probar el sitio desde el móvil.
 | `server/auth.js` | La contraseña, los códigos y las sesiones del panel del taller |
 | `server/mail.js` | Los dos correos de cada solicitud nueva (SMTP de Gmail) |
 | `server/mailhtml.js` | La maqueta en HTML de esos dos correos |
+| `NEXT-STEPS.md` | Lo que queda por hacer del correo y los hallazgos de la revisión |
 | `server/env.js` | Lee el `.env` de la raíz al arrancar |
 | `_config.yml` | Qué no se publica en GitHub Pages |
 | `render.yaml`, `.nvmrc` | El despliegue en Render |
@@ -467,6 +468,10 @@ Las del panel del taller, todas detrás de la contraseña compartida:
 | `PATCH /api/staff/requests/:id` | Cambia el estado de una solicitud |
 
 ## Los correos de cada solicitud
+
+> **Ojo:** el envío no funciona de forma fiable desde Render — el alojamiento
+> descarta la salida SMTP. Lo medido y lo que hay que hacer están en
+> [`NEXT-STEPS.md`](NEXT-STEPS.md).
 
 Cuando alguien termina el asistente salen dos avisos (`server/mail.js`):
 
