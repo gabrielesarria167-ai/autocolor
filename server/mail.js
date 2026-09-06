@@ -10,9 +10,19 @@
      - al taller: los datos de contacto y el trabajo pedido, para preparar el
        presupuesto sin tener que abrir el panel.
 
-   Se mandan por la API HTTP de Resend (https://resend.com) con el `fetch` que
-   ya trae Node, a propósito: así `pg` sigue siendo la única dependencia del
-   proyecto. Hablar SMTP a mano —o traer nodemailer— era la alternativa.
+   Salen por el SMTP de Gmail, con la cuenta del taller. No es lo más vistoso
+   —el remitente es un @gmail.com y no el dominio del taller—, pero es lo
+   único que hoy entrega de verdad: los servicios de correo por API solo dejan
+   mandar desde un dominio verificado, y el sitio vive en el subdominio de
+   Render, cuyo DNS es de Render. Cuando haya dominio propio, cambiar de
+   transporte es este archivo y nada más.
+
+   Es la razón de la segunda dependencia del proyecto, `nodemailer`. Hablar
+   SMTP a mano se consideró y se descartó: la parte fácil es el diálogo con el
+   servidor, y la que muerde es codificar los mensajes —los asuntos y los
+   cuerpos van con tildes y con «ñ», y eso es MIME, quoted-printable y
+   cabeceras codificadas—. Equivocarse ahí no rompe: entrega «Solicitud de
+   PÃ©rez».
 
    NINGUNO DE LOS DOS PUEDE TUMBAR UNA SOLICITUD. Para cuando se envían, la
    fila ya está en la base y el cliente ya tiene su código en pantalla. Que un
@@ -20,37 +30,38 @@
    peor. Por eso server.js los dispara DESPUÉS de responder el 201 y
    notifyNewRequest() no rechaza nunca: los fallos se registran y ya.
 
-   Sin AUTOCOLOR_RESEND_KEY no se manda nada y el sitio funciona igual. Es lo
-   que pasa en la máquina de trabajo, donde no hace falta una clave para
-   probar el asistente.
+   Sin AUTOCOLOR_SMTP_USER y AUTOCOLOR_SMTP_PASS no se manda nada y el sitio
+   funciona igual. Es lo que pasa en la máquina de trabajo, donde no hace falta
+   una cuenta para probar el asistente.
    ========================================================================== */
 
-const RESEND_URL = 'https://api.resend.com/emails';
+const nodemailer = require('nodemailer');
 
-// Resend tarda decenas de milisegundos cuando todo va bien. El tope está para
-// que una llamada colgada no deje la promesa viva para siempre.
+// La cuenta que manda. La contraseña NO es la del correo: es una «contraseña
+// de aplicación» de 16 caracteres que Google emite aparte (myaccount.google.com
+// → Seguridad → Verificación en dos pasos → Contraseñas de aplicaciones), y
+// que se puede revocar sola sin tocar la cuenta. Google no acepta la
+// contraseña normal por SMTP desde 2022.
+const SMTP_USER = process.env.AUTOCOLOR_SMTP_USER || '';
+const SMTP_PASS = process.env.AUTOCOLOR_SMTP_PASS || '';
+
+// Gmail por omisión, pero configurable: cambiar de proveedor —a uno del
+// dominio del taller, el día que lo haya— no debería ser un cambio de código.
+// El 465 es TLS desde el primer byte; el 587 empieza en claro y sube con
+// STARTTLS, y `secure` se deduce del puerto para que no puedan contradecirse.
+const SMTP_HOST = process.env.AUTOCOLOR_SMTP_HOST || 'smtp.gmail.com';
+const SMTP_PORT = Number(process.env.AUTOCOLOR_SMTP_PORT) || 465;
+
+// Tope para conectar, para el saludo y para cada operación del diálogo SMTP.
 const TIMEOUT_MS = 10000;
 
-const KEY = process.env.AUTOCOLOR_RESEND_KEY || '';
+// Gmail reescribe el remitente al de la cuenta autenticada, así que ponerlo
+// distinto no engaña a nadie: lo único que se elige es el nombre visible.
+const FROM = process.env.AUTOCOLOR_MAIL_FROM || (SMTP_USER ? `Autocolor <${SMTP_USER}>` : '');
 
-// El remitente. Resend solo deja mandar desde un dominio verificado, y el
-// taller todavía no tiene dominio propio: el sitio vive en el subdominio que
-// da Render, cuyo DNS es de Render y no se puede verificar.
-//
-// Mientras tanto queda onboarding@resend.dev, el remitente de prueba que
-// Resend presta a toda cuenta nueva. TIENE UN LÍMITE QUE IMPORTA: solo
-// entrega a la dirección con la que se registró la cuenta. La copia del
-// taller llega; la confirmación del cliente la rechaza Resend con un 403 que
-// explica exactamente eso, y queda en el registro.
-//
-// Se arregla comprando un dominio y verificándolo en resend.com/domains: a
-// partir de ahí esto es una variable de entorno y un reinicio, sin tocar
-// código.
-const FROM = process.env.AUTOCOLOR_MAIL_FROM || 'Autocolor <onboarding@resend.dev>';
-
-// A dónde va la copia del taller. Por ahora un Gmail personal, porque nadie
-// tiene todavía las llaves de info@autocolorayacucho.com; cuando las haya,
-// esto es una variable de entorno y no un cambio de código.
+// A dónde va la copia del taller. Por ahora el Gmail personal que hace de
+// buzón; cuando el taller tenga el suyo, esto es una variable de entorno y no
+// un cambio de código.
 const SHOP = process.env.AUTOCOLOR_MAIL_SHOP || 'gabrielesarria167@gmail.com';
 
 // Para los enlaces de los correos. RENDER_EXTERNAL_URL la pone el alojamiento
@@ -69,7 +80,34 @@ const QUALITY_LABELS = {
 };
 
 function isConfigured() {
-    return KEY.length > 0;
+    return SMTP_USER.length > 0 && SMTP_PASS.length > 0;
+}
+
+// Un solo transporte para todo el proceso, con su pool: nodemailer reaprovecha
+// la conexión TLS en vez de rehacer el saludo y la autenticación en cada
+// correo, y los dos de una solicitud salen casi siempre seguidos.
+//
+// Se crea perezosamente para que no cueste nada en la máquina de trabajo, que
+// arranca sin cuenta configurada y no manda ningún correo.
+let transport = null;
+
+function getTransport() {
+    if (transport) return transport;
+    transport = nodemailer.createTransport({
+        host: SMTP_HOST,
+        port: SMTP_PORT,
+        secure: SMTP_PORT === 465,   // 465 es TLS directo; 587 sube con STARTTLS
+        auth: { user: SMTP_USER, pass: SMTP_PASS },
+        pool: true,
+        maxConnections: 1,
+        // Los tres topes están para que un alojamiento que bloquee el puerto
+        // de salida —cosa que pasa— falle y se registre, en vez de dejar la
+        // promesa colgada para siempre.
+        connectionTimeout: TIMEOUT_MS,
+        greetingTimeout: TIMEOUT_MS,
+        socketTimeout: TIMEOUT_MS,
+    });
+    return transport;
 }
 
 /**
@@ -78,7 +116,7 @@ function isConfigured() {
  * validateRequest() recorta los extremos pero no toca lo de dentro, así que un
  * nombre pegado desde otro sitio puede traer saltos de línea. En un cuerpo de
  * texto plano eso solo descuadra la lista de datos —no hay cabeceras que
- * inyectar, porque a Resend se le manda JSON y es él quien arma el mensaje—,
+ * inyectar: nodemailer codifica las cabeceras y es él quien arma el mensaje—,
  * pero un correo cuadrado se lee mejor.
  */
 function oneLine(value) {
@@ -100,29 +138,13 @@ function block(title, rows) {
 }
 
 /**
- * Manda un correo por Resend. Rechaza si la clave falta, si la petición se
- * cae o si Resend contesta con un error; quien llama decide qué hacer con eso
- * —aquí siempre es registrarlo—.
+ * Manda un correo. Rechaza si falta la cuenta, si no se puede conectar o si el
+ * servidor rechaza el mensaje; quien llama decide qué hacer con eso —aquí
+ * siempre es registrarlo—.
  */
 async function send(message) {
-    if (!isConfigured()) throw new Error('Falta AUTOCOLOR_RESEND_KEY');
-
-    const response = await fetch(RESEND_URL, {
-        method: 'POST',
-        headers: {
-            Authorization: `Bearer ${KEY}`,
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(message),
-        signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
-
-    if (!response.ok) {
-        // El cuerpo de Resend dice por qué (dominio sin verificar, clave
-        // vencida, destinatario inválido). Se recorta porque va al registro.
-        const detail = await response.text().catch(() => '');
-        throw new Error(`Resend respondió ${response.status}: ${detail.slice(0, 300)}`);
-    }
+    if (!isConfigured()) throw new Error('Faltan AUTOCOLOR_SMTP_USER y AUTOCOLOR_SMTP_PASS');
+    await getTransport().sendMail(message);
 }
 
 /* -----------------------------------------------------------------------------
@@ -208,7 +230,7 @@ function shopMessage(created, data) {
 
     // Responder al correo del taller le escribe al cliente, que es lo que uno
     // quiere hacer al leerlo.
-    if (data.email) message.reply_to = [data.email];
+    if (data.email) message.replyTo = data.email;
 
     return message;
 }
@@ -251,9 +273,22 @@ async function notifyNewRequest(created, data) {
     await Promise.all(jobs);
 }
 
+/**
+ * Cierra la conexión SMTP del pool. Solo la llama el apagado ordenado de
+ * server.js, junto al cierre del pool de Postgres: sin esto queda un socket
+ * abierto contra Gmail mientras el proceso termina de irse.
+ */
+function close() {
+    if (transport) {
+        transport.close();
+        transport = null;
+    }
+}
+
 module.exports = {
     isConfigured,
     notifyNewRequest,
+    close,
     // Exportados para poder revisar los cuerpos sin mandar nada (ver
     // tools/mailpreview.js).
     customerMessage,

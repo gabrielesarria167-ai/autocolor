@@ -17,7 +17,8 @@
      PATCH /api/staff/requests/:id cambia el estado de una solicitud
 
    Sin framework a propósito: el sitio es HTML y JS a secas, y el servidor
-   necesita un puñado de rutas y archivos estáticos. La única dependencia es `pg`.
+   necesita un puñado de rutas y archivos estáticos. Las dependencias son dos:
+   `pg` para la base y `nodemailer` para los avisos por correo.
 
        npm install
        npm run db:init           # crea y levanta el Postgres propio (puerto 5434)
@@ -828,11 +829,11 @@ async function start() {
             console.log(`Panel del taller: apagado — falta ${faltan.join(' y ')}.`);
             console.log('  Escríbelo en el .env de la raíz (hay un .env.example al lado).');
         }
-        // Sin clave de Resend el sitio funciona igual y las solicitudes se
+        // Sin cuenta de correo el sitio funciona igual y las solicitudes se
         // guardan; lo que no sale es el aviso. Se dice para que nadie se
         // quede esperando un correo que nunca se intentó mandar.
         if (!mail.isConfigured()) {
-            console.log('Correos de aviso: apagados — falta AUTOCOLOR_RESEND_KEY.');
+            console.log('Correos de aviso: apagados — faltan AUTOCOLOR_SMTP_USER y AUTOCOLOR_SMTP_PASS.');
         }
         if (ALLOWED_ORIGINS.size > 0) {
             console.log(`Orígenes permitidos: ${[...ALLOWED_ORIGINS].join(', ')}`);
@@ -842,6 +843,7 @@ async function start() {
 
 for (const signal of ['SIGINT', 'SIGTERM']) {
     process.on(signal, () => {
+        mail.close();
         server.close(() => pool.end().then(() => process.exit(0)));
     });
 }

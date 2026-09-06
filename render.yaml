@@ -96,22 +96,19 @@ services:
       - key: AUTOCOLOR_WORKER_IDS
         sync: false
 
-      # La clave de Resend, que es quien manda los dos correos de cada
-      # solicitud nueva (server/mail.js). Sin ella el asistente sigue
-      # guardando solicitudes y nadie recibe aviso: el fallo se registra y ya,
-      # porque perder una solicitud por un correo sería mucho peor.
-      - key: AUTOCOLOR_RESEND_KEY
+      # La cuenta de Gmail que manda los dos avisos de cada solicitud
+      # (server/mail.js). La contraseña NO es la del correo: es una
+      # «contraseña de aplicación» de 16 caracteres que Google emite aparte y
+      # que se puede revocar sola. Sin las dos, el asistente sigue guardando
+      # solicitudes y nadie recibe aviso: el fallo se registra y ya, porque
+      # perder una solicitud por un correo sería mucho peor.
+      #
+      # Si algún día el alojamiento bloquea la salida SMTP, se verá aquí como
+      # un tiempo agotado al conectar, no como un rechazo.
+      - key: AUTOCOLOR_SMTP_USER
         sync: false
-
-      # El remitente. Resend solo deja mandar desde un dominio verificado y el
-      # taller no tiene dominio propio todavía —el sitio vive en el subdominio
-      # de Render, cuyo DNS es de Render—, así que queda el remitente de
-      # prueba que Resend presta. Solo entrega a la dirección de la cuenta:
-      # la copia del taller llega y la confirmación del cliente se rechaza con
-      # un 403. Con un dominio verificado, esta línea y un reinicio lo
-      # arreglan.
-      - key: AUTOCOLOR_MAIL_FROM
-        value: "Autocolor <onboarding@resend.dev>"
+      - key: AUTOCOLOR_SMTP_PASS
+        sync: false
 
       # A dónde va la copia con los datos del cliente. Un Gmail personal
       # mientras nadie tenga las llaves del correo del dominio; cambiarlo es

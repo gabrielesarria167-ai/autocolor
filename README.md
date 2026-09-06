@@ -11,7 +11,7 @@ Hace falta Node 18 o más nuevo y los binarios de Postgres instalados
 (Postgres.app o Homebrew).
 
 ```bash
-npm install                          # única dependencia: pg
+npm install                          # dependencias: pg y nodemailer
 cp .env.example .env                 # y escribe ahí la contraseña del taller
 npm run db:init                      # crea y levanta el servidor propio
 npm start                            # http://localhost:3000
@@ -82,7 +82,7 @@ lo abre a propósito, por ejemplo para probar el sitio desde el móvil.
 | `src/config.js` | A qué servidor le habla el sitio |
 | `server/db.js` | Acceso a Postgres |
 | `server/auth.js` | La contraseña, los códigos y las sesiones del panel del taller |
-| `server/mail.js` | Los dos correos de cada solicitud nueva (Resend) |
+| `server/mail.js` | Los dos correos de cada solicitud nueva (SMTP de Gmail) |
 | `server/env.js` | Lee el `.env` de la raíz al arrancar |
 | `_config.yml` | Qué no se publica en GitHub Pages |
 | `render.yaml`, `.nvmrc` | El despliegue en Render |
@@ -161,9 +161,9 @@ La primera vez, en este orden:
 
 3. **Crear el Blueprint en Render** apuntando al repositorio, y escribir en su
    panel los secretos que `render.yaml` deja marcados `sync: false`:
-   `DATABASE_URL`, `AUTOCOLOR_STAFF_PASSWORD`, `AUTOCOLOR_WORKER_IDS` y
-   `AUTOCOLOR_RESEND_KEY`. Los tres primeros se leen una sola vez al arrancar,
-   así que cambiarlos exige reiniciar el servicio.
+   `DATABASE_URL`, `AUTOCOLOR_STAFF_PASSWORD`, `AUTOCOLOR_WORKER_IDS`,
+   `AUTOCOLOR_SMTP_USER` y `AUTOCOLOR_SMTP_PASS`. Todos se leen una sola vez
+   al arrancar, así que cambiarlos exige reiniciar el servicio.
 
    `render.yaml` solo declara que la variable existe; el valor no puede salir
    del repositorio y hay que escribirlo a mano. Una variable declarada y
@@ -473,40 +473,51 @@ Cuando alguien termina el asistente salen dos avisos (`server/mail.js`):
 | Al cliente | Unas líneas y el código de seguimiento |
 | Al taller | Los datos de contacto y el trabajo pedido, con `Reply-To` al cliente |
 
-Se mandan por la API HTTP de [Resend](https://resend.com) con el `fetch` que ya
-trae Node, a propósito: así `pg` sigue siendo la única dependencia del
-proyecto. Hace falta `AUTOCOLOR_RESEND_KEY`; sin ella no se manda nada y el
+Salen por el **SMTP de Gmail**, con la cuenta del taller. Hacen falta
+`AUTOCOLOR_SMTP_USER` y `AUTOCOLOR_SMTP_PASS`; sin ellas no se manda nada y el
 asistente funciona igual, que es lo que pasa en la máquina de trabajo.
+
+**La contraseña no es la del correo.** Es una *contraseña de aplicación* de 16
+caracteres que Google emite aparte, en myaccount.google.com → Seguridad →
+Verificación en dos pasos → Contraseñas de aplicaciones. Hace falta tener la
+verificación en dos pasos activada, no sirve para entrar al correo por la web,
+y se puede revocar sola sin tocar la cuenta.
 
 **Ningún correo puede tumbar una solicitud.** Para cuando se envían, la fila ya
 está en la base y el cliente ya tiene su código en pantalla, así que
 `POST /api/requests` contesta su `201` y solo después dispara los envíos, sin
-esperarlos. Un fallo de Resend —clave mala, dominio sin verificar, su servicio
-caído— queda en el registro y nada más:
+esperarlos. Un fallo —contraseña revocada, Gmail caído, el puerto de salida
+bloqueado— queda en el registro y nada más:
 
 ```
-[mail] no salió el aviso al taller de 4820175639: Resend respondió 403: …
+[mail] no salió el aviso al taller de 4820175639: Invalid login: 535-5.7.8 …
 ```
 
-### El remitente, mientras no haya dominio
+### Por qué Gmail y no un servicio por API
 
-Resend solo deja mandar desde un dominio verificado, y el taller no tiene
-dominio propio: el sitio vive en el subdominio que da Render, cuyo DNS es de
-Render y no se puede verificar. Así que `AUTOCOLOR_MAIL_FROM` usa
-`onboarding@resend.dev`, el remitente de prueba que Resend presta a toda cuenta
-nueva.
+Los servicios de correo por API (Resend, SendGrid, Postmark) solo dejan mandar
+desde un **dominio verificado**, y el taller no tiene dominio propio: el sitio
+vive en el subdominio que da Render, cuyo DNS es de Render. Con el remitente de
+prueba que prestan, la confirmación al cliente no se entrega — que es justamente
+la mitad que importa.
 
-**Tiene un límite que importa:** solo entrega a la dirección con la que se abrió
-la cuenta de Resend. En la práctica, hoy:
+El SMTP de Gmail entrega a cualquiera hoy, a cambio de que el remitente sea un
+`@gmail.com` en vez del dominio del taller. Menos vistoso, pero es correo que
+llega. El día que haya dominio propio, cambiar de transporte es `server/mail.js`
+y nada más: `AUTOCOLOR_SMTP_HOST` y `AUTOCOLOR_SMTP_PORT` ya están para apuntar
+a otro servidor sin tocar código.
 
-| | Qué pasa |
-| --- | --- |
-| Copia al taller (`AUTOCOLOR_MAIL_SHOP`) | Llega, si es la dirección de la cuenta de Resend |
-| Confirmación al cliente | **No llega.** Resend la rechaza con un `403` que lo explica, y queda en el registro |
+Gmail corta sobre los ~500 envíos al día en una cuenta gratuita. A dos por
+solicitud, son unas 250 solicitudes diarias: muy por encima de lo que el taller
+recibe.
 
-Se arregla comprando un dominio y verificándolo en
-[resend.com/domains](https://resend.com/domains). A partir de ahí es cambiar
-`AUTOCOLOR_MAIL_FROM` y reiniciar: no hay que tocar código.
+### La segunda dependencia
+
+`nodemailer` es la razón por la que `pg` dejó de estar solo. Hablar SMTP a mano
+se consideró y se descartó: la parte fácil es el diálogo con el servidor, y la
+que muerde es codificar los mensajes — los asuntos y los cuerpos van con tildes
+y con «ñ», y eso es MIME, *quoted-printable* y cabeceras codificadas.
+Equivocarse ahí no rompe de forma visible: entrega «Solicitud de PÃ©rez».
 
 Para ver cómo quedan los dos cuerpos sin mandar nada:
 
