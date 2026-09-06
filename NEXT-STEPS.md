@@ -18,7 +18,7 @@ Everything below is committed and pushed to `main`. Nothing is half-applied.
 | Required fields | email, Departamento, Provincia enforced in the wizard and in `validateRequest` |
 | Two emails | Built, laid out on the supplied mock, escaped, plain-text half included |
 | Email delivery | **Retried, not fixed at the source — see §1** |
-| Review findings | 12 of 15 closed; the 3 left are not about email (§2) |
+| Review findings | 13 of 15 closed; the 2 left are not about email (§2) |
 
 ---
 
@@ -126,17 +126,17 @@ Needs nothing from you.
 | 13 | `server/mail.js` | Text and HTML recomputed the same derived fields separately — which is how #3 happened. `mileageLabel`, `zoneLabel` and `vehicleName` are shared through `htmlContext()`. |
 | 14 | `tools/mailpreview.js` | The one degraded-rendering fixture tested a payload `validateRequest` can no longer produce. Split into a realistic minimum and a `LEGACY` row for the pre-requirement case. |
 
-Most of #15 went with them: `row()` lost its always-`16` width argument,
-`escapeHtml` is no longer exported unused, and `tools/mailpreview.js` uses
-English identifiers like the rest of the repo.
+#15 went with them: `row()` lost its always-`16` width argument, `eyebrow()`
+its never-passed colour, `escapeHtml` is no longer exported unused,
+`tools/mailpreview.js` uses English identifiers like the rest of the repo, and
+a successful staff login is logged at `console.log` rather than `console.warn`.
 
-### Still open — none of them about email
+### Still open — neither of them about email
 
 | # | Where | What |
 |---|---|---|
 | 6 | `server/auth.js:81` | `verifyWorkerId` checks membership but not shape, while the browser hard-enforces `[A-Za-z]{2}[0-9]{5}`. A code like `JEFE` in the env var is accepted server-side and blocked client-side: that person can never log in, and the error blames their typing. |
 | 7 | `src/repair.js:835` | Clearing the email field hides the error but leaves Confirmar disabled with no explanation — the `input` handler still encodes "empty email is valid". |
-| 15 | `server/server.js:631` | A successful login is logged at `console.warn`, where every other `warn` in the file marks an anomaly. |
 
 ---
 
@@ -182,7 +182,7 @@ at. Customers replying there get nothing. Already flagged as item B2 in
 1. Deploy and send a test request. Watch for `salió … (al intento N)` in the
    log; N > 1 is the queue doing its job, not a problem.
 2. Chores §3.1 and §3.2 — quick, and §3.1 is a two-minute config change.
-3. Findings #6, #7, #15.
+3. Findings #6 and #7.
 4. Brevo (§1), only if mail is still not arriving after the queue.
 
 ---
