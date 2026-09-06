@@ -47,6 +47,17 @@ const MONO = "'Courier New',Courier,monospace";
 // data: URI Gmail lo borra directamente.
 const LOGO_CID = 'autocolor-logo';
 
+// Los datos del taller en el pie de los dos correos.
+//
+// SON UNA COPIA. El original está en la lista de contacto de index.html (busca
+// `contact__details`), y esto no puede leerlo: aquella es una página estática
+// que se sirve tal cual y esto corre en el servidor. Si cambia la dirección,
+// el teléfono o el horario, hay que cambiarlo en los dos sitios.
+//
+// La redacción sí difiere a propósito: en el correo van enteros («Lunes a
+// Sábado», y el país detrás de la dirección) porque un correo puede leerse
+// lejos del sitio y sin nada alrededor que dé contexto. Lo que tiene que
+// coincidir son los datos, no las palabras.
 const SHOP_ADDRESS = 'Jr. San Juan Masías, Ayacucho 05002, Perú';
 const SHOP_PHONE = '+51 935 646 304';
 const SHOP_PHONE_TEL = '+51935646304';
@@ -189,7 +200,7 @@ ${body}
         <tr>
           <td class="px" align="center" style="padding:24px 48px 32px 48px;">
             <div style="font-family:${FONT}; font-size:12px; line-height:19px; color:${MUTED};">
-              ${footerNote}<br>
+              ${escapeHtml(footerNote)}<br>
               ${escapeHtml(SHOP_ADDRESS)}
             </div>
           </td>
@@ -213,8 +224,8 @@ ${body}
 
 function customerHtml(created, data, ctx) {
     const name = ctx.oneLine(data.firstName);
-    const vehicle = [ctx.oneLine(data.brand), ctx.oneLine(data.model), data.year].filter(Boolean).join(' ');
-    const zone = [ctx.oneLine(data.department), ctx.oneLine(data.province)].filter(Boolean).join(' / ');
+    const vehicle = ctx.vehicleName(data, true);
+    const zone = ctx.zoneLabel(data);
     const lookupUrl = ctx.siteUrl ? `${ctx.siteUrl}/pgs/repair.html#consulta` : '';
 
     const rows = detailRows([
@@ -298,8 +309,8 @@ ${hairline('36px 48px 0 48px')}
 
 function shopHtml(created, data, ctx) {
     const fullName = [ctx.oneLine(data.firstName), ctx.oneLine(data.lastName)].filter(Boolean).join(' ');
-    const vehicle = [ctx.oneLine(data.brand), ctx.oneLine(data.model)].filter(Boolean).join(' ');
-    const zone = [ctx.oneLine(data.department), ctx.oneLine(data.province)].filter(Boolean).join(' / ');
+    const vehicle = ctx.vehicleName(data, false);
+    const zone = ctx.zoneLabel(data);
     const panelUrl = ctx.siteUrl ? `${ctx.siteUrl}/pgs/taller.html` : '';
     const phone = ctx.formatPhone(data.phone);
     const email = ctx.oneLine(data.email);
@@ -325,7 +336,7 @@ function shopHtml(created, data, ctx) {
         { label: 'Marca y modelo', value: vehicle },
         { label: 'Carrocería', value: ctx.bodyTypeLabel(data.bodyType) },
         { label: 'Año', value: data.year },
-        { label: 'Kilometraje', value: data.mileage === null || data.mileage === undefined ? '' : `${data.mileage.toLocaleString('es-PE')} km` },
+        { label: 'Kilometraje', value: ctx.mileageLabel(data.mileage) },
         { label: 'Código de color', value: ctx.oneLine(data.colorCode) },
         // La silueta del visor 3D no siempre coincide con la carrocería real
         // (cuatro siluetas para ocho carrocerías), así que va aparte.
@@ -414,6 +425,5 @@ ${panelUrl ? `
 module.exports = {
     customerHtml,
     shopHtml,
-    escapeHtml,
     LOGO_CID,
 };

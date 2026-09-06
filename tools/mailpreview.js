@@ -40,17 +40,26 @@ const FULL = {
     notes: 'El capó tiene un rayón profundo.\nEl techo solo necesita pulido.',
 };
 
-// Lo mínimo que valida el asistente: sin correo, sin kilometraje, sin código
-// de color, sin zona y sin notas.
+// Lo mínimo que HOY puede llegar: sin kilometraje, sin código de color y sin
+// notas, que son los tres campos que el asistente sigue dejando vacíos. El
+// correo, el departamento y la provincia ya no pueden faltar —validateRequest
+// los exige—, así que ponerlos a null probaba una carga imposible.
 const MINIMAL = {
     ...FULL,
     mileage: null,
     colorCode: null,
+    notes: null,
+    parts: ['hood'],
+};
+
+// Una fila anterior a que el correo fuera obligatorio. No sale del asistente,
+// pero sí de la base, y mail.js tiene una guarda para ella (el `if (data.email)`
+// de notifyNewRequest): esto es lo que se ve al reenviar una de esas.
+const LEGACY = {
+    ...MINIMAL,
     department: null,
     province: null,
     email: null,
-    notes: null,
-    parts: ['hood'],
 };
 
 // El HTML se escribe a disco además de resumirse: mirarlo en un navegador es
@@ -64,7 +73,11 @@ function writeHtml(name, message) {
     // El logotipo viaja pegado al correo (cid:), que un navegador no resuelve.
     // Para mirarlo se apunta al archivo del repositorio.
     const logo = 'file://' + require('node:path').join(__dirname, '..', 'imgs', 'logoEmail.jpg');
-    require('node:fs').writeFileSync(file, message.html.replace(/cid:[^"]+/g, logo));
+    // El identificador termina donde termina el atributo, no en la siguiente
+    // comilla: los cuerpos van escapados, así que un `[^"]+` no encontraba
+    // dónde parar y se llevaba por delante medio `<img>`. Y el reemplazo va en
+    // una función porque en una cadena los `$` significan otra cosa.
+    require('node:fs').writeFileSync(file, message.html.replace(/cid:[^"'\s>]+/g, () => logo));
     return file;
 }
 
@@ -79,22 +92,25 @@ function show(title, message) {
     console.log(`${'-'.repeat(72)}\n${message.text}`);
 }
 
-const cliente = mail.customerMessage(CREATED, FULL);
-const taller = mail.shopMessage(CREATED, FULL);
-const tallerMin = mail.shopMessage(CREATED, MINIMAL);
+const customer = mail.customerMessage(CREATED, FULL);
+const shop = mail.shopMessage(CREATED, FULL);
+const shopMinimal = mail.shopMessage(CREATED, MINIMAL);
+const shopLegacy = mail.shopMessage(CREATED, LEGACY);
 
-show('AL CLIENTE — solicitud completa', cliente);
-show('AL TALLER — solicitud completa', taller);
-show('AL TALLER — sin correo ni datos opcionales', tallerMin);
+show('AL CLIENTE — solicitud completa', customer);
+show('AL TALLER — solicitud completa', shop);
+show('AL TALLER — sin los datos opcionales', shopMinimal);
+show('AL TALLER — fila antigua, sin correo ni zona', shopLegacy);
 
-const escritos = [
-    ['cliente', writeHtml('autocolor-cliente.html', cliente)],
-    ['taller', writeHtml('autocolor-taller.html', taller)],
-    ['taller (mínimo)', writeHtml('autocolor-taller-min.html', tallerMin)],
+const written = [
+    ['cliente', writeHtml('autocolor-cliente.html', customer)],
+    ['taller', writeHtml('autocolor-taller.html', shop)],
+    ['taller (mínimo)', writeHtml('autocolor-taller-min.html', shopMinimal)],
+    ['taller (antiguo)', writeHtml('autocolor-taller-legacy.html', shopLegacy)],
 ].filter(([, file]) => file);
-if (escritos.length) {
+if (written.length) {
     console.log(`\n${'='.repeat(72)}\nHTML para mirar en el navegador\n${'='.repeat(72)}`);
-    for (const [name, file] of escritos) console.log(`  ${name.padEnd(16)} ${file}`);
+    for (const [name, file] of written) console.log(`  ${name.padEnd(16)} ${file}`);
 }
 console.log(`\n(Con la cuenta de correo puesta, notifyNewRequest() mandaría estos.)`);
 console.log(`Configurado ahora mismo: ${mail.isConfigured() ? 'sí' : 'no'}\n`);

@@ -469,8 +469,9 @@ Las del panel del taller, todas detrás de la contraseña compartida:
 
 ## Los correos de cada solicitud
 
-> **Ojo:** el envío no funciona de forma fiable desde Render — el alojamiento
-> descarta la salida SMTP. Lo medido y lo que hay que hacer están en
+> **Ojo:** desde Render, las conexiones a Gmail se pierden a ratos. Por eso
+> los avisos van a una cola que reintenta durante casi una hora (ver abajo):
+> un correo puede tardar en llegar, y eso es normal. Lo medido está en
 > [`NEXT-STEPS.md`](NEXT-STEPS.md).
 
 Cuando alguien termina el asistente salen dos avisos (`server/mail.js`):
@@ -548,7 +549,7 @@ Lo que suele ser, en orden:
 | `Invalid login: 535-5.7.8` | La contraseña no es una *contraseña de aplicación*, o se revocó |
 | `ENETUNREACH` con una dirección tipo `2607:f8b0:…` | IPv6. Ya no debería pasar: ver abajo |
 | `Connection timeout` en el 465 | El alojamiento bloquea ese puerto. Render lo hace: usa el 587, que es el de por omisión |
-| `Connection timeout` en el 587, tras 60 s | El alojamiento no llega a Gmail. Si tarda menos, mira los topes de `server/mail.js`: cortarlos demasiado da este mismo error con una conexión que iba a funcionar |
+| `Connection timeout` en el 587, tras 15 s | El alojamiento no llega a Gmail en ese momento. Es lo que hace Render a ratos; la cola lo reintenta, así que mira si detrás hay un `salió … (al intento N)` |
 | `ECONNREFUSED` / `ETIMEDOUT` en los dos puertos | El alojamiento bloquea la salida SMTP entera. Toca un proveedor por HTTP, y entonces hace falta un dominio o un remitente verificado |
 
 `GET /api/staff/whoami` trae en su bloque `mail` la dirección con la que se
@@ -557,47 +558,101 @@ fallo dice además a dónde iba y cuánto tardó, que es lo que separa «no lleg
 de «llego y me rechazan»:
 
 ```
-[mail] no salió el aviso al taller de 7822278010: Connection timeout (smtp.gmail.com 142.251.127.108:587, tras 60.0 s)
+[mail] no salió aviso al taller de 7822278010: Connection timeout (smtp.gmail.com 142.251.127.108:587, tras 15.0 s)
 ```
 
-#### Un fallo se reintenta una vez
+#### La cola: un correo que falla se reintenta durante casi una hora
 
-Los dos correos salen a la vez y comparten **un pool de una sola conexión**. Si
-la primera vuelta falla, se tira el transporte —puede haber quedado con una IP
-vieja o una conexión muerta— y se reintenta, una vez. Una instancia dormida
-tarda en abrir su primera conexión de salida, y un envío que falla por eso
-vuelve a funcionar enseguida.
+`notifyNewRequest()` **no manda nada**: pone los dos mensajes en una cola y
+vuelve. La cola los manda de uno en uno, y al que falla lo devuelve al final
+con su siguiente reintento programado:
 
-Un fallo de la primera vuelta se registra como aviso y dice «reintentando»;
-solo el de la segunda se registra como error. Si en el registro hay un
-`reintentando` sin un `no salió` detrás, el correo salió.
+| Intento | Cuándo |
+| --- | --- |
+| 1 | en el acto |
+| 2 | 30 s después |
+| 3 | 2 min |
+| 4 | 5 min |
+| 5 | 15 min |
+| 6 | 30 min |
 
-**El transporte se cierra cuando los dos correos han terminado, nunca dentro de
-uno.** Cerrarlo desde el fallo de uno se llevaba por delante al otro, que
-estaba en la cola del mismo pool:
+Seis intentos repartidos en unos 48 minutos. **Son tan separados a propósito.**
+El fallo de Render no es lentitud: en un rato las conexiones salen y en otro se
+pierden, así que reintentar a los dos segundos vuelve a caer en el mismo rato
+malo. Y `smtp.gmail.com` resuelve a una dirección distinta cada pocos minutos
+—el TTL de su registro A ronda los 135 s—, de modo que esperar también cambia
+la IP contra la que se prueba.
+
+Que tarde no importa: la solicitud ya está guardada y el cliente ya tiene su
+código en pantalla. Un aviso que llega media hora tarde es infinitamente mejor
+que uno que no llega.
+
+Leyendo el registro: `falló … se reintenta en N s` es un aviso y puede acabar
+bien; solo `no salió` es un correo perdido de verdad.
 
 ```
-[mail] no salió el aviso al taller de 9816859188: Greeting never received (…, tras 30.0 s)
-[mail] no salió la confirmación de 9816859188: Connection pool was closed (smtp.gmail.com ?:587, tras 60.0 s)
+[mail] falló aviso al taller de 4820175639, se reintenta en 30 s: Connection timeout (…)
+[mail] salió aviso al taller de 4820175639 (al intento 2)
 ```
 
-El segundo no falló por nada suyo. El `?` en lugar de la dirección es la
-señal: `close()` la olvida, así que un `?` ahí quiere decir que alguien cerró
-el transporte por debajo.
+**Un 5xx no se reintenta.** Si el servidor contesta que no —535 por la
+contraseña, 550 por la dirección—, repetirlo cinco veces no lo arregla y encima
+le regala a Google cinco intentos fallidos de autenticación desde la misma IP.
+Se registra como `no salió` a la primera.
 
-#### Los topes de tiempo no son cortos a propósito
+`GET /api/staff/whoami` trae `mail.pending`, cuántos avisos están esperando su
+turno. Un número que no baja entre dos consultas es la señal de que el correo
+está caído, sin tener que ir al registro del despliegue.
 
-Estuvieron en 10 s los tres y se quedaban cortos. Render duerme las instancias
-del plan gratuito, y la primera conexión de salida de un contenedor recién
-despierto no siempre entra en diez segundos: el resultado era un
-`Connection timeout` —el nombre que nodemailer le da justo a ese tope— con la
-solicitud guardada y ningún correo.
+**La cola vive en memoria**, y eso es una decisión: guardarla en Postgres
+pediría una tabla y una migración a mano (ver `render.yaml`) para cubrir un
+caso —que Render apague la instancia justo en la media hora en la que el correo
+está caído— en el que no se pierde nada importante, porque la solicitud está en
+la base y el panel la enseña igual. Lo que sí se hace es decirlo al apagar:
 
-Ahora son 60 s para conectar, 30 para el saludo y 60 de inactividad. Los topes
-están para que un puerto bloqueado falle y se registre en vez de dejar la
-promesa colgada para siempre; eso no pide que sean cortos. Los dos correos
-salen **después** de contestar el 201, así que esperar un minuto no le cuesta
-nada a quien envió la solicitud: solo retrasa un renglón del registro.
+```
+[mail] el proceso termina con 2 correo(s) sin mandar:
+[mail]   - aviso al taller de 4820175639 (iba por el intento 3)
+```
+
+#### Un transporte por intento, y sin pool
+
+Hubo un solo transporte para todo el proceso, con un pool de una conexión, para
+no rehacer el saludo TLS en cada correo. Costaba dos correos perdidos:
+
+- **El pool es estado compartido.** Cerrarlo desde el código de una solicitud
+  —para tirar una conexión que se creía muerta— se llevaba por delante el
+  correo que tenía otra esperando. Y `sendMail()` sobre un pool cerrado no
+  resuelve **ni** rechaza: ese correo desaparecía sin dejar un renglón.
+
+  ```
+  [mail] no salió el aviso al taller de 9816859188: Greeting never received (…, tras 30.0 s)
+  [mail] no salió la confirmación de 9816859188: Connection pool was closed (smtp.gmail.com ?:587, tras 60.0 s)
+  ```
+
+  El `?` en lugar de la dirección era la señal: el segundo no falló por nada
+  suyo, alguien le cerró el transporte por debajo.
+
+- **La IP se quedaba fija** para toda la vida del proceso. Si la primera
+  resolución caía en una dirección que Render no alcanza, todos los avisos de
+  esa instancia iban a esa dirección hasta el siguiente despliegue.
+
+Ahora cada intento crea el suyo y lo suelta al terminar. No hay nada compartido
+que cerrar, y cada reintento vuelve a resolver el nombre. Se paga un saludo TLS
+por correo: 22 ms medidos, detrás de una respuesta que ya salió.
+
+#### Los topes de tiempo: 15 s, no 60
+
+Estuvieron en 60 s con la idea de que Render duerme las instancias del plan
+gratuito y la primera conexión de un contenedor recién despierto tardaría. La
+medida dice otra cosa: **una conexión sana a `smtp.gmail.com:587` se establece
+en 22 milésimas de segundo.** Las que fallan no van lentas, se pierden, así que
+esperarlas un minuto solo hacía que cada fallo tardara un minuto en aparecer en
+el registro.
+
+Ahora son 15 s para conectar, 15 para el saludo y 30 de inactividad. Lo que
+rescata un correo no es esperar más dentro de un intento, es volver a intentarlo
+más tarde; y para eso conviene que cada intento se rinda pronto.
 
 #### El puerto es el 587, no el 465
 
@@ -630,16 +685,17 @@ connect ENETUNREACH 2607:f8b0:4004:c19::6c:465 - Local (:::0)
 ```
 
 Tiene una lista de reserva para reintentar con otra dirección, pero solo
-durante el saludo inicial, y el tope de diez segundos la cortaba: el segundo
-correo de la misma solicitud moría en `Connection timeout`. Por eso
+durante el saludo inicial, y el tope del saludo la cortaba: el segundo correo
+de la misma solicitud moría en `Connection timeout`. Por eso
 `server/mail.js` resuelve el registro A por su cuenta y le pasa a nodemailer
 una IP ya elegida —`net.isIP()` le ataja la resolución entera—, con el nombre
 aparte en `tls.servername` para que el certificado se siga comprobando contra
 `smtp.gmail.com`.
 
-Si un envío falla se tira el transporte, de modo que el siguiente vuelve a
-resolver: Gmail rota direcciones y una IP guardada para siempre acabaría
-caducando.
+La resolución se hace **una vez por intento**, no una por proceso: Gmail rota
+direcciones cada pocos minutos, así que un reintento de dentro de media hora
+sale contra otra IP, y con ella contra otra ruta. Eso es media razón para
+reintentar.
 
 El panel también lo enseña sin entrar al registro: `GET /api/staff/whoami`
 devuelve un bloque `mail` con la cuenta y el servidor configurados (nunca la
@@ -647,11 +703,15 @@ contraseña).
 
 ### Por qué Gmail y no un servicio por API
 
-Los servicios de correo por API (Resend, SendGrid, Postmark) solo dejan mandar
-desde un **dominio verificado**, y el taller no tiene dominio propio: el sitio
-vive en el subdominio que da Render, cuyo DNS es de Render. Con el remitente de
-prueba que prestan, la confirmación al cliente no se entrega — que es justamente
-la mitad que importa.
+Casi todos los servicios de correo por API (Resend, SendGrid, Postmark) solo
+dejan mandar desde un **dominio verificado**, y el taller no tiene dominio
+propio: el sitio vive en el subdominio que da Render, cuyo DNS es de Render.
+Con el remitente de prueba que prestan, la confirmación al cliente no se
+entrega — que es justamente la mitad que importa.
+
+Hay excepciones que verifican una **dirección** suelta en vez de un dominio, y
+que además salen por el 443, que ningún alojamiento bloquea. Es la salida si la
+cola deja de bastar; está anotada en [`NEXT-STEPS.md`](NEXT-STEPS.md).
 
 El SMTP de Gmail entrega a cualquiera hoy, a cambio de que el remitente sea un
 `@gmail.com` en vez del dominio del taller. Menos vistoso, pero es correo que
@@ -679,8 +739,10 @@ node tools/mailpreview.js
 
 Resume los dos en la terminal y escribe el HTML a disco, con el logotipo
 apuntando al archivo del repositorio para poder abrirlo en un navegador. La
-ruta se elige con `MAILPREVIEW_OUT`. Enseña también la variante sin datos
-opcionales, que es donde se ve si una fila vacía deja un renglón suelto.
+ruta se elige con `MAILPREVIEW_OUT`. Enseña también la variante sin los datos
+opcionales —donde se ve si una fila vacía deja un renglón suelto— y una fila
+anterior a que el correo fuera obligatorio, que es lo que se vería al reenviar
+una solicitud vieja.
 
 ## El día a día del taller
 

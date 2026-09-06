@@ -680,10 +680,14 @@ async function handleApi(req, res, pathname) {
         const created = await createRequest(data);
         console.log(`[requests] nueva solicitud ${created.id} (${data.vehicle}, ${data.parts.length} piezas)`);
         sendJson(res, 201, created);
-        // Los dos correos salen DESPUÉS de contestar y sin `await`: la fila ya
-        // está guardada y el cliente ya tiene su código, así que un tropiezo
-        // del correo no puede convertirse en un error de la solicitud. Ver
-        // server/mail.js: notifyNewRequest() no rechaza nunca.
+        // Los dos correos salen DESPUÉS de contestar: la fila ya está guardada
+        // y el cliente ya tiene su código, así que un tropiezo del correo no
+        // puede convertirse en un error de la solicitud.
+        //
+        // Sin `await` y sin `.catch()` a propósito: notifyNewRequest() es
+        // síncrona, se limita a poner los dos mensajes en una cola y no lanza
+        // —ni siquiera si armar un cuerpo falla—, así que aquí no queda nada
+        // colgando. Lo que tarden en salir es asunto de server/mail.js.
         mail.notifyNewRequest(created, data);
         return;
     }
@@ -861,10 +865,26 @@ async function start() {
     });
 }
 
+// Una promesa rechazada sin dueño termina el proceso en Node 20 y siguientes.
+// En un servidor eso es tirar el sitio entero —y todas las sesiones abiertas
+// del panel— por un fallo de algo secundario, que casi siempre es un correo.
+// Registrarlo y seguir es lo correcto: lo que no podía seguir era la
+// solicitud, y esa ya se contestó mucho antes de llegar aquí.
+process.on('unhandledRejection', (reason) => {
+    console.error(`[server] promesa rechazada sin manejar: ${reason instanceof Error ? reason.stack : reason}`);
+});
+
 for (const signal of ['SIGINT', 'SIGTERM']) {
     process.on(signal, () => {
-        mail.close();
-        server.close(() => pool.end().then(() => process.exit(0)));
+        // EL ORDEN IMPORTA. Primero se deja de aceptar y se termina lo que ya
+        // está en marcha; solo cuando no queda nadie sirviendo se abandonan la
+        // cola del correo y el pool de la base. Al revés —como estaba— cada
+        // despliegue y cada apagado por inactividad cortaba los avisos que
+        // estuvieran saliendo en ese momento.
+        server.close(() => {
+            mail.close();
+            pool.end().then(() => process.exit(0));
+        });
     });
 }
 

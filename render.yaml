@@ -107,6 +107,12 @@ services:
       # que se intentó primero: los avisos morían en «Connection timeout».
       # server/mail.js usa el 587 por omisión por eso; no hace falta poner
       # AUTOCOLOR_SMTP_PORT aquí.
+      #
+      # Aun por el 587, las conexiones a Gmail desde aquí se pierden a ratos.
+      # Por eso los avisos van a una cola que reintenta durante casi una hora
+      # (ver server/mail.js): en el registro del despliegue, un «falló … se
+      # reintenta en N s» es normal y suele acabar en «salió … (al intento
+      # 2)». Solo «no salió» es un correo perdido.
       - key: AUTOCOLOR_SMTP_USER
         sync: false
       - key: AUTOCOLOR_SMTP_PASS
