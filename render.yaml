@@ -103,8 +103,10 @@ services:
       # solicitudes y nadie recibe aviso: el fallo se registra y ya, porque
       # perder una solicitud por un correo sería mucho peor.
       #
-      # Si algún día el alojamiento bloquea la salida SMTP, se verá aquí como
-      # un tiempo agotado al conectar, no como un rechazo.
+      # Render deja salir por el 587 y NO por el 465, que es el puerto por el
+      # que se intentó primero: los avisos morían en «Connection timeout».
+      # server/mail.js usa el 587 por omisión por eso; no hace falta poner
+      # AUTOCOLOR_SMTP_PORT aquí.
       - key: AUTOCOLOR_SMTP_USER
         sync: false
       - key: AUTOCOLOR_SMTP_PASS

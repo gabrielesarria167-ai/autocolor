@@ -49,10 +49,17 @@ const SMTP_PASS = process.env.AUTOCOLOR_SMTP_PASS || '';
 
 // Gmail por omisión, pero configurable: cambiar de proveedor —a uno del
 // dominio del taller, el día que lo haya— no debería ser un cambio de código.
+//
+// EL PUERTO ES EL 587 Y NO EL 465 POR UNA RAZÓN MEDIDA: Render deja salir por
+// el 587 y no por el 465. Con el 465 los dos avisos de cada solicitud morían
+// en «Connection timeout» —un tiempo agotado, no un rechazo: los paquetes se
+// pierden sin respuesta, que es como se ve un cortafuegos del alojamiento—.
+// Cambiar el puerto fue lo único que hizo falta.
+//
 // El 465 es TLS desde el primer byte; el 587 empieza en claro y sube con
 // STARTTLS, y `secure` se deduce del puerto para que no puedan contradecirse.
 const SMTP_HOST = process.env.AUTOCOLOR_SMTP_HOST || 'smtp.gmail.com';
-const SMTP_PORT = Number(process.env.AUTOCOLOR_SMTP_PORT) || 465;
+const SMTP_PORT = Number(process.env.AUTOCOLOR_SMTP_PORT) || 587;
 
 // Tope para conectar, para el saludo y para cada operación del diálogo SMTP.
 const TIMEOUT_MS = 10000;
@@ -140,8 +147,10 @@ async function getTransport() {
         // es TLS desde el primer byte.
         requireTLS: true,
         // El certificado se comprueba contra el nombre, no contra la IP que
-        // se acaba de resolver.
-        tls: { servername: SMTP_HOST },
+        // se acaba de resolver. Si lo configurado ya era una IP no hay nombre
+        // que comprobar, y ponerla como SNI lo prohíbe el RFC 6066: Node avisa
+        // de que lo ignorará.
+        ...(net.isIP(SMTP_HOST) ? {} : { tls: { servername: SMTP_HOST } }),
         auth: { user: SMTP_USER, pass: SMTP_PASS },
         pool: true,
         maxConnections: 1,

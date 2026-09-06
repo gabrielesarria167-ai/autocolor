@@ -518,10 +518,30 @@ Lo que suele ser, en orden:
 | `apagados — faltan AUTOCOLOR_SMTP_USER…` | Las variables no están puestas en el alojamiento, o el servicio no se reinició después de ponerlas |
 | `Invalid login: 535-5.7.8` | La contraseña no es una *contraseña de aplicación*, o se revocó |
 | `ENETUNREACH` con una dirección tipo `2607:f8b0:…` | IPv6. Ya no debería pasar: ver abajo |
-| `ECONNREFUSED` / `ETIMEDOUT` | El alojamiento bloquea la salida SMTP. Toca un proveedor por HTTP, y entonces hace falta un dominio |
+| `Connection timeout` en el 465 | El alojamiento bloquea ese puerto. Render lo hace: usa el 587, que es el de por omisión |
+| `ECONNREFUSED` / `ETIMEDOUT` en los dos puertos | El alojamiento bloquea la salida SMTP entera. Toca un proveedor por HTTP, y entonces hace falta un dominio o un remitente verificado |
 
 `GET /api/staff/whoami` trae en su bloque `mail` la dirección con la que se
 conectó de verdad (`address`), que es lo que distingue estos dos casos.
+
+#### El puerto es el 587, no el 465
+
+Los dos puertos valen para Gmail y el código deduce del número si la conexión
+empieza cifrada (465) o se sube con STARTTLS (587). **Render deja salir por el
+587 y no por el 465.** Con el 465, los dos avisos de cada solicitud morían así:
+
+```
+[mail] no salió el aviso al taller de 4567074004: Connection timeout
+[mail] no salió la confirmación de 4567074004: Connection timeout
+```
+
+Un tiempo agotado y no un rechazo: los paquetes se pierden sin respuesta, que
+es como se ve un cortafuegos del alojamiento y no un servidor que dice que no.
+Cambiar el puerto fue lo único que hizo falta.
+
+Como el 587 empieza en claro, el transporte lleva `requireTLS`: si un servidor
+no ofreciera STARTTLS, el envío falla **antes** de autenticarse, en vez de
+mandar la contraseña sin cifrar.
 
 #### IPv6: por qué se fuerza IPv4
 
