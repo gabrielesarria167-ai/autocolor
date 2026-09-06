@@ -165,7 +165,7 @@ async function listRequests(options) {
     const status = (options || {}).status || null;
     const { rows } = await pool.query(
         `SELECT id, created_at, first_name, last_name, phone, brand, model,
-                plate, quality, status, cardinality(parts) AS part_count
+                plate, quality, status, occupied_by, cardinality(parts) AS part_count
            FROM requests
           WHERE $1::text IS NULL OR status = $1
           ORDER BY created_at DESC
@@ -183,26 +183,96 @@ async function listRequests(options) {
         plate: row.plate,
         quality: row.quality,
         status: row.status,
+        // El código del trabajador que la tiene, o null si está disponible. El
+        // nombre legible lo pone server.js con server/names.js; aquí va el
+        // código, que es con lo que se decide quién puede tocarla.
+        occupiedBy: row.occupied_by,
         partCount: Number(row.part_count),
     }));
 }
 
 /**
- * Cambia el estado de una solicitud. Devuelve null si el código no existe,
- * para poder responder 404 en vez de un éxito que no cambió nada.
+ * Cambia el estado de una solicitud, pero solo si quien lo pide puede: una
+ * disponible la mueve cualquiera; una ocupada, únicamente el trabajador que la
+ * tiene. El filtro va en el propio WHERE para que la comprobación y el cambio
+ * sean un solo paso y no haya hueco entre «miré quién la tiene» y «la cambié».
  *
- * `updated_at` lo pone el trigger de la base (ver server/schema.sql), así que
- * no hay forma de actualizar una fila y dejar la fecha vieja.
+ * Devuelve { ok: true, ... } con la fila; o { ok: false, reason } —'not_found'
+ * si el código no existe, 'forbidden' si la tiene otro— para que server.js
+ * responda 404 o 403. `updated_at` lo pone el trigger de la base.
+ *
+ * `viewerId` es el código de la sesión (ver server/auth.js); nunca llega del
+ * cuerpo de la petición, así que no se puede falsear para tocar la de otro.
  */
-async function updateRequestStatus(id, status) {
+async function updateRequestStatus(id, status, viewerId) {
     const { rows } = await pool.query(
         `UPDATE requests SET status = $2
-          WHERE id = $1
-      RETURNING id, status, updated_at`,
-        [id, status]
+          WHERE id = $1 AND (occupied_by IS NULL OR occupied_by = $3)
+      RETURNING id, status, occupied_by, updated_at`,
+        [id, status, viewerId]
     );
-    if (rows.length === 0) return null;
-    return { id: rows[0].id.trim(), status: rows[0].status, updatedAt: rows[0].updated_at };
+    if (rows.length > 0) {
+        return {
+            ok: true,
+            id: rows[0].id.trim(),
+            status: rows[0].status,
+            occupiedBy: rows[0].occupied_by,
+            updatedAt: rows[0].updated_at,
+        };
+    }
+    // No cambió nada: o el código no existe, o la tiene otro trabajador. Una
+    // segunda consulta lo distingue para dar el error correcto.
+    const cur = await pool.query('SELECT occupied_by FROM requests WHERE id = $1', [id]);
+    if (cur.rows.length === 0) return { ok: false, reason: 'not_found' };
+    return { ok: false, reason: 'forbidden', occupiedBy: cur.rows[0].occupied_by };
+}
+
+/**
+ * Ocupa una solicitud disponible en nombre de un trabajador. Solo prende si
+ * `occupied_by` está en NULL, así que dos que la pidan a la vez no se pisan: el
+ * segundo no cambia ninguna fila y se entera de que ya la tomaron.
+ *
+ * Devuelve { ok: true, occupiedBy } al lograrlo; { ok: false, reason } si no
+ * ('not_found' o 'taken', esta última con el código de quien la tiene).
+ */
+async function occupyRequest(id, workerId) {
+    const { rows } = await pool.query(
+        `UPDATE requests SET occupied_by = $2
+          WHERE id = $1 AND occupied_by IS NULL
+      RETURNING id, occupied_by`,
+        [id, workerId]
+    );
+    if (rows.length > 0) return { ok: true, occupiedBy: rows[0].occupied_by };
+
+    const cur = await pool.query('SELECT occupied_by FROM requests WHERE id = $1', [id]);
+    if (cur.rows.length === 0) return { ok: false, reason: 'not_found' };
+    // Si ya la tenía este mismo trabajador, no es un error: ocupar lo que uno ya
+    // ocupa es idempotente y se responde éxito.
+    if (cur.rows[0].occupied_by === workerId) return { ok: true, occupiedBy: workerId };
+    return { ok: false, reason: 'taken', occupiedBy: cur.rows[0].occupied_by };
+}
+
+/**
+ * Libera una solicitud, dejándola disponible otra vez. Solo la suelta el
+ * trabajador que la tenía: el WHERE exige que `occupied_by` sea el suyo.
+ *
+ * Devuelve { ok: true } al liberarla o si ya estaba libre (idempotente);
+ * { ok: false, reason } si no ('not_found', o 'forbidden' con el código de
+ * quien la tiene).
+ */
+async function releaseRequest(id, workerId) {
+    const { rows } = await pool.query(
+        `UPDATE requests SET occupied_by = NULL
+          WHERE id = $1 AND occupied_by = $2
+      RETURNING id`,
+        [id, workerId]
+    );
+    if (rows.length > 0) return { ok: true };
+
+    const cur = await pool.query('SELECT occupied_by FROM requests WHERE id = $1', [id]);
+    if (cur.rows.length === 0) return { ok: false, reason: 'not_found' };
+    if (cur.rows[0].occupied_by === null) return { ok: true };
+    return { ok: false, reason: 'forbidden', occupiedBy: cur.rows[0].occupied_by };
 }
 
 /**
@@ -250,5 +320,6 @@ function describe() {
 
 module.exports = {
     createRequest, findRequest, listRequests, updateRequestStatus,
+    occupyRequest, releaseRequest,
     ping, describe, pool, DATABASE_URL,
 };

@@ -13,8 +13,9 @@
 
      POST  /api/staff/login        abre sesión
      POST  /api/staff/logout       la cierra
-     GET   /api/staff/requests     lista la cola de trabajo
-     PATCH /api/staff/requests/:id cambia el estado de una solicitud
+     GET   /api/staff/requests             lista la cola de trabajo
+     PATCH /api/staff/requests/:id           cambia el estado de una solicitud
+     PATCH /api/staff/requests/:id/occupancy ocupa o libera un vehículo
 
    Sin framework a propósito: el sitio es HTML y JS a secas, y el servidor
    necesita un puñado de rutas y archivos estáticos. La dependencia es una,
@@ -39,9 +40,11 @@ const net = require('node:net');
 const path = require('node:path');
 const {
     createRequest, findRequest, listRequests, updateRequestStatus,
+    occupyRequest, releaseRequest,
     ping, describe, pool, DATABASE_URL,
 } = require('./db');
 const auth = require('./auth');
+const names = require('./names');
 const mail = require('./mail');
 const netcheck = require('./netcheck');
 
@@ -560,6 +563,17 @@ function applyCors(req, res) {
 }
 
 const STAFF_PATH = /^\/api\/staff\/requests\/([0-9]{10})$/;
+const OCCUPANCY_PATH = /^\/api\/staff\/requests\/([0-9]{10})\/occupancy$/;
+
+// Cada fila del panel lleva, además de su código, el nombre del trabajador que
+// la tiene ocupada. Se arma aquí y no en la base porque el nombre se inventa a
+// partir del código (ver server/names.js) y ese es el único sitio donde se
+// decide. `occupiedBy` viene de la base; `occupiedName` es cosa del servidor.
+function withOccupiedName(request) {
+    return Object.assign({}, request, {
+        occupiedName: request.occupiedBy ? names.nameFor(request.occupiedBy) : null,
+    });
+}
 
 // Todas las rutas del panel pasan por aquí. Sin contraseña configurada no hay
 // panel: responder 503 y no 401 distingue «este servidor no lo tiene» de «tu
@@ -647,21 +661,71 @@ async function handleStaff(req, res, pathname, ip) {
         requireStaff(req);
         const wanted = new URL(req.url, 'http://localhost').searchParams.get('status');
         if (wanted && !STATUSES.has(wanted)) throw new BadRequest('El estado no es válido.');
-        return sendJson(res, 200, { requests: await listRequests({ status: wanted }) });
+        const requests = (await listRequests({ status: wanted })).map(withOccupiedName);
+        // Quién está mirando: el panel lo necesita para saber qué filas puede
+        // tocar —una ocupada solo la mueve quien la tiene— sin volver a
+        // preguntar por cada una.
+        const viewerId = auth.sessionWorkerId(req);
+        const viewer = { workerId: viewerId, name: names.nameFor(viewerId) };
+        return sendJson(res, 200, { requests, viewer });
     }
 
     if (req.method === 'PATCH') {
         const match = STAFF_PATH.exec(pathname);
         if (match) {
             requireStaff(req);
+            const viewerId = auth.sessionWorkerId(req);
             const body = requireObject(await readJsonBody(req));
             if (!STATUSES.has(body.status)) throw new BadRequest('El estado no es válido.');
-            const updated = await updateRequestStatus(match[1], body.status);
-            if (!updated) {
+            const result = await updateRequestStatus(match[1], body.status, viewerId);
+            if (!result.ok && result.reason === 'not_found') {
                 return sendJson(res, 404, { error: 'No encontramos ninguna solicitud con ese código.' });
             }
-            console.log(`[taller] ${updated.id} -> ${updated.status}`);
-            return sendJson(res, 200, updated);
+            // La tiene otro: solo quien la ocupa le cambia el estado. El error
+            // nombra a quien la tiene para que quede claro a quién pedírsela.
+            if (!result.ok) {
+                const holder = names.nameFor(result.occupiedBy) || 'otro trabajador';
+                return sendJson(res, 403, { error: `${holder} tiene este vehículo. Solo esa persona puede cambiarle el estado.` });
+            }
+            console.log(`[taller] ${result.id} -> ${result.status}`);
+            return sendJson(res, 200, withOccupiedName(result));
+        }
+
+        // Ocupar o liberar un vehículo. Uno disponible lo toma cualquiera; uno
+        // ocupado solo lo suelta quien lo tiene. Las dos reglas las hace cumplir
+        // la base (ver server/db.js), no este handler ni el navegador.
+        const occ = OCCUPANCY_PATH.exec(pathname);
+        if (occ) {
+            requireStaff(req);
+            const viewerId = auth.sessionWorkerId(req);
+            const body = requireObject(await readJsonBody(req));
+            if (typeof body.occupied !== 'boolean') {
+                throw new BadRequest('Falta indicar si se ocupa o se libera.');
+            }
+
+            if (body.occupied) {
+                const result = await occupyRequest(occ[1], viewerId);
+                if (!result.ok && result.reason === 'not_found') {
+                    return sendJson(res, 404, { error: 'No encontramos ninguna solicitud con ese código.' });
+                }
+                if (!result.ok) {
+                    const holder = names.nameFor(result.occupiedBy) || 'otro trabajador';
+                    return sendJson(res, 409, { error: `${holder} ya tomó este vehículo.` });
+                }
+                console.log(`[taller] ${occ[1]} ocupado por ${viewerId}`);
+                return sendJson(res, 200, { id: occ[1], occupiedBy: viewerId, occupiedName: names.nameFor(viewerId) });
+            }
+
+            const result = await releaseRequest(occ[1], viewerId);
+            if (!result.ok && result.reason === 'not_found') {
+                return sendJson(res, 404, { error: 'No encontramos ninguna solicitud con ese código.' });
+            }
+            if (!result.ok) {
+                const holder = names.nameFor(result.occupiedBy) || 'otro trabajador';
+                return sendJson(res, 403, { error: `${holder} tiene este vehículo. Solo esa persona puede liberarlo.` });
+            }
+            console.log(`[taller] ${occ[1]} liberado por ${viewerId}`);
+            return sendJson(res, 200, { id: occ[1], occupiedBy: null, occupiedName: null });
         }
     }
 
@@ -823,6 +887,19 @@ async function start() {
 
     server.listen(PORT, HOST, () => {
         console.log(`Autocolor en ${process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`}`);
+        // DE QUÉ CÓDIGO ES ESTE PROCESO. Las dos variables las pone Render
+        // sola; en esta máquina no hay ninguna y el renglón no sale.
+        //
+        // Está aquí porque ya costó una tarde: se puso una variable nueva en
+        // el panel del alojamiento y no pasaba nada, y el motivo era que lo
+        // desplegado seguía siendo una versión anterior que ni siquiera leía
+        // esa variable. Todo lo que se mira para diagnosticar —los avisos del
+        // correo, los de abajo— habla del código que está corriendo, así que
+        // conviene que el registro diga cuál es antes que nada.
+        if (process.env.RENDER_GIT_COMMIT) {
+            const branch = process.env.RENDER_GIT_BRANCH || 'rama desconocida';
+            console.log(`Desplegado: ${branch} @ ${process.env.RENDER_GIT_COMMIT.slice(0, 7)}`);
+        }
         console.log(`Base de datos: ${describe()}`);
         // El panel pide las dos cosas: la contraseña y los códigos de
         // trabajador. Se nombra la que falte —o las dos—, porque el panel

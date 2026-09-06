@@ -3460,6 +3460,106 @@ body.staff {
 .staff [data-status="entregado"]          { --pill-bg: #ecefe9; --pill-fg: #57604f; --pill-dot: #8d9682; }
 .staff [data-status="cancelado"]          { --pill-bg: #fbe9e8; --pill-fg: #a5241d; --pill-dot: #d94a41; }
 
+/* La píldora de estado de un vehículo que tiene otro: inerte y sin el caret que
+   invita a desplegarla. El servidor rechaza el cambio igual (403); esto solo
+   evita el clic que no iba a ninguna parte. */
+.staff-status__pill--locked {
+    cursor: default;
+    opacity: 0.55;
+}
+
+.staff-status__pill--locked .staff-status__caret {
+    display: none;
+}
+
+/* -----------------------------------------------------------------------------
+   Columna «Ocupado»
+
+   Quién tiene el vehículo entre manos. Disponible es un botón para tomarlo;
+   ocupado por uno mismo, una píldora que al pulsarla lo suelta; ocupado por
+   otro, solo el nombre. La regla —una vez ocupado, solo quien lo tiene lo
+   suelta o le cambia el estado— la aplica el servidor; esto es su reflejo.
+   -------------------------------------------------------------------------- */
+
+.staff-occupied {
+    white-space: nowrap;
+}
+
+/* Disponible: un botón discreto que invita a tomarlo. */
+.staff-occupied__claim {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 12px;
+    border: 1px dashed var(--border);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text-dim);
+    font: inherit;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color 0.15s var(--ease-out), color 0.15s var(--ease-out), background 0.15s var(--ease-out);
+}
+
+.staff-occupied__claim:hover {
+    border-color: #299fdf;
+    border-style: solid;
+    color: var(--ink);
+    background: var(--surface-tint);
+}
+
+/* Ocupado por uno mismo: píldora sólida con el nombre; al pulsarla, se suelta. */
+.staff-occupied__mine {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border: none;
+    border-radius: 999px;
+    background: #e4f3e9;
+    color: #1a6d3c;
+    font: inherit;
+    font-size: 0.82rem;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background 0.15s var(--ease-out);
+}
+
+.staff-occupied__mine:hover {
+    background: #d5ecdc;
+}
+
+/* «Liberar» aparece al pasar por encima o al enfocar, para no cargar la celda
+   cuando solo se está leyendo la lista. */
+.staff-occupied__free {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #2f9e5c;
+    opacity: 0;
+    transition: opacity 0.12s var(--ease-out);
+}
+
+.staff-occupied__mine:hover .staff-occupied__free,
+.staff-occupied__mine:focus-visible .staff-occupied__free {
+    opacity: 1;
+}
+
+.staff-occupied__claim:focus-visible,
+.staff-occupied__mine:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+}
+
+/* Ocupado por otro: solo el nombre, apagado, sin que parezca pulsable. */
+.staff-occupied__other {
+    color: var(--text-dim);
+    font-size: 0.82rem;
+    font-weight: 500;
+}
+
 /* -----------------------------------------------------------------------------
    Estados de la página
    -------------------------------------------------------------------------- */

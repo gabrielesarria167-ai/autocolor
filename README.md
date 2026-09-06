@@ -619,6 +619,20 @@ panel la enseña igual. Lo que sí se hace es decirlo al apagar:
 
 ### Si no llega ningún correo
 
+**Lo primero, antes que el motivo: mirar qué está desplegado.** El registro lo
+dice en su segundo renglón, y es lo único que distingue «el correo falla» de
+«el correo que falla no es el que crees»:
+
+```
+Desplegado: main @ e4c1a54
+```
+
+Render despliega la rama `main` (ver `render.yaml`). Una variable nueva en su
+panel no hace nada si el código desplegado es de antes de que existiera: ya
+pasó con `AUTOCOLOR_BREVO_KEY`, puesta mientras `main` seguía llevando la
+versión de SMTP, que ni la leía. El síntoma era exactamente este —ningún
+correo, ningún error, nada en el panel de Brevo—.
+
 El fallo del correo es invisible desde fuera: el sitio se ve perfecto y las
 solicitudes se siguen guardando. Por eso el servidor lo comprueba **al
 arrancar** —pregunta por la cuenta, sin mandar nada ni gastar un envío— y lo

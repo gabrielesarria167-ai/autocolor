@@ -61,6 +61,12 @@
     var statusFilter = "";
     var searchTerm = "";
 
+    // Quién entró: lo manda el servidor con el listado (ver /api/staff/requests).
+    // Con esto se decide qué filas puede tocar —una ocupada solo la mueve quien
+    // la tiene—, pero es solo para la interfaz: la regla de verdad la aplica el
+    // servidor, que no se fía de lo que diga el navegador.
+    var viewer = { workerId: "", name: "" };
+
     /* ---------------------------------------------------------------------
        Reloj
 
@@ -72,11 +78,19 @@
     var clockTimer = null;
 
     function paintClock() {
-        clockEl.textContent = new Date().toLocaleTimeString("es-PE", {
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit"
-        });
+        // Se arma a mano en vez de toLocaleTimeString: el locale es-PE devuelve
+        // «08:15:49 p. m.» —minúsculas, con puntos y espacio—, y aquí se quiere
+        // «08:15:49 PM», con AM/PM en mayúsculas y sin puntos.
+        var now = new Date();
+        var hours = now.getHours();
+        var suffix = hours >= 12 ? "PM" : "AM";
+        hours = hours % 12;
+        if (hours === 0) hours = 12;
+        clockEl.textContent = pad(hours) + ":" + pad(now.getMinutes()) + ":" + pad(now.getSeconds()) + " " + suffix;
+    }
+
+    function pad(n) {
+        return n < 10 ? "0" + n : String(n);
     }
 
     function startClock() {
@@ -218,7 +232,7 @@
         menu.style.left = left + "px";
     }
 
-    function buildStatusCell(row, request) {
+    function buildStatusCell(row, request, editable) {
         var td = document.createElement("td");
 
         var wrap = document.createElement("span");
@@ -232,6 +246,16 @@
         pill.setAttribute("aria-haspopup", "listbox");
         pill.setAttribute("aria-expanded", "false");
         pill.setAttribute("aria-label", "Estado de la solicitud " + request.id);
+
+        // Un vehículo ocupado por otro no se toca: la píldora queda inerte. Es
+        // solo comodidad —el servidor rechaza el cambio igual (403)—, pero
+        // evita el clic que no iba a ninguna parte. Un botón deshabilitado no
+        // recibe clic ni teclas, así que no hace falta guardar cada escucha.
+        if (!editable) {
+            pill.disabled = true;
+            pill.classList.add("staff-status__pill--locked");
+            pill.title = "Lo tiene " + (request.occupiedName || "otro trabajador");
+        }
 
         var dot = document.createElement("span");
         dot.className = "staff-status__dot";
@@ -360,6 +384,101 @@
         row.appendChild(td);
     }
 
+    /* ---------------------------------------------------------------------
+       Ocupar un vehículo
+
+       La columna «Ocupado» dice quién tiene el vehículo entre manos. Un
+       vehículo disponible lo toma cualquiera con un clic y pasa a mostrar su
+       nombre; a partir de ahí, solo esa persona puede soltarlo (y solo esa
+       persona puede cambiarle el estado). Los demás lo ven como texto, sin
+       poder tocarlo. La regla la aplica el servidor; esto solo la refleja.
+    --------------------------------------------------------------------- */
+
+    function buildOccupiedCell(row, request) {
+        var td = document.createElement("td");
+        td.className = "staff-occupied";
+
+        if (!request.occupiedBy) {
+            // Disponible: un botón para tomarlo.
+            var claim = document.createElement("button");
+            claim.type = "button";
+            claim.className = "staff-occupied__claim";
+            claim.textContent = "Disponible";
+            claim.setAttribute("aria-label", "Tomar el vehículo de la solicitud " + request.id);
+            claim.addEventListener("click", function () { setOccupied(request, true); });
+            td.appendChild(claim);
+        } else if (request.occupiedBy === viewer.workerId) {
+            // Lo tengo yo: mi nombre, y al hacer clic lo suelto.
+            var mine = document.createElement("button");
+            mine.type = "button";
+            mine.className = "staff-occupied__mine";
+            mine.setAttribute("aria-label", "Liberar el vehículo de la solicitud " + request.id);
+            mine.title = "Liberar";
+
+            var name = document.createElement("span");
+            name.textContent = request.occupiedName || viewer.name || viewer.workerId;
+            mine.appendChild(name);
+
+            var free = document.createElement("span");
+            free.className = "staff-occupied__free";
+            free.textContent = "Liberar";
+            mine.appendChild(free);
+
+            mine.addEventListener("click", function () { setOccupied(request, false); });
+            td.appendChild(mine);
+        } else {
+            // Lo tiene otro: solo el nombre, sin tocar.
+            var other = document.createElement("span");
+            other.className = "staff-occupied__other";
+            other.textContent = request.occupiedName || request.occupiedBy;
+            td.appendChild(other);
+        }
+
+        row.appendChild(td);
+    }
+
+    function setOccupied(request, occupied) {
+        setError("");
+        patchOccupancy(request.id, occupied)
+            .then(function (updated) {
+                request.occupiedBy = updated.occupiedBy;
+                request.occupiedName = updated.occupiedName;
+                rebuildRow(request);
+            })
+            .catch(function (err) {
+                if (err.unauthorized) {
+                    showLogin();
+                    setError("Tu sesión venció. Vuelve a entrar.");
+                    return;
+                }
+                setError(err.message);
+                // La ocupación cambió por debajo —otro lo tomó, o ya no lo
+                // teníamos—: se vuelve a pedir la lista para que la columna
+                // muestre quién lo tiene de verdad y no un estado inventado.
+                loadRequests();
+            });
+    }
+
+    function patchOccupancy(id, occupied) {
+        return fetch(API_BASE + "/api/staff/requests/" + id + "/occupancy", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify({ occupied: occupied })
+        }).then(function (response) {
+            return response.json().catch(function () { return null; }).then(function (body) {
+                if (!response.ok) {
+                    var error = new Error((body && body.error) || "No pudimos cambiar la ocupación.");
+                    if (response.status === 401) error.unauthorized = true;
+                    throw error;
+                }
+                return body;
+            });
+        }, function () {
+            throw new Error(NETWORK_MESSAGE);
+        });
+    }
+
     // Los escuchas van una sola vez en el documento y no uno por fila: con
     // doscientas solicitudes serían doscientos escuchas haciendo lo mismo.
     document.addEventListener("click", function (event) {
@@ -447,6 +566,42 @@
             : shown + " de " + total + " " + noun;
     }
 
+    // Quién puede tocar esta fila: si está disponible, cualquiera; si la ocupa
+    // alguien, solo esa persona. Es lo que decide tanto la píldora de estado
+    // como el botón de ocupar/liberar.
+    function isMine(request) {
+        return !request.occupiedBy || request.occupiedBy === viewer.workerId;
+    }
+
+    function makeRow(request) {
+        var row = document.createElement("tr");
+        cell(row, request.id, "staff-table__code");
+
+        var plateTd = document.createElement("td");
+        if (request.plate) {
+            var plate = document.createElement("span");
+            plate.className = "staff-table__plate";
+            plate.textContent = request.plate;
+            plateTd.appendChild(plate);
+        } else {
+            plateTd.textContent = "—";
+        }
+        row.appendChild(plateTd);
+
+        cell(row, [request.firstName, request.lastName].filter(Boolean).join(" "));
+        cell(row, request.phone, "staff-table__nowrap");
+        cell(row, [request.brand, request.model].filter(Boolean).join(" "));
+        cell(row, formatDate(request.createdAt), "staff-table__muted");
+        cell(row, request.partCount, "staff-table__num");
+        cell(row, QUALITY_LABELS[request.quality] || request.quality, "staff-table__nowrap");
+        buildStatusCell(row, request, isMine(request));
+        buildOccupiedCell(row, request);
+        // Guardada para que el buscador la esconda en vez de rehacerla, y para
+        // poder rehacerla sola cuando cambia la ocupación (ver rebuildRow).
+        request.row = row;
+        return row;
+    }
+
     function render() {
         // Las filas se rehacen enteras: un menú abierto quedaría apuntando a
         // un nodo que ya no está en la página.
@@ -454,32 +609,21 @@
 
         rowsEl.textContent = "";
         allRequests.forEach(function (request) {
-            var row = document.createElement("tr");
-            cell(row, request.id, "staff-table__code");
-
-            var plateTd = document.createElement("td");
-            if (request.plate) {
-                var plate = document.createElement("span");
-                plate.className = "staff-table__plate";
-                plate.textContent = request.plate;
-                plateTd.appendChild(plate);
-            } else {
-                plateTd.textContent = "—";
-            }
-            row.appendChild(plateTd);
-
-            cell(row, [request.firstName, request.lastName].filter(Boolean).join(" "));
-            cell(row, request.phone, "staff-table__nowrap");
-            cell(row, [request.brand, request.model].filter(Boolean).join(" "));
-            cell(row, formatDate(request.createdAt), "staff-table__muted");
-            cell(row, request.partCount, "staff-table__num");
-            cell(row, QUALITY_LABELS[request.quality] || request.quality, "staff-table__nowrap");
-            buildStatusCell(row, request);
-            // Guardada para que el buscador la esconda en vez de rehacerla.
-            request.row = row;
-            rowsEl.appendChild(row);
+            rowsEl.appendChild(makeRow(request));
         });
 
+        applySearch();
+    }
+
+    // Al ocupar o liberar cambia también si la píldora de estado se puede tocar,
+    // así que se rehace la fila entera en vez de parchear la celda: es un clic
+    // deliberado y de vez en cuando, no el buscador tecleando.
+    function rebuildRow(request) {
+        if (!request.row || !request.row.parentNode) return;
+        var fresh = makeRow(request);
+        request.row.parentNode.replaceChild(fresh, request.row);
+        // makeRow ya dejó request.row apuntando a `fresh`. applySearch repone la
+        // visibilidad y el contador, que el reemplazo no conserva.
         applySearch();
     }
 
@@ -513,6 +657,10 @@
                     show(logoutBtn, true);
                     startClock();
                     setError("");
+                    // Quién entró, para decidir qué filas puede tocar. Si el
+                    // servidor no lo mandó, queda vacío y todo se ve como de
+                    // otro —el servidor rechazaría el cambio igual—.
+                    viewer = body.viewer || { workerId: "", name: "" };
                     allRequests = body.requests || [];
                     allRequests.forEach(function (request) {
                         request.searchText = haystack(request);

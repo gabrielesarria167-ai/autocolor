@@ -71,6 +71,13 @@ CREATE TABLE IF NOT EXISTS requests (
                                               'cristales', 'finitura',
                                               'listo', 'entregado', 'cancelado')),
 
+    -- Qué trabajador tiene el vehículo en sus manos, con su código (AB12345), o
+    -- NULL si está disponible. Es lo que pinta la columna «Ocupado» del panel;
+    -- el nombre legible se deriva del código en server/names.js. Una vez
+    -- ocupado, solo ese trabajador puede soltarlo o cambiarle el estado, y eso
+    -- lo hacen cumplir las consultas de server/db.js, no el navegador.
+    occupied_by text        CHECK (occupied_by IS NULL OR occupied_by ~ '^[A-Z]{2}[0-9]{5}$'),
+
     created_at  timestamptz NOT NULL DEFAULT now(),
     updated_at  timestamptz NOT NULL DEFAULT now()
 );
@@ -90,6 +97,8 @@ ALTER TABLE requests ADD COLUMN IF NOT EXISTS plate      text
 ALTER TABLE requests ADD COLUMN IF NOT EXISTS mileage    integer
     CHECK (mileage >= 0);
 ALTER TABLE requests ADD COLUMN IF NOT EXISTS color_code text;
+ALTER TABLE requests ADD COLUMN IF NOT EXISTS occupied_by text
+    CHECK (occupied_by IS NULL OR occupied_by ~ '^[A-Z]{2}[0-9]{5}$');
 
 
 -- Hubo una silueta 'suv' que pasó a llamarse 'pickup' cuando se separaron
