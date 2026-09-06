@@ -46,10 +46,17 @@
         <section class="lookup staff-login" id="staffLogin" aria-labelledby="staffLoginTitle" hidden>
             <div class="lookup__head">
                 <h2 id="staffLoginTitle">Acceso del taller</h2>
-                <p>Ingresa la contraseña del taller para ver las solicitudes.</p>
+                <p>Ingresa tu código de trabajador y la contraseña del taller para ver las solicitudes.</p>
             </div>
 
             <form class="lookup__form" id="staffLoginForm" novalidate>
+                <div class="field">
+                    <label for="staffWorkerId">Código de trabajador</label>
+                    <input type="text" id="staffWorkerId" name="staffWorkerId" autocomplete="username"
+                        maxlength="7" minlength="7" pattern="[A-Za-z]{2}[0-9]{5}"
+                        spellcheck="false" autocapitalize="characters"
+                        aria-describedby="staffError" required>
+                </div>
                 <div class="field">
                     <label for="staffPassword">Contraseña</label>
                     <input type="password" id="staffPassword" name="staffPassword" autocomplete="current-password"

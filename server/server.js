@@ -588,6 +588,7 @@ function whoami(req, ip) {
         socket: req.socket.remoteAddress,              // el último salto
         trustProxy: TRUST_PROXY,
         forwarding,                                    // de dónde podría salir
+        workerId: auth.sessionWorkerId(req),           // quién tiene la sesión
     };
 }
 
@@ -606,13 +607,24 @@ async function handleStaff(req, res, pathname, ip) {
         if (!rateLimit(`login:${ip}`, 5)) {
             return sendJson(res, 429, { error: 'Demasiados intentos. Espera un minuto.' });
         }
-        const body = requireObject(await readJsonBody(req));
-        if (!auth.verifyPassword(body.password)) {
-            console.warn(`[taller] intento fallido desde ${ip}`);
-            return sendJson(res, 401, { error: 'Contraseña incorrecta.' });
+        // Sin códigos de trabajador configurados el panel quedaría abierto
+        // a cualquiera con la contraseña: se responde 503, como cuando falta
+        // la propia contraseña, en vez de dejar entrar sin identificar a nadie.
+        if (!auth.hasWorkerIds()) {
+            return sendJson(res, 503, { error: 'El panel del taller no está configurado en este servidor.' });
         }
-        res.setHeader('Set-Cookie', auth.cookieHeader(auth.createSession()));
-        return sendJson(res, 200, { ok: true });
+        const body = requireObject(await readJsonBody(req));
+        // Hacen falta los dos: un código de trabajador válido y la contraseña.
+        // El error no dice cuál de los dos falló, para no revelar qué códigos
+        // existen a quien prueba.
+        const workerId = auth.verifyWorkerId(body.workerId);
+        if (!workerId || !auth.verifyPassword(body.password)) {
+            console.warn(`[taller] intento fallido desde ${ip}`);
+            return sendJson(res, 401, { error: 'Código de trabajador o contraseña incorrectos.' });
+        }
+        console.warn(`[taller] entró ${workerId} desde ${ip}`);
+        res.setHeader('Set-Cookie', auth.cookieHeader(auth.createSession(workerId)));
+        return sendJson(res, 200, { ok: true, workerId });
     }
 
     if (pathname === '/api/staff/logout' && req.method === 'POST') {

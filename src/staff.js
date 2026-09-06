@@ -19,6 +19,7 @@
     var loadingEl = document.getElementById("staffLoading");
     var loginEl = document.getElementById("staffLogin");
     var loginForm = document.getElementById("staffLoginForm");
+    var workerIdInput = document.getElementById("staffWorkerId");
     var passwordInput = document.getElementById("staffPassword");
     var loginSubmit = document.getElementById("staffLoginSubmit");
     var panelEl = document.getElementById("staffPanel");
@@ -453,7 +454,7 @@
         show(panelEl, false);
         show(logoutBtn, false);
         show(loginEl, true);
-        passwordInput.focus();
+        workerIdInput.focus();
     }
 
     function loadRequests() {
@@ -494,11 +495,30 @@
        Acceso
     --------------------------------------------------------------------- */
 
+    // Dos letras y cinco dígitos. La comprobación de verdad la hace el
+    // servidor contra la lista de códigos; esto solo evita un viaje cuando lo
+    // que se escribió ni siquiera tiene la forma.
+    var WORKER_ID_RE = /^[A-Za-z]{2}[0-9]{5}$/;
+
     loginForm.addEventListener("submit", function (event) {
         event.preventDefault();
+        // Se normaliza igual que en el servidor: sin espacios y en mayúsculas,
+        // para que «jp64723» entre igual que «JP64723».
+        var workerId = workerIdInput.value.trim().toUpperCase();
         var password = passwordInput.value;
+        if (!workerId) {
+            setError("Escribe tu código de trabajador.");
+            workerIdInput.focus();
+            return;
+        }
+        if (!WORKER_ID_RE.test(workerId)) {
+            setError("El código de trabajador es dos letras y cinco dígitos (ej. JP64723).");
+            workerIdInput.focus();
+            return;
+        }
         if (!password) {
             setError("Escribe la contraseña del taller.");
+            passwordInput.focus();
             return;
         }
 
@@ -510,14 +530,15 @@
             method: "POST",
             headers: { "Content-Type": "application/json" },
             credentials: "same-origin",
-            body: JSON.stringify({ password: password })
+            body: JSON.stringify({ workerId: workerId, password: password })
         })
             .then(function (response) {
                 return response.json().catch(function () { return null; }).then(function (body) {
                     if (!response.ok) {
                         throw new Error((body && body.error) || "No pudimos iniciar sesión.");
                     }
-                    // La contraseña no se queda escrita en el formulario.
+                    // Ni el código ni la contraseña se quedan escritos.
+                    workerIdInput.value = "";
                     passwordInput.value = "";
                     return loadRequests();
                 });

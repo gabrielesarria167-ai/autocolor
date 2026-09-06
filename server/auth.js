@@ -29,10 +29,22 @@ const COOKIE_NAME = 'autocolor_staff';
 const SESSION_MS = 8 * 60 * 60 * 1000;   // una jornada
 const PASSWORD = process.env.AUTOCOLOR_STAFF_PASSWORD || '';
 
+// Los códigos de trabajador válidos, en AUTOCOLOR_WORKER_IDS, separados por
+// comas. Cada uno es la inicial del nombre, la del apellido y cinco dígitos
+// (JP64723). Se guardan normalizados —sin espacios y en mayúsculas— para que
+// «jp64723» al entrar case con «JP64723» del .env. La contraseña sigue siendo
+// el secreto compartido; el código dice además quién entró.
+const WORKER_IDS = new Set(
+    (process.env.AUTOCOLOR_WORKER_IDS || '')
+        .split(',')
+        .map(function (id) { return id.trim().toUpperCase(); })
+        .filter(Boolean)
+);
+
 // Las sesiones viven en memoria y se pierden al reiniciar el servidor: el
 // panel es de una máquina y de un puñado de personas, y una tabla en la base
 // solo agregaría cosas que mantener para ahorrarles volver a entrar.
-const sessions = new Map(); // token -> { expiresAt }
+const sessions = new Map(); // token -> { expiresAt, workerId }
 
 function isConfigured() {
     return PASSWORD.length > 0;
@@ -53,9 +65,28 @@ function verifyPassword(entered) {
     return crypto.timingSafeEqual(a, b);
 }
 
-function createSession() {
+function hasWorkerIds() {
+    return WORKER_IDS.size > 0;
+}
+
+/**
+ * Comprueba un código de trabajador contra la lista de AUTOCOLOR_WORKER_IDS.
+ *
+ * Devuelve el código ya normalizado (mayúsculas, sin espacios) si es válido, o
+ * cadena vacía si no. Se normaliza igual que al cargarlos para que no importe
+ * cómo lo escriba quien entra. A diferencia de la contraseña no se compara en
+ * tiempo constante: el código identifica, no es el secreto —ese es la
+ * contraseña—, y el límite de intentos ya frena probarlos a ciegas.
+ */
+function verifyWorkerId(entered) {
+    if (typeof entered !== 'string') return '';
+    const code = entered.trim().toUpperCase();
+    return WORKER_IDS.has(code) ? code : '';
+}
+
+function createSession(workerId) {
     const token = crypto.randomBytes(32).toString('base64url');
-    sessions.set(token, { expiresAt: Date.now() + SESSION_MS });
+    sessions.set(token, { expiresAt: Date.now() + SESSION_MS, workerId: workerId || '' });
     return token;
 }
 
@@ -91,6 +122,13 @@ function readSession(req) {
     return token;
 }
 
+/** El código del trabajador de la sesión viva, o cadena vacía si no la hay. */
+function sessionWorkerId(req) {
+    const token = readSession(req);
+    const session = token && sessions.get(token);
+    return session ? (session.workerId || '') : '';
+}
+
 // HttpOnly para que ningún script pueda leer el token, y SameSite=Strict para
 // que la cookie no viaje en peticiones que nazcan en otro sitio. Secure queda
 // tras una variable porque en http://localhost el navegador descartaría la
@@ -121,8 +159,11 @@ setInterval(() => {
 
 module.exports = {
     isConfigured,
+    hasWorkerIds,
     verifyPassword,
+    verifyWorkerId,
     createSession,
+    sessionWorkerId,
     destroySession,
     readSession,
     readToken,
