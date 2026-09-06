@@ -73,9 +73,12 @@ day, well above what the shop gets.
 The logo used to travel inside the message, referenced by `cid:`. Brevo's API
 has no way to express that — an inline attachment needs a `Content-ID` MIME
 header, and its attachment list only takes named files. So the logo is now a
-normal image URL pointing at the site's own `/imgs/logoEmail.jpg`, which is
-public and already served. Where there is no site URL (a dev machine), the
-layout writes the shop's name instead of showing a broken image.
+normal image URL pointing at the site's own `/imgs/`, which is public and
+already served. Where there is no site URL (a dev machine), the layout writes
+the shop's name instead of showing a broken image.
+
+Since then it became two transparent PNGs, one per colour scheme — see the
+dark-mode section of the README.
 
 ---
 

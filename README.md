@@ -548,14 +548,57 @@ con Brevo:** un adjunto en línea se referencia por una cabecera MIME
 (`Content-ID`) que su API no expone — su lista de adjuntos acepta un archivo
 con nombre, no un adjunto incrustado.
 
-Así que ahora es una URL del propio sitio, que es público y sirve `/imgs/`:
-`imgs/logoEmail.jpg`, la versión de 480 px y 18 KB hecha para esto (la del
-sitio pesa 218 KB). Un `data:` URI tampoco valía: Gmail lo borra.
+Así que ahora es una URL del propio sitio, que es público y sirve `/imgs/`.
+Un `data:` URI tampoco valía: Gmail lo borra.
+
+Son **dos**, y **PNG con transparencia**: `imgs/logoEmail.png` con la palabra
+«AUTO» en negro, para fondo claro, y `imgs/logoEmailDark.png` en blanco, para
+fondo oscuro. Antes era un JPEG con el fondo blanco pegado, y eso se rompía en
+los clientes que invierten los colores por su cuenta: no tocan las imágenes, así
+que la tarjeta se volvía oscura y el logotipo quedaba de ladrillo blanco en
+medio. Sin fondo cae bien sobre lo que haya. De paso pesan 5 y 6 KB contra los
+18 del JPEG, porque el dibujo son tres tintas y entra en una paleta.
 
 Sin dirección de sitio conocida —la máquina de trabajo, donde no hay
 `RENDER_EXTERNAL_URL`— no hay URL que poner, y en su lugar se escribe el nombre
 del taller: una imagen rota se ve peor que un nombre bien puesto. El texto
 alternativo hace lo mismo en los clientes que no bajan imágenes remotas.
+
+### Modo oscuro
+
+Los dos correos traen su paleta para quien tenga el sistema en oscuro, en un
+`@media (prefers-color-scheme: dark)` del `<style>`. Los tonos son los mismos
+cálidos del sitio (`#17150f` es el de la cabecera del panel del taller).
+
+**El rojo del texto se aclara y el del botón no.** `#c8102e` sobre la tarjeta
+oscura da 2,79 de contraste, por debajo de lo legible; `#f04a5f` da 4,57. Pero
+eso solo vale para el rojo que es *texto* —antetítulos, enlaces, la placa—:
+en el botón el rojo es el fondo y lo que tiene que leerse es el blanco encima,
+que sobre `#c8102e` da 5,88 y sobre el aclarado bajaría a 3,59. Así que el
+botón se queda igual en los dos modos.
+
+Todas las reglas del bloque llevan `!important` porque el color de verdad va en
+el atributo `style` de cada etiqueta —así tiene que ser en correo— y una regla
+de hoja normal no le gana a un estilo en línea. **La de los enlaces es la
+excepción**, a propósito: el texto del botón es blanco en línea, y con
+`!important` se lo llevaría por delante dejando rojo claro sobre rojo.
+
+#### Dónde se ve y dónde no
+
+| Cliente | Qué pasa |
+| --- | --- |
+| Apple Mail (macOS/iOS), Outlook 2019+ mac, Thunderbird, Samsung Mail | Entienden la media query: se ve la paleta oscura tal cual |
+| **Gmail** | **Borra `prefers-color-scheme`.** Se queda con la paleta clara y le aplica su propia inversión |
+| Outlook en Windows | Compone con el motor de Word: ignora la media query y transforma los colores a su manera |
+
+Es decir: en Gmail **no se puede** elegir los colores del modo oscuro, haga uno
+lo que haga. Lo que sí se puede es que su inversión no destroce nada, y de eso
+se ocupan dos decisiones de arriba: el logotipo sin fondo (que era lo único que
+quedaba feo de verdad) y no usar blanco ni negro puros en ningún sitio.
+
+Queda fuera a propósito el juego de atributos `[data-ogsc]` / `[data-ogsb]`,
+que reconocen Samsung Mail y Outlook.com: sería una tercera paleta que mantener
+al día para un trozo pequeño de lectores.
 
 ### La cola: un correo que falla se reintenta
 

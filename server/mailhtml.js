@@ -35,6 +35,27 @@ const INK = '#1a1a1a';      // titulares y datos
 const BODY = '#4a4844';     // texto corrido
 const MUTED = '#8a8681';    // etiquetas y letra pequeña
 
+// La misma paleta para quien tenga el sistema en oscuro.
+//
+// Los tonos son cálidos y no grises neutros, para que sean los mismos que usa
+// el sitio (#17150f es el de la cabecera del panel del taller) y porque los
+// claros de arriba también tiran a cálido.
+//
+// EL ROJO SE ACLARA, y no por gusto: #c8102e sobre la tarjeta oscura da 2,79
+// de contraste, por debajo de lo legible. #f04a5f da 4,57. Solo cambia el rojo
+// que es TEXTO —antetítulos, enlaces, la placa—; el del botón se queda como
+// está, porque ahí el rojo es el fondo y lo que tiene que leerse es el blanco
+// encima, que sobre #c8102e da 5,88 y sobre el aclarado solo 3,59.
+const GROUND_DARK = '#17150f';
+const CARD_DARK = '#221f1a';
+const LINE_DARK = '#3a352d';
+const RED_DARK = '#f04a5f';
+const INK_DARK = '#f3f2f2';
+const BODY_DARK = '#c4bfb6';
+const MUTED_DARK = '#8f8a81';
+const PANEL_DARK = '#2e2a23';   // el panel del código, que en claro es casi negro
+const NOTE_DARK = '#1f1c16';    // el recuadro de las notas
+
 // Poppins solo la verán los clientes que carguen la hoja de Google (pocos:
 // Gmail la quita). Arial es lo que va a ver de verdad casi todo el mundo, y la
 // maqueta está pensada para aguantarlo.
@@ -84,13 +105,13 @@ function escapeMultiline(value) {
 
 /** El antetítulo rojo en versalitas espaciadas que abre cada sección. */
 function eyebrow(text) {
-    return `<div style="font-family:${FONT}; font-size:11px; line-height:14px; letter-spacing:3px; color:${RED}; text-transform:uppercase; padding-bottom:12px;">${escapeHtml(text)}</div>`;
+    return `<div class="c-accent" style="font-family:${FONT}; font-size:11px; line-height:14px; letter-spacing:3px; color:${RED}; text-transform:uppercase; padding-bottom:12px;">${escapeHtml(text)}</div>`;
 }
 
 /** La línea fina que separa secciones. Es una tabla porque un <hr> se pinta
  *  distinto en cada cliente. */
 function hairline(padding) {
-    return `<tr><td class="px" style="padding:${padding};"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="border-top:1px solid ${LINE}; font-size:0; line-height:0;">&nbsp;</td></tr></table></td></tr>`;
+    return `<tr><td class="px" style="padding:${padding};"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td class="c-rule" style="border-top:1px solid ${LINE}; font-size:0; line-height:0;">&nbsp;</td></tr></table></td></tr>`;
 }
 
 /**
@@ -111,9 +132,9 @@ function detailRows(rows) {
 
 /** El panel negro con el código, que es lo que la gente vuelve a buscar. */
 function codePanel(label, code) {
-    return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid ${INK};">
+    return `<table role="presentation" class="c-panel" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid ${INK};">
               <tr>
-                <td align="center" bgcolor="${INK}" style="padding:22px 24px; background-color:${INK};">
+                <td class="c-panel" align="center" bgcolor="${INK}" style="padding:22px 24px; background-color:${INK};">
                   <div style="font-family:${FONT}; font-size:11px; line-height:14px; letter-spacing:3px; color:#b9b6b1; text-transform:uppercase; padding-bottom:10px;">${escapeHtml(label)}</div>
                   <div style="font-family:${MONO}; font-size:28px; line-height:32px; letter-spacing:4px; color:#ffffff; font-weight:bold;">${escapeHtml(code)}</div>
                 </td>
@@ -145,11 +166,19 @@ function button(href, text) {
  * escrito. El texto alternativo hace lo mismo en los clientes que no bajan
  * imágenes remotas.
  */
-function wordmark(logoUrl) {
+function wordmark(logoUrl, logoDarkUrl) {
     if (!logoUrl) {
-        return `<div style="font-family:${FONT}; font-size:26px; line-height:32px; letter-spacing:4px; color:${INK}; font-weight:bold; text-transform:uppercase;">Autocolor</div>`;
+        return `<div class="c-ink" style="font-family:${FONT}; font-size:26px; line-height:32px; letter-spacing:4px; color:${INK}; font-weight:bold; text-transform:uppercase;">Autocolor</div>`;
     }
-    return `<img src="${escapeHtml(logoUrl)}" width="240" alt="Autocolor" style="display:block; width:240px; max-width:70%; height:auto; margin:0 auto;">`;
+
+    const light = `<img class="c-logo-light" src="${escapeHtml(logoUrl)}" width="240" alt="Autocolor" style="display:block; width:240px; max-width:70%; height:auto; margin:0 auto;">`;
+    if (!logoDarkUrl) return light;
+
+    // El segundo logotipo va escondido y solo lo saca la media query de
+    // arriba. Dentro de un condicional «no mso» porque Outlook compone con el
+    // motor de Word: no entiende la media query, y sin esto enseñaría los dos.
+    const dark = `<!--[if !mso]><!--><img class="c-logo-dark" src="${escapeHtml(logoDarkUrl)}" width="240" alt="Autocolor" style="display:none; width:240px; max-width:70%; height:auto; margin:0 auto;"><!--<![endif]-->`;
+    return light + dark;
 }
 
 /**
@@ -159,7 +188,7 @@ function wordmark(logoUrl) {
  * Va escondida en el cuerpo: sin ella, lo que se lee en la lista es el
  * principio del texto del correo, que casi nunca es lo que uno resumiría.
  */
-function shell({ title, preheader, kicker, body, footerNote, logoUrl }) {
+function shell({ title, preheader, kicker, body, footerNote, logoUrl, logoDarkUrl }) {
     return `<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -186,22 +215,44 @@ function shell({ title, preheader, kicker, body, footerNote, logoUrl }) {
     .detail-label { width:100% !important; display:block !important; padding-bottom:2px !important; border-bottom:0 !important; }
     .detail-value { width:100% !important; display:block !important; }
   }
+  /* Modo oscuro.
+     Todo lleva !important porque el color de verdad va en el atributo style de
+     cada etiqueta —así tiene que ser en correo (ver la cabecera)— y una regla
+     de hoja normal no le gana a un estilo en línea. Con !important sí.
+     La regla de los enlaces es la excepción: va SIN !important a propósito,
+     porque el texto del botón es blanco en línea y con !important se lo
+     llevaría por delante, dejando rojo claro sobre rojo. */
+  @media (prefers-color-scheme: dark) {
+    body, .c-ground { background-color:${GROUND_DARK} !important; }
+    .c-card { background-color:${CARD_DARK} !important; border-color:${LINE_DARK} !important; }
+    .c-rule { border-top-color:${LINE_DARK} !important; }
+    .detail-label, .detail-value { border-bottom-color:${LINE_DARK} !important; }
+    .c-ink, .detail-value { color:${INK_DARK} !important; }
+    .c-body { color:${BODY_DARK} !important; }
+    .c-muted, .detail-label { color:${MUTED_DARK} !important; }
+    .c-accent { color:${RED_DARK} !important; }
+    a { color:${RED_DARK}; }
+    .c-panel { background-color:${PANEL_DARK} !important; border-color:${LINE_DARK} !important; }
+    .c-note { background-color:${NOTE_DARK} !important; }
+    .c-logo-light { display:none !important; }
+    .c-logo-dark { display:block !important; }
+  }
 </style>
 </head>
-<body style="margin:0; padding:0; width:100%; background-color:${GROUND};">
+<body class="c-ground" style="margin:0; padding:0; width:100%; background-color:${GROUND};">
 
 <span style="display:none !important; visibility:hidden; opacity:0; color:${GROUND}; height:0; width:0; font-size:1px; line-height:1px; mso-hide:all; overflow:hidden;">${escapeHtml(preheader)}</span>
 
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${GROUND};">
+<table role="presentation" class="c-ground" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${GROUND};">
   <tr>
     <td align="center" style="padding:32px 12px;">
 
-      <table role="presentation" class="container" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px; max-width:600px; background-color:${CARD}; border:1px solid ${LINE};">
+      <table role="presentation" class="container c-card" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px; max-width:600px; background-color:${CARD}; border:1px solid ${LINE};">
 
         <tr>
           <td class="px" align="center" style="padding:36px 48px 24px 48px;">
-            ${wordmark(logoUrl)}
-            <div style="font-family:${FONT}; font-size:12px; line-height:16px; letter-spacing:3px; color:${MUTED}; padding-top:14px; text-transform:uppercase;">${escapeHtml(kicker)}</div>
+            ${wordmark(logoUrl, logoDarkUrl)}
+            <div class="c-muted" style="font-family:${FONT}; font-size:12px; line-height:16px; letter-spacing:3px; color:${MUTED}; padding-top:14px; text-transform:uppercase;">${escapeHtml(kicker)}</div>
           </td>
         </tr>
 
@@ -214,7 +265,7 @@ ${body}
       <table role="presentation" class="container" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px; max-width:600px;">
         <tr>
           <td class="px" align="center" style="padding:24px 48px 32px 48px;">
-            <div style="font-family:${FONT}; font-size:12px; line-height:19px; color:${MUTED};">
+            <div class="c-muted" style="font-family:${FONT}; font-size:12px; line-height:19px; color:${MUTED};">
               ${escapeHtml(footerNote)}<br>
               ${escapeHtml(SHOP_ADDRESS)}
             </div>
@@ -255,8 +306,8 @@ function customerHtml(created, data, ctx) {
         <tr>
           <td class="px" align="left" style="padding:36px 48px 0 48px;">
             ${eyebrow('Solicitud recibida')}
-            <div style="font-family:${FONT}; font-size:30px; line-height:38px; color:${INK}; font-weight:normal;">${name ? `Gracias, ${escapeHtml(name)}` : 'Gracias'}</div>
-            <div style="font-family:${FONT}; font-size:16px; line-height:26px; color:${BODY}; padding-top:16px;">
+            <div class="c-ink" style="font-family:${FONT}; font-size:30px; line-height:38px; color:${INK}; font-weight:normal;">${name ? `Gracias, ${escapeHtml(name)}` : 'Gracias'}</div>
+            <div class="c-body" style="font-family:${FONT}; font-size:16px; line-height:26px; color:${BODY}; padding-top:16px;">
               Recibimos tu solicitud de pintura y ya está registrada. Te contactaremos
               en 24 horas con tu presupuesto personalizado.
             </div>
@@ -266,7 +317,7 @@ function customerHtml(created, data, ctx) {
         <tr>
           <td class="px" style="padding:28px 48px 0 48px;">
             ${codePanel('Código de seguimiento', created.id)}
-            <div style="font-family:${FONT}; font-size:13px; line-height:20px; color:${MUTED}; padding-top:10px;">Guárdalo: con este código puedes ver el estado de tu solicitud cuando quieras.</div>
+            <div class="c-muted" style="font-family:${FONT}; font-size:13px; line-height:20px; color:${MUTED}; padding-top:10px;">Guárdalo: con este código puedes ver el estado de tu solicitud cuando quieras.</div>
           </td>
         </tr>
 
@@ -289,9 +340,9 @@ ${hairline('36px 48px 0 48px')}
         <tr>
           <td class="px" align="left" style="padding:24px 48px 32px 48px;">
             ${eyebrow('Contacto')}
-            <div style="font-family:${FONT}; font-size:14px; line-height:24px; color:${BODY};">
+            <div class="c-body" style="font-family:${FONT}; font-size:14px; line-height:24px; color:${BODY};">
               ${escapeHtml(SHOP_ADDRESS)}<br>
-              Tel. / WhatsApp: <a href="tel:${SHOP_PHONE_TEL}" style="color:${RED}; text-decoration:none;">${SHOP_PHONE}</a><br>
+              Tel. / WhatsApp: <a class="c-accent" href="tel:${SHOP_PHONE_TEL}" style="color:${RED}; text-decoration:none;">${SHOP_PHONE}</a><br>
               ${escapeHtml(SHOP_HOURS)}
             </div>
           </td>
@@ -304,6 +355,7 @@ ${hairline('36px 48px 0 48px')}
         body,
         footerNote: 'Recibiste este correo porque enviaste una solicitud en Autocolor.',
         logoUrl: ctx.logoUrl,
+        logoDarkUrl: ctx.logoDarkUrl,
     });
 }
 
@@ -338,12 +390,12 @@ function shopHtml(created, data, ctx) {
         {
             label: 'Teléfono',
             value: phone,
-            html: phone ? `<a href="tel:${escapeHtml(phone.replace(/[^+\d]/g, ''))}" style="color:${RED}; text-decoration:none; font-weight:bold;">${escapeHtml(phone)}</a>` : '',
+            html: phone ? `<a class="c-accent" href="tel:${escapeHtml(phone.replace(/[^+\d]/g, ''))}" style="color:${RED}; text-decoration:none; font-weight:bold;">${escapeHtml(phone)}</a>` : '',
         },
         {
             label: 'Email',
             value: email,
-            html: email ? `<a href="mailto:${escapeHtml(email)}" style="color:${RED}; text-decoration:none;">${escapeHtml(email)}</a>` : '',
+            html: email ? `<a class="c-accent" href="mailto:${escapeHtml(email)}" style="color:${RED}; text-decoration:none;">${escapeHtml(email)}</a>` : '',
         },
         { label: 'Zona', value: zone },
     ]);
@@ -372,8 +424,8 @@ function shopHtml(created, data, ctx) {
         <tr>
           <td class="px" align="left" style="padding:36px 48px 0 48px;">
             ${eyebrow('Nueva solicitud')}
-            <div style="font-family:${FONT}; font-size:26px; line-height:34px; color:${INK}; font-weight:normal;">${escapeHtml(fullName || 'Solicitud sin nombre')}</div>
-            <div style="font-family:${MONO}; font-size:18px; line-height:26px; letter-spacing:2px; color:${RED}; padding-top:6px; font-weight:bold;">${escapeHtml(data.plate)}</div>
+            <div class="c-ink" style="font-family:${FONT}; font-size:26px; line-height:34px; color:${INK}; font-weight:normal;">${escapeHtml(fullName || 'Solicitud sin nombre')}</div>
+            <div class="c-accent" style="font-family:${MONO}; font-size:18px; line-height:26px; letter-spacing:2px; color:${RED}; padding-top:6px; font-weight:bold;">${escapeHtml(data.plate)}</div>
           </td>
         </tr>
 
@@ -413,9 +465,9 @@ ${data.notes ? `
         <tr>
           <td class="px" style="padding:28px 48px 0 48px;">
             ${eyebrow('Notas del cliente')}
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${GROUND}; border-left:3px solid ${RED};">
+            <table role="presentation" class="c-note" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${GROUND}; border-left:3px solid ${RED};">
               <tr>
-                <td style="padding:16px 18px; font-family:${FONT}; font-size:15px; line-height:24px; color:${BODY};">${escapeMultiline(data.notes)}</td>
+                <td class="c-note c-body" style="padding:16px 18px; font-family:${FONT}; font-size:15px; line-height:24px; color:${BODY};">${escapeMultiline(data.notes)}</td>
               </tr>
             </table>
           </td>
@@ -436,6 +488,7 @@ ${panelUrl ? `
         body,
         footerNote: 'Aviso automático del asistente de cotización. Responder a este correo le escribe al cliente.',
         logoUrl: ctx.logoUrl,
+        logoDarkUrl: ctx.logoDarkUrl,
     });
 }
 

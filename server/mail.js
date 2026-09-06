@@ -115,7 +115,9 @@ const SENDER = {
 const SITE_URL = (process.env.AUTOCOLOR_SITE_URL || process.env.RENDER_EXTERNAL_URL || '')
     .replace(/\/+$/, '');
 
-// El logotipo, servido desde el propio sitio.
+// El logotipo, servido desde el propio sitio. Son DOS: uno con la palabra
+// «AUTO» en negro, para fondo claro, y otro en blanco para fondo oscuro.
+// mailhtml.js enseña el que toque según el sistema de quien lee.
 //
 // IBA PEGADO AL MENSAJE Y AHORA NO PUEDE. Un logotipo dentro del correo se
 // referencia por su identificador (cid:), y eso es una cabecera MIME que la
@@ -123,14 +125,20 @@ const SITE_URL = (process.env.AUTOCOLOR_SITE_URL || process.env.RENDER_EXTERNAL_
 // no un adjunto en línea. Un data: URI tampoco vale —Gmail lo borra—, así que
 // queda la URL, que es lo que hacen casi todos los correos que uno recibe.
 //
-// El sitio es público y sirve /imgs/ (ver serveStatic en server/server.js), y
-// esta es la versión de 480 px y 18 KB hecha para esto: la del sitio pesa
-// 218 KB y se pagaría en cada apertura.
+// SON PNG CON TRANSPARENCIA Y NO JPEG, que es lo que había. El JPEG llevaba el
+// fondo blanco pegado, y los clientes que invierten los colores por su cuenta
+// —Gmail en el móvil, sin ir más lejos— no tocan las imágenes: la tarjeta se
+// volvía oscura y el logotipo se quedaba como un ladrillo blanco en medio. Sin
+// fondo, cae bien sobre lo que haya. De paso pesan menos: 5 y 6 KB contra los
+// 18 del JPEG, porque el dibujo son tres tintas y entra en una paleta.
+//
+// El sitio es público y sirve /imgs/ (ver serveStatic en server/server.js).
 //
 // Si el cliente de correo no baja imágenes remotas, se ve el texto alternativo
 // y ya; y sin sitio conocido —la máquina de trabajo— no hay URL que poner, así
 // que mailhtml.js escribe el nombre del taller en su lugar.
-const LOGO_URL = SITE_URL ? `${SITE_URL}/imgs/logoEmail.jpg` : '';
+const LOGO_URL = SITE_URL ? `${SITE_URL}/imgs/logoEmail.png` : '';
+const LOGO_DARK_URL = SITE_URL ? `${SITE_URL}/imgs/logoEmailDark.png` : '';
 
 // Copia de src/staff.js. Son dos y no pueden leerse entre ellas —una corre en
 // el navegador y la otra aquí—, así que las dos tienen que decir lo mismo, del
@@ -259,7 +267,7 @@ function vehicleName(data, withYear) {
 function htmlContext() {
     return { oneLine, partLabel, qualityLabel, bodyTypeLabel, vehicleLabel,
              formatPhone, mileageLabel, zoneLabel, vehicleName,
-             siteUrl: SITE_URL, logoUrl: LOGO_URL,
+             siteUrl: SITE_URL, logoUrl: LOGO_URL, logoDarkUrl: LOGO_DARK_URL,
              partsLabel: (parts) => parts.map(partLabel).join(', ') };
 }
 
