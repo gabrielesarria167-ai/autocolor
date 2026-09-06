@@ -16,6 +16,14 @@
    producción.
    ========================================================================== */
 
+// El logotipo y los botones de los correos salen de la dirección del sitio, y
+// en la máquina de trabajo no hay ninguna: sin esto la vista previa enseña el
+// nombre escrito y ningún enlace, que es justo lo que no se quiere mirar. Se
+// apunta al repositorio, que un navegador abre igual. Se pone ANTES de cargar
+// server/mail.js, que lee la variable al cargarse.
+process.env.AUTOCOLOR_SITE_URL = process.env.AUTOCOLOR_SITE_URL
+    || `file://${require('node:path').join(__dirname, '..')}`;
+
 const mail = require('../server/mail');
 
 const CREATED = { id: '4820175639', status: 'recibido', createdAt: new Date() };
@@ -70,22 +78,14 @@ const OUT_DIR = process.env.MAILPREVIEW_OUT || require('node:os').tmpdir();
 function writeHtml(name, message) {
     if (!message.html) return null;
     const file = require('node:path').join(OUT_DIR, name);
-    // El logotipo viaja pegado al correo (cid:), que un navegador no resuelve.
-    // Para mirarlo se apunta al archivo del repositorio.
-    const logo = 'file://' + require('node:path').join(__dirname, '..', 'imgs', 'logoEmail.jpg');
-    // El identificador termina donde termina el atributo, no en la siguiente
-    // comilla: los cuerpos van escapados, así que un `[^"]+` no encontraba
-    // dónde parar y se llevaba por delante medio `<img>`. Y el reemplazo va en
-    // una función porque en una cadena los `$` significan otra cosa.
-    require('node:fs').writeFileSync(file, message.html.replace(/cid:[^"'\s>]+/g, () => logo));
+    require('node:fs').writeFileSync(file, message.html);
     return file;
 }
 
 function show(title, message) {
     console.log(`\n${'='.repeat(72)}\n${title}\n${'='.repeat(72)}`);
-    // Sin cuenta configurada el remitente sale vacío, que es exactamente lo
-    // que pasaría al mandar: se dice, en vez de enseñar un renglón en blanco.
-    console.log(`De:       ${message.from || '(sin configurar: saldría «Autocolor <AUTOCOLOR_SMTP_USER>»)'}`);
+    const from = mail.describe().from;
+    console.log(`De:       ${from.name} <${from.email}>`);
     console.log(`Para:     ${message.to.join(', ')}`);
     if (message.replyTo) console.log(`Responder: ${message.replyTo}`);
     console.log(`Asunto:   ${message.subject}`);
@@ -112,5 +112,5 @@ if (written.length) {
     console.log(`\n${'='.repeat(72)}\nHTML para mirar en el navegador\n${'='.repeat(72)}`);
     for (const [name, file] of written) console.log(`  ${name.padEnd(16)} ${file}`);
 }
-console.log(`\n(Con la cuenta de correo puesta, notifyNewRequest() mandaría estos.)`);
+console.log(`\n(Con AUTOCOLOR_BREVO_KEY puesta, notifyNewRequest() mandaría estos.)`);
 console.log(`Configurado ahora mismo: ${mail.isConfigured() ? 'sí' : 'no'}\n`);

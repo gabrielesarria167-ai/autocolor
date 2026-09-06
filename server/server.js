@@ -17,8 +17,8 @@
      PATCH /api/staff/requests/:id cambia el estado de una solicitud
 
    Sin framework a propósito: el sitio es HTML y JS a secas, y el servidor
-   necesita un puñado de rutas y archivos estáticos. Las dependencias son dos:
-   `pg` para la base y `nodemailer` para los avisos por correo.
+   necesita un puñado de rutas y archivos estáticos. La dependencia es una,
+   `pg`: los avisos por correo salen por HTTPS y no necesitan biblioteca.
 
        npm install
        npm run db:init           # crea y levanta el Postgres propio (puerto 5434)
@@ -849,17 +849,18 @@ async function start() {
         // su código. No se espera para atender: la comprobación va por su
         // cuenta y el sitio ya está sirviendo.
         if (!mail.isConfigured()) {
-            console.log('Correos de aviso: apagados — faltan AUTOCOLOR_SMTP_USER y AUTOCOLOR_SMTP_PASS.');
+            console.log('Correos de aviso: apagados — falta AUTOCOLOR_BREVO_KEY.');
         } else {
             mail.verify().then((result) => {
                 if (result.ok) {
                     const m = mail.describe();
-                    console.log(`Correos de aviso: listos (${m.host} ${m.address}:${m.port}, de ${m.from}).`);
+                    const account = result.account ? `, cuenta ${result.account}` : '';
+                    console.log(`Correos de aviso: listos (Brevo, de ${m.from.name} <${m.from.email}>${account}).`);
                 } else {
                     console.error(`\nCorreos de aviso: NO FUNCIONAN — ${result.error}`);
                     console.error('  Las solicitudes se siguen guardando; lo que no sale es el aviso.');
-                    console.error('  Repasa AUTOCOLOR_SMTP_USER y AUTOCOLOR_SMTP_PASS (que es la contraseña');
-                    console.error('  de aplicación de 16 caracteres de Google, no la del correo).');
+                    console.error('  Un 401 es la llave (AUTOCOLOR_BREVO_KEY); un 400 suele ser el');
+                    console.error('  remitente, que tiene que estar verificado en Brevo → Senders.');
                     // Y se mira a dónde llega este alojamiento, porque «no
                     // funcionan» tiene tres causas que se arreglan de maneras
                     // distintas y el motivo de arriba no las distingue: ver

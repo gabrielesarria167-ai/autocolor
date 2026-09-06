@@ -3,23 +3,24 @@
 /* =============================================================================
    netcheck.js — a dónde llega este alojamiento y a dónde no
 
-   Existe porque el fallo del correo lleva cuatro rondas diciendo lo mismo
-   —«Connection timeout» contra smtp.gmail.com— y esa frase, sola, no distingue
-   tres situaciones que se arreglan de maneras distintas:
+   Existe porque «no se pudo conectar» no distingue tres situaciones que se
+   arreglan de maneras distintas:
 
-     1. El alojamiento no deja salir por el 587. Entonces NINGÚN servidor de
-        correo por SMTP va a funcionar desde aquí, y la única salida es un
-        proveedor por HTTPS (el 443 no lo bloquea nadie).
-     2. El 587 sale bien, pero Google no acepta conexiones desde la IP de
-        salida de este alojamiento —el plan gratuito de Render sale por
-        direcciones compartidas, y Google las trata según su reputación—.
-        Entonces cambiar de proveedor arregla el problema y afinar el SMTP no.
-     3. El 587 y Gmail están bien, y lo que falla es otra cosa (la cuenta, el
-        mensaje, la resolución de nombres).
+     1. No hay salida a internet, o el DNS no contesta. Entonces no es cosa
+        del correo y hay que mirar el alojamiento.
+     2. Se sale bien, pero la API de Brevo no responde. Entonces no hay nada
+        que arreglar aquí: es esperar, que para eso están los reintentos.
+     3. Se llega a todo, y lo que falla es la llave, el remitente sin verificar
+        o el mensaje. Eso lo dice el motivo que dio la comprobación.
 
-   Se prueba abriendo un socket y nada más: ni se habla SMTP ni se manda un
-   byte. Lo único que se mide es si el saludo TCP llega a completarse, que es
-   exactamente lo que está fallando.
+   Se prueba abriendo un socket y nada más: ni se habla HTTP ni se manda un
+   byte. Lo único que se mide es si el saludo TCP llega a completarse.
+
+   ESTO SE ESCRIBIÓ PARA EL PROBLEMA ANTERIOR, cuando los correos salían por el
+   SMTP de Gmail y morían en «Connection timeout» sin decir por qué (ver la
+   cabecera de server/mail.js). Se queda, apuntado al transporte de ahora,
+   porque la pregunta que contesta —«¿llega este alojamiento a donde tiene que
+   llegar?»— es la misma el día que algo vuelva a fallar.
 
    NO SE CORRE NUNCA SI EL CORREO FUNCIONA. Lo dispara server.js solo cuando la
    comprobación del arranque falla, así que en un despliegue sano esto no
@@ -34,15 +35,13 @@ const net = require('node:net');
 // el arranque por debajo de eso: las cuatro pruebas van a la vez.
 const PROBE_TIMEOUT_MS = 8000;
 
-// Las cuatro preguntas, en el orden en que se leen. Los destinos no son un
-// capricho: los dos primeros son el que usamos y el que ya se descartó, y los
-// dos últimos son el candidato a sustituirlo, así que si hay que mudarse,
-// esto ya dice si el sitio nuevo es alcanzable.
+// Las tres preguntas, en el orden en que se leen: el destino que usamos, otro
+// del mismo tipo para saber si el problema es suyo o nuestro, y un tercero que
+// solo comprueba que este contenedor sale a internet.
 const PROBES = [
-    { label: 'Gmail por el 587 (el que usamos)', host: 'smtp.gmail.com', port: 587 },
-    { label: 'Gmail por el 465 (ya descartado)', host: 'smtp.gmail.com', port: 465 },
-    { label: 'otro SMTP cualquiera por el 587', host: 'smtp-relay.brevo.com', port: 587 },
-    { label: 'una API de correo por HTTPS', host: 'api.brevo.com', port: 443 },
+    { label: 'la API de Brevo (la que usamos)', host: 'api.brevo.com', port: 443 },
+    { label: 'otro sitio cualquiera por HTTPS', host: 'www.cloudflare.com', port: 443 },
+    { label: 'la base de datos (Neon)', host: 'console.neon.tech', port: 443 },
 ];
 
 /**
@@ -80,7 +79,7 @@ function probe({ label, host, port }) {
  */
 async function run(probes = PROBES) {
     const results = await Promise.all(probes.map(probe));
-    const [gmail587, gmail465, otherSmtp, https] = results;
+    const [api, other, neon] = results;
 
     const lines = results.map((r) => {
         const mark = r.ok ? 'sí' : 'NO';
@@ -88,28 +87,24 @@ async function run(probes = PROBES) {
         return `    ${mark.padEnd(4)} ${r.label.padEnd(36)} ${r.host}:${r.port} (${detail})`;
     });
 
-    return { lines, verdict: verdictFor({ gmail587, gmail465, otherSmtp, https }) };
+    return { lines, verdict: verdictFor({ api, other, neon }) };
 }
 
-function verdictFor({ gmail587, otherSmtp, https }) {
-    if (gmail587.ok) {
-        return ['  El camino hasta Gmail está bien, así que el fallo del correo no es de red.',
-                '  Mira el motivo que dio la comprobación: la cuenta, la contraseña de',
-                '  aplicación o el mensaje.'];
+function verdictFor({ api, other, neon }) {
+    if (api.ok) {
+        return ['  Se llega a la API, así que el fallo no es de red. Mira el motivo que',
+                '  dio la comprobación: suele ser la llave (401) o el remitente sin',
+                '  verificar en Brevo (400).'];
     }
-    if (otherSmtp.ok) {
-        return ['  Se sale por el 587, pero NO hacia Gmail. Es Google el que no acepta',
-                '  conexiones desde la IP de salida de este alojamiento, no un cortafuegos.',
-                '  Reintentar no lo va a arreglar: hay que mandar por otro proveedor.'];
+    if (other.ok || neon.ok) {
+        return ['  Se sale a internet, pero NO se llega a la API de Brevo. Casi siempre es',
+                '  cosa suya y se arregla sola; los avisos se reintentan durante cuarenta y',
+                '  ocho minutos. Si sigue mañana, mira si Brevo tiene una caída.'];
     }
-    if (https.ok) {
-        return ['  El 587 está bloqueado hacia fuera, sea cual sea el servidor. Ningún',
-                '  ajuste del SMTP va a hacer que salga un correo desde aquí.',
-                '  El 443 sí sale: la salida es un proveedor de correo por HTTPS.'];
-    }
-    return ['  No se llega a ninguno de los cuatro. Esto ya no es cosa del correo:',
+    return ['  No se llega a ninguno de los tres. Esto ya no es cosa del correo:',
             '  o no hay salida a internet, o la resolución de nombres está caída.',
-            '  (La base de datos es externa: si el sitio funciona, mira ahí primero.)'];
+            '  (La base de datos también es externa: si el sitio guarda solicitudes,',
+            '  desconfía de este resultado antes que del alojamiento.)'];
 }
 
 module.exports = { run };

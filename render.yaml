@@ -96,26 +96,22 @@ services:
       - key: AUTOCOLOR_WORKER_IDS
         sync: false
 
-      # La cuenta de Gmail que manda los dos avisos de cada solicitud
-      # (server/mail.js). La contraseña NO es la del correo: es una
-      # «contraseña de aplicación» de 16 caracteres que Google emite aparte y
-      # que se puede revocar sola. Sin las dos, el asistente sigue guardando
+      # La llave de la API de Brevo, que es por donde salen los dos avisos de
+      # cada solicitud (server/mail.js). Sin ella el asistente sigue guardando
       # solicitudes y nadie recibe aviso: el fallo se registra y ya, porque
       # perder una solicitud por un correo sería mucho peor.
       #
-      # Render deja salir por el 587 y NO por el 465, que es el puerto por el
-      # que se intentó primero: los avisos morían en «Connection timeout».
-      # server/mail.js usa el 587 por omisión por eso; no hace falta poner
-      # AUTOCOLOR_SMTP_PORT aquí.
+      # POR QUÉ NO EL SMTP DE GMAIL, QUE ES LO QUE HABÍA. Desde aquí no sale.
+      # El 465 lo bloquea Render, y por el 587 —que sí deja salir— las
+      # conexiones a smtp.gmail.com se agotan sin respuesta a ratos largos.
+      # Medido: una conexión sana tarda 22 ms; estas se agotaban a los 15 000
+      # sin contestar. Se subieron los topes a un minuto y se le puso delante
+      # una cola con seis reintentos en cuarenta y ocho minutos, y aun así los
+      # avisos no llegaban. El 443 no lo bloquea nadie.
       #
-      # Aun por el 587, las conexiones a Gmail desde aquí se pierden a ratos.
-      # Por eso los avisos van a una cola que reintenta durante casi una hora
-      # (ver server/mail.js): en el registro del despliegue, un «falló … se
-      # reintenta en N s» es normal y suele acabar en «salió … (al intento
-      # 2)». Solo «no salió» es un correo perdido.
-      - key: AUTOCOLOR_SMTP_USER
-        sync: false
-      - key: AUTOCOLOR_SMTP_PASS
+      # El remitente tiene que estar verificado en Brevo (Senders), o la API
+      # contesta 400. Por omisión es el mismo AUTOCOLOR_MAIL_SHOP de abajo.
+      - key: AUTOCOLOR_BREVO_KEY
         sync: false
 
       # A dónde va la copia con los datos del cliente. Un Gmail personal

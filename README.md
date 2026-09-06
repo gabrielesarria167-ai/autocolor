@@ -11,7 +11,7 @@ Hace falta Node 18 o más nuevo y los binarios de Postgres instalados
 (Postgres.app o Homebrew).
 
 ```bash
-npm install                          # dependencias: pg y nodemailer
+npm install                          # única dependencia: pg
 cp .env.example .env                 # y escribe ahí la contraseña del taller
 npm run db:init                      # crea y levanta el servidor propio
 npm start                            # http://localhost:3000
@@ -82,8 +82,9 @@ lo abre a propósito, por ejemplo para probar el sitio desde el móvil.
 | `src/config.js` | A qué servidor le habla el sitio |
 | `server/db.js` | Acceso a Postgres |
 | `server/auth.js` | La contraseña, los códigos y las sesiones del panel del taller |
-| `server/mail.js` | Los dos correos de cada solicitud nueva (SMTP de Gmail) |
+| `server/mail.js` | Los dos correos de cada solicitud nueva (API de Brevo) |
 | `server/mailhtml.js` | La maqueta en HTML de esos dos correos |
+| `server/netcheck.js` | A dónde llega el alojamiento, cuando el correo falla |
 | `NEXT-STEPS.md` | Lo que queda por hacer del correo y los hallazgos de la revisión |
 | `server/env.js` | Lee el `.env` de la raíz al arrancar |
 | `_config.yml` | Qué no se publica en GitHub Pages |
@@ -163,9 +164,9 @@ La primera vez, en este orden:
 
 3. **Crear el Blueprint en Render** apuntando al repositorio, y escribir en su
    panel los secretos que `render.yaml` deja marcados `sync: false`:
-   `DATABASE_URL`, `AUTOCOLOR_STAFF_PASSWORD`, `AUTOCOLOR_WORKER_IDS`,
-   `AUTOCOLOR_SMTP_USER` y `AUTOCOLOR_SMTP_PASS`. Todos se leen una sola vez
-   al arrancar, así que cambiarlos exige reiniciar el servicio.
+   `DATABASE_URL`, `AUTOCOLOR_STAFF_PASSWORD`, `AUTOCOLOR_WORKER_IDS` y
+   `AUTOCOLOR_BREVO_KEY`. Todos se leen una sola vez al arrancar, así que
+   cambiarlos exige reiniciar el servicio.
 
    `render.yaml` solo declara que la variable existe; el valor no puede salir
    del repositorio y hay que escribirlo a mano. Una variable declarada y
@@ -469,11 +470,6 @@ Las del panel del taller, todas detrás de la contraseña compartida:
 
 ## Los correos de cada solicitud
 
-> **Ojo:** desde Render, las conexiones a Gmail se pierden a ratos. Por eso
-> los avisos van a una cola que reintenta durante casi una hora (ver abajo):
-> un correo puede tardar en llegar, y eso es normal. Lo medido está en
-> [`NEXT-STEPS.md`](NEXT-STEPS.md).
-
 Cuando alguien termina el asistente salen dos avisos (`server/mail.js`):
 
 | A quién | Qué lleva |
@@ -483,10 +479,9 @@ Cuando alguien termina el asistente salen dos avisos (`server/mail.js`):
 
 Los dos van maquetados (`server/mailhtml.js`) sobre el mismo diseño —fondo
 gris, tarjeta blanca de 600 px, rojo `#c8102e` de acento— y **los dos llevan
-también su versión en texto plano**, en el mismo mensaje
-(`multipart/alternative`). El texto no es un resto de cuando no había HTML: es
-lo que se ve en los clientes que no lo pintan y en los avisos del móvil, así
-que cuando cambie uno hay que cambiar el otro.
+también su versión en texto plano**, en el mismo mensaje. El texto no es un
+resto de cuando no había HTML: es lo que se ve en los clientes que no lo pintan
+y en los avisos del móvil, así que cuando cambie uno hay que cambiar el otro.
 
 Son dos maquetas y no una porque el trabajo es distinto. La del cliente
 confirma: código grande, cuatro datos, un enlace para consultar. La del taller
@@ -495,100 +490,74 @@ reconoce un trabajo en una bandeja con varios—, el teléfono y el correo van
 arriba y como enlaces porque lo primero que se hace es llamar, y las piezas van
 con su nombre y enumeradas porque son las que hay que presupuestar.
 
-El logotipo viaja **pegado al mensaje** y el HTML lo llama por `cid:`. Ni una
-URL —muchos clientes no bajan imágenes remotas sin permiso— ni un `data:` URI,
-que Gmail borra. Es `imgs/logoEmail.jpg`, una versión de 480 px y 18 KB hecha
-para esto: la del sitio pesa 218 KB y se pagaría en cada correo.
-
 **Todo lo que escribe una persona pasa por `escapeHtml()`.** `notes` admite
 2000 caracteres de texto libre y acaba en un correo que lee el taller, así que
 es la vía por la que alguien podría colar etiquetas.
 
-Salen por el **SMTP de Gmail**, con la cuenta del taller. Hacen falta
-`AUTOCOLOR_SMTP_USER` y `AUTOCOLOR_SMTP_PASS`; sin ellas no se manda nada y el
-asistente funciona igual, que es lo que pasa en la máquina de trabajo.
-
-**La contraseña no es la del correo.** Es una *contraseña de aplicación* de 16
-caracteres que Google emite aparte, en myaccount.google.com → Seguridad →
-Verificación en dos pasos → Contraseñas de aplicaciones. Hace falta tener la
-verificación en dos pasos activada, no sirve para entrar al correo por la web,
-y se puede revocar sola sin tocar la cuenta.
-
 **Ningún correo puede tumbar una solicitud.** Para cuando se envían, la fila ya
 está en la base y el cliente ya tiene su código en pantalla, así que
-`POST /api/requests` contesta su `201` y solo después dispara los envíos, sin
-esperarlos. Un fallo —contraseña revocada, Gmail caído, el puerto de salida
-bloqueado— queda en el registro y nada más:
+`POST /api/requests` contesta su `201` y solo después los encola, sin
+esperarlos. Un fallo queda en el registro y nada más.
 
-```
-[mail] no salió el aviso al taller de 4820175639: Invalid login: 535-5.7.8 …
-```
+### Salen por la API de Brevo, no por SMTP
 
-### Si no llega ningún correo
+Una petición HTTPS al 443 (`https://api.brevo.com/v3/smtp/email`). Hace falta
+`AUTOCOLOR_BREVO_KEY` y nada más; sin ella no se manda nada y el asistente
+funciona igual, que es lo que pasa en la máquina de trabajo.
 
-El fallo del correo es invisible desde fuera: el sitio se ve perfecto y las
-solicitudes se siguen guardando. Por eso el servidor lo comprueba **al
-arrancar** —conecta y se autentica sin mandar nada— y lo dice en el registro
-del despliegue, que es donde se mira:
+**El remitente tiene que estar verificado en Brevo** (Brevo → Senders), o la
+API contesta `400` y no manda nada. Por omisión es el mismo
+`AUTOCOLOR_MAIL_SHOP`; se cambia con `AUTOCOLOR_MAIL_FROM`, y el nombre visible
+con `AUTOCOLOR_MAIL_FROM_NAME`.
 
-```
-Correos de aviso: listos (smtp.gmail.com, de Autocolor <eltaller@gmail.com>).
-```
+#### Por qué no el SMTP de Gmail, que es lo que había
 
-Si algo está mal, sale esto en su lugar, con el motivo:
+**Desde Render no sale.** Cuatro rondas de pruebas:
 
-```
-Correos de aviso: NO FUNCIONAN — Invalid login: 535-5.7.8 …
-```
-
-Lo que suele ser, en orden:
-
-| Lo que dice el registro | Qué pasa |
+| Lo que se intentó | Qué pasó |
 | --- | --- |
-| `apagados — faltan AUTOCOLOR_SMTP_USER…` | Las variables no están puestas en el alojamiento, o el servicio no se reinició después de ponerlas |
-| `Invalid login: 535-5.7.8` | La contraseña no es una *contraseña de aplicación*, o se revocó |
-| `ENETUNREACH` con una dirección tipo `2607:f8b0:…` | IPv6. Ya no debería pasar: ver abajo |
-| `Connection timeout` en el 465 | El alojamiento bloquea ese puerto. Render lo hace: usa el 587, que es el de por omisión |
-| `Connection timeout` en el 587, tras 15 s | El alojamiento no llega a Gmail en ese momento. Es lo que hace Render a ratos; la cola lo reintenta, así que mira si detrás hay un `salió … (al intento N)` |
-| `ECONNREFUSED` / `ETIMEDOUT` en los dos puertos | El alojamiento bloquea la salida SMTP entera. Toca un proveedor por HTTP, y entonces hace falta un dominio o un remitente verificado |
+| Gmail por el 465 | `Connection timeout`. Render bloquea ese puerto |
+| Gmail por el 587 | `Connection timeout` también, a ratos largos |
+| Topes de 10 s → 60 s | Nada. Solo tardaba un minuto en rendirse |
+| Forzar IPv4, un transporte por intento | Quitó dos fallos reales, no el principal |
+| Cola con 6 reintentos en 48 min | Los avisos siguieron sin llegar |
 
-#### A dónde llega el alojamiento
+La medida que lo zanjó: **una conexión sana a `smtp.gmail.com:587` se establece
+en 22 ms**, y las de Render se agotaban a los 15 000 sin respuesta. No es
+lentitud, son paquetes que se pierden — y ninguna cantidad de reintentos abre
+un camino cerrado.
 
-«Connection timeout» contra Gmail tiene tres causas que se arreglan de maneras
-distintas, y el mensaje solo no las separa. Por eso, **cuando la comprobación
-del arranque falla**, el servidor abre un socket contra cuatro destinos y dice
-cuáles alcanza (`server/netcheck.js`). No habla SMTP ni manda un byte: solo
-mide si el saludo TCP se completa, que es justo lo que está fallando.
+El 443 no lo bloquea nadie, porque es por donde va la web entera. Y **Brevo
+verifica una dirección suelta en vez de un dominio**, que es lo que lo hace
+posible aquí: el taller no tiene dominio propio —el sitio vive en el subdominio
+de Render, cuyo DNS es de Render—, así que Resend, SendGrid y Postmark, que
+piden dominio verificado, quedaban descartados.
 
-```
-  A dónde llega este alojamiento:
-    NO   Gmail por el 587 (el que usamos)     smtp.gmail.com:587 (sin respuesta, tras 8.0 s)
-    NO   Gmail por el 465 (ya descartado)     smtp.gmail.com:465 (sin respuesta, tras 8.0 s)
-    sí   otro SMTP cualquiera por el 587      smtp-relay.brevo.com:587 (41 ms)
-    sí   una API de correo por HTTPS          api.brevo.com:443 (33 ms)
-```
+De paso, `pg` vuelve a ser la única dependencia: `nodemailer` estaba para
+codificar los mensajes (tildes y «ñ» significan MIME y *quoted-printable*), y
+por HTTPS el cuerpo va en un JSON en UTF-8 y de las cabeceras se encarga Brevo.
 
-Lo que dice cada resultado:
+Gmail cortaba sobre los ~500 envíos diarios; el plan gratuito de Brevo son
+**300 al día**. A dos por solicitud, 150 solicitudes diarias: muy por encima de
+lo que el taller recibe.
 
-| Lo que se ve | Qué significa |
-| --- | --- |
-| Gmail 587 **sí** | La red está bien: el fallo es la cuenta, la contraseña o el mensaje |
-| Gmail 587 **no**, otro SMTP **sí** | Google no acepta conexiones desde la IP de salida de este alojamiento. Reintentar no lo arregla; hay que mandar por otro proveedor |
-| los tres SMTP **no**, 443 **sí** | El 587 está bloqueado hacia fuera. Ningún ajuste del SMTP va a servir: toca un proveedor por HTTPS |
-| los cuatro **no** | No es cosa del correo — salida a internet o DNS |
+#### El logotipo va por URL, no pegado al correo
 
-En un despliegue sano esto no llega a correr.
+Viajaba dentro del mensaje y el HTML lo llamaba por `cid:`. **Eso no se puede
+con Brevo:** un adjunto en línea se referencia por una cabecera MIME
+(`Content-ID`) que su API no expone — su lista de adjuntos acepta un archivo
+con nombre, no un adjunto incrustado.
 
-`GET /api/staff/whoami` trae en su bloque `mail` la dirección con la que se
-conectó de verdad (`address`), que es lo que distingue estos dos casos. Cada
-fallo dice además a dónde iba y cuánto tardó, que es lo que separa «no llego»
-de «llego y me rechazan»:
+Así que ahora es una URL del propio sitio, que es público y sirve `/imgs/`:
+`imgs/logoEmail.jpg`, la versión de 480 px y 18 KB hecha para esto (la del
+sitio pesa 218 KB). Un `data:` URI tampoco valía: Gmail lo borra.
 
-```
-[mail] no salió aviso al taller de 7822278010: Connection timeout (smtp.gmail.com 142.251.127.108:587, tras 15.0 s)
-```
+Sin dirección de sitio conocida —la máquina de trabajo, donde no hay
+`RENDER_EXTERNAL_URL`— no hay URL que poner, y en su lugar se escribe el nombre
+del taller: una imagen rota se ve peor que un nombre bien puesto. El texto
+alternativo hace lo mismo en los clientes que no bajan imágenes remotas.
 
-#### La cola: un correo que falla se reintenta durante casi una hora
+### La cola: un correo que falla se reintenta
 
 `notifyNewRequest()` **no manda nada**: pone los dos mensajes en una cola y
 vuelve. La cola los manda de uno en uno, y al que falla lo devuelve al final
@@ -603,188 +572,114 @@ con su siguiente reintento programado:
 | 5 | 15 min |
 | 6 | 30 min |
 
-Seis intentos repartidos en unos 48 minutos. **Son tan separados a propósito.**
-El fallo de Render no es lentitud: en un rato las conexiones salen y en otro se
-pierden, así que reintentar a los dos segundos vuelve a caer en el mismo rato
-malo. Y `smtp.gmail.com` resuelve a una dirección distinta cada pocos minutos
-—el TTL de su registro A ronda los 135 s—, de modo que esperar también cambia
-la IP contra la que se prueba.
-
-Que tarde no importa: la solicitud ya está guardada y el cliente ya tiene su
-código en pantalla. Un aviso que llega media hora tarde es infinitamente mejor
-que uno que no llega.
+La escalera se escribió para el problema de Gmail y con Brevo debería sobrar:
+por el 443 el primer intento va a bastar casi siempre. Se queda porque el caso
+que cubre no desaparece con el proveedor — una API puede estar caída un rato, y
+volver a intentarlo a los veinte minutos no le cuesta nada a nadie.
 
 Leyendo el registro: `falló … se reintenta en N s` es un aviso y puede acabar
 bien; solo `no salió` es un correo perdido de verdad.
 
 ```
-[mail] falló aviso al taller de 4820175639, se reintenta en 30 s: Connection timeout (…)
+[mail] falló aviso al taller de 4820175639, se reintenta en 30 s: 500 Internal Server Error — oops (Brevo, tras 0.3 s)
 [mail] salió aviso al taller de 4820175639 (al intento 2)
 ```
 
-**Un 5xx no se reintenta.** Si el servidor contesta que no —535 por la
-contraseña, 550 por la dirección—, repetirlo cinco veces no lo arregla y encima
-le regala a Google cinco intentos fallidos de autenticación desde la misma IP.
-Se registra como `no salió` a la primera.
+**Un 4xx no se reintenta.** Es la API contestando que no, siempre por algo que
+repetir no cambia: la llave está mal (`401`), el remitente no está verificado o
+el cuerpo está mal armado (`400`). La excepción es el `429`, que es «ahora no»
+y no «no».
 
 **Y tampoco se reintenta lo que pudo haber llegado.** Solo se repite un envío
-cuando consta que el mensaje no salió: el saludo TCP no se completó, o el
-servidor no llegó a contestar su `220`. Si en cambio la conexión se corta
-*después* de mandar el cuerpo, Gmail puede haberlo aceptado y ser la respuesta
-lo que se perdió — reintentar entregaría el mismo correo dos veces. Ahí se para
-y se dice:
+cuando consta que no salió: no se llegó a conectar (`ENOTFOUND`,
+`ECONNREFUSED`, `UND_ERR_CONNECT_TIMEOUT`…). Si en cambio la conexión se corta
+*esperando la respuesta*, la petición ya iba de camino y Brevo puede haberla
+aceptado — reintentar entregaría el mismo correo dos veces. Ahí se para y se
+dice:
 
 ```
 [mail] aviso al taller de 4820175639: se cortó sin respuesta y puede haber
-       llegado; no se reintenta para no duplicarlo — Timeout (…)
+       llegado; no se reintenta para no duplicarlo — la API no contestó a tiempo (Brevo, tras 15.0 s)
 ```
-
-Nunca se ha visto pasar: lo que falla desde Render son todos fallos de
-conexión, que sí se reintentan.
 
 `GET /api/staff/whoami` trae `mail.pending`, cuántos avisos están esperando su
 turno. Un número que no baja entre dos consultas es la señal de que el correo
-está caído, sin tener que ir al registro del despliegue.
+está caído.
 
 **La cola vive en memoria**, y eso es una decisión: guardarla en Postgres
 pediría una tabla y una migración a mano (ver `render.yaml`) para cubrir un
-caso —que Render apague la instancia justo en la media hora en la que el correo
-está caído— en el que no se pierde nada importante, porque la solicitud está en
-la base y el panel la enseña igual. Lo que sí se hace es decirlo al apagar:
+caso —que Render apague la instancia justo mientras el correo está caído— en el
+que no se pierde nada importante, porque la solicitud está en la base y el
+panel la enseña igual. Lo que sí se hace es decirlo al apagar:
 
 ```
 [mail] el proceso termina con 2 correo(s) sin mandar:
 [mail]   - aviso al taller de 4820175639 (iba por el intento 3)
 ```
 
-#### Un transporte por intento, y sin pool
+### Si no llega ningún correo
 
-Hubo un solo transporte para todo el proceso, con un pool de una conexión, para
-no rehacer el saludo TLS en cada correo. Costaba dos correos perdidos:
-
-- **El pool es estado compartido.** Cerrarlo desde el código de una solicitud
-  —para tirar una conexión que se creía muerta— se llevaba por delante el
-  correo que tenía otra esperando. Y `sendMail()` sobre un pool cerrado no
-  resuelve **ni** rechaza: ese correo desaparecía sin dejar un renglón.
-
-  ```
-  [mail] no salió el aviso al taller de 9816859188: Greeting never received (…, tras 30.0 s)
-  [mail] no salió la confirmación de 9816859188: Connection pool was closed (smtp.gmail.com ?:587, tras 60.0 s)
-  ```
-
-  El `?` en lugar de la dirección era la señal: el segundo no falló por nada
-  suyo, alguien le cerró el transporte por debajo.
-
-- **La IP se quedaba fija** para toda la vida del proceso. Si la primera
-  resolución caía en una dirección que Render no alcanza, todos los avisos de
-  esa instancia iban a esa dirección hasta el siguiente despliegue.
-
-Ahora cada intento crea el suyo y lo suelta al terminar. No hay nada compartido
-que cerrar, y cada reintento vuelve a resolver el nombre. Se paga un saludo TLS
-por correo: 22 ms medidos, detrás de una respuesta que ya salió.
-
-#### Los topes de tiempo: 15 s, no 60
-
-Estuvieron en 60 s con la idea de que Render duerme las instancias del plan
-gratuito y la primera conexión de un contenedor recién despierto tardaría. La
-medida dice otra cosa: **una conexión sana a `smtp.gmail.com:587` se establece
-en 22 milésimas de segundo.** Las que fallan no van lentas, se pierden, así que
-esperarlas un minuto solo hacía que cada fallo tardara un minuto en aparecer en
-el registro.
-
-Ahora son 15 s para conectar, 15 para el saludo y 30 de inactividad. Lo que
-rescata un correo no es esperar más dentro de un intento, es volver a intentarlo
-más tarde; y para eso conviene que cada intento se rinda pronto.
-
-#### El puerto es el 587, no el 465
-
-Los dos puertos valen para Gmail y el código deduce del número si la conexión
-empieza cifrada (465) o se sube con STARTTLS (587). **Render deja salir por el
-587 y no por el 465.** Con el 465, los dos avisos de cada solicitud morían así:
+El fallo del correo es invisible desde fuera: el sitio se ve perfecto y las
+solicitudes se siguen guardando. Por eso el servidor lo comprueba **al
+arrancar** —pregunta por la cuenta, sin mandar nada ni gastar un envío— y lo
+dice en el registro del despliegue, que es donde se mira:
 
 ```
-[mail] no salió el aviso al taller de 4567074004: Connection timeout
-[mail] no salió la confirmación de 4567074004: Connection timeout
+Correos de aviso: listos (Brevo, de Autocolor <taller@gmail.com>, cuenta taller@gmail.com).
 ```
 
-Un tiempo agotado y no un rechazo: los paquetes se pierden sin respuesta, que
-es como se ve un cortafuegos del alojamiento y no un servidor que dice que no.
-Cambiar el puerto fue lo único que hizo falta.
-
-Como el 587 empieza en claro, el transporte lleva `requireTLS`: si un servidor
-no ofreciera STARTTLS, el envío falla **antes** de autenticarse, en vez de
-mandar la contraseña sin cifrar.
-
-#### IPv6: por qué se fuerza IPv4
-
-Render no tiene salida IPv6, y `smtp.gmail.com` contesta con las dos familias
-—hoy, un registro A y uno AAAA—. nodemailer pide las dos, las junta y **elige
-una al azar**, así que la mitad de los envíos salía contra una dirección
-inalcanzable:
+Si algo está mal, sale esto en su lugar, con el motivo:
 
 ```
-connect ENETUNREACH 2607:f8b0:4004:c19::6c:465 - Local (:::0)
+Correos de aviso: NO FUNCIONAN — 401 Unauthorized — Key not found (Brevo, tras 0.2 s)
 ```
 
-Tiene una lista de reserva para reintentar con otra dirección, pero solo
-durante el saludo inicial, y el tope del saludo la cortaba: el segundo correo
-de la misma solicitud moría en `Connection timeout`. Por eso
-`server/mail.js` resuelve el registro A por su cuenta y le pasa a nodemailer
-una IP ya elegida —`net.isIP()` le ataja la resolución entera—, con el nombre
-aparte en `tls.servername` para que el certificado se siga comprobando contra
-`smtp.gmail.com`.
+Lo que suele ser, en orden:
 
-La resolución se hace **una vez por intento**, no una por proceso: Gmail rota
-direcciones cada pocos minutos, así que un reintento de dentro de media hora
-sale contra otra IP, y con ella contra otra ruta. Eso es media razón para
-reintentar.
+| Lo que dice el registro | Qué pasa |
+| --- | --- |
+| `apagados — falta AUTOCOLOR_BREVO_KEY` | La variable no está puesta en el alojamiento, o el servicio no se reinició después de ponerla |
+| `401 Unauthorized` | La llave está mal, o se revocó en Brevo |
+| `400 Bad Request — sender.email…` | El remitente no está verificado en Brevo → Senders |
+| `429 Too Many Requests` | Se agotaron los 300 envíos del día. Se reintenta solo |
+| `no se pudo conectar (…)` | No se llega a la API: ver el bloque de abajo |
 
-El panel también lo enseña sin entrar al registro: `GET /api/staff/whoami`
-devuelve un bloque `mail` con la cuenta y el servidor configurados (nunca la
-contraseña).
+#### A dónde llega el alojamiento
 
-### Por qué Gmail y no un servicio por API
+Cuando la comprobación del arranque falla, el servidor abre un socket contra
+tres destinos y dice cuáles alcanza (`server/netcheck.js`). No habla HTTP ni
+manda un byte: solo mide si el saludo TCP se completa.
 
-Casi todos los servicios de correo por API (Resend, SendGrid, Postmark) solo
-dejan mandar desde un **dominio verificado**, y el taller no tiene dominio
-propio: el sitio vive en el subdominio que da Render, cuyo DNS es de Render.
-Con el remitente de prueba que prestan, la confirmación al cliente no se
-entrega — que es justamente la mitad que importa.
+```
+  A dónde llega este alojamiento:
+    NO   la API de Brevo (la que usamos)     api.brevo.com:443 (sin respuesta, tras 8.0 s)
+    sí   otro sitio cualquiera por HTTPS     www.cloudflare.com:443 (28 ms)
+    sí   la base de datos (Neon)             console.neon.tech:443 (52 ms)
+```
 
-Hay excepciones que verifican una **dirección** suelta en vez de un dominio, y
-que además salen por el 443, que ningún alojamiento bloquea. Es la salida si la
-cola deja de bastar; está anotada en [`NEXT-STEPS.md`](NEXT-STEPS.md).
+| Lo que se ve | Qué significa |
+| --- | --- |
+| Brevo **sí** | La red está bien: el fallo es la llave, el remitente o el mensaje |
+| Brevo **no**, los otros **sí** | No se llega a la API. Casi siempre es cosa suya y se arregla sola; los avisos se reintentan |
+| los tres **no** | No es cosa del correo — salida a internet o DNS |
 
-El SMTP de Gmail entrega a cualquiera hoy, a cambio de que el remitente sea un
-`@gmail.com` en vez del dominio del taller. Menos vistoso, pero es correo que
-llega. El día que haya dominio propio, cambiar de transporte es `server/mail.js`
-y nada más: `AUTOCOLOR_SMTP_HOST` y `AUTOCOLOR_SMTP_PORT` ya están para apuntar
-a otro servidor sin tocar código.
+Se escribió para el problema anterior, cuando los correos morían en
+`Connection timeout` sin decir por qué. Se queda porque la pregunta que
+contesta es la misma el día que algo vuelva a fallar. En un despliegue sano no
+llega a correr.
 
-Gmail corta sobre los ~500 envíos al día en una cuenta gratuita. A dos por
-solicitud, son unas 250 solicitudes diarias: muy por encima de lo que el taller
-recibe.
-
-### La segunda dependencia
-
-`nodemailer` es la razón por la que `pg` dejó de estar solo. Hablar SMTP a mano
-se consideró y se descartó: la parte fácil es el diálogo con el servidor, y la
-que muerde es codificar los mensajes — los asuntos y los cuerpos van con tildes
-y con «ñ», y eso es MIME, *quoted-printable* y cabeceras codificadas.
-Equivocarse ahí no rompe de forma visible: entrega «Solicitud de PÃ©rez».
-
-Para ver cómo quedan los dos correos sin mandar nada:
+### Ver los correos sin mandarlos
 
 ```bash
 node tools/mailpreview.js
 ```
 
-Resume los dos en la terminal y escribe el HTML a disco, con el logotipo
-apuntando al archivo del repositorio para poder abrirlo en un navegador. La
-ruta se elige con `MAILPREVIEW_OUT`. Enseña también la variante sin los datos
-opcionales —donde se ve si una fila vacía deja un renglón suelto— y una fila
-anterior a que el correo fuera obligatorio, que es lo que se vería al reenviar
-una solicitud vieja.
+Resume los dos en la terminal y escribe el HTML a disco; la ruta se elige con
+`MAILPREVIEW_OUT`. Sin `AUTOCOLOR_SITE_URL` se apunta sola al repositorio, para
+que el logotipo y los botones se vean al abrirlo en un navegador. Enseña
+también la variante sin los datos opcionales —donde se ve si una fila vacía
+deja un renglón suelto— y una fila anterior a que el correo fuera obligatorio,
+que es lo que se vería al reenviar una solicitud vieja.
 
 ## El día a día del taller
 

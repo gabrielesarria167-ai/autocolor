@@ -10,20 +10,29 @@
      - al taller: los datos de contacto y el trabajo pedido, para preparar el
        presupuesto sin tener que abrir el panel.
 
-   Salen por el SMTP de Gmail, con la cuenta del taller. El remitente es un
-   @gmail.com y no el dominio del taller, porque no hay dominio del taller: el
-   sitio vive en el subdominio de Render, cuyo DNS es de Render, y casi todos
-   los servicios de correo por API piden un dominio verificado para dejar
-   mandar. Cuando lo haya, cambiar de transporte es este archivo y nada más
-   (ver NEXT-STEPS.md, que también anota la alternativa por HTTPS para
-   mientras tanto).
+   Salen por la API de Brevo, con una petición HTTPS al 443.
 
-   Es la razón de la segunda dependencia del proyecto, `nodemailer`. Hablar
-   SMTP a mano se consideró y se descartó: la parte fácil es el diálogo con el
-   servidor, y la que muerde es codificar los mensajes —los asuntos y los
-   cuerpos van con tildes y con «ñ», y eso es MIME, quoted-printable y
-   cabeceras codificadas—. Equivocarse ahí no rompe: entrega «Solicitud de
-   PÃ©rez».
+   ANTES SALÍAN POR EL SMTP DE GMAIL Y NO FUNCIONABA. Cuatro rondas de
+   pruebas desde Render: los avisos morían en «Connection timeout» contra
+   smtp.gmail.com, primero por el 465 —que Render bloquea— y después por el
+   587, que deja salir pero no hasta Gmail. Se midió: una conexión sana se
+   establece en 22 milésimas de segundo, y las de Render se agotaban a los
+   quince mil sin respuesta. Se subieron los topes a un minuto: nada. Se le
+   puso delante una cola con seis reintentos repartidos en cuarenta y ocho
+   minutos: tampoco. Con eso quedó claro que el camino no es lento, está
+   cerrado, y que ninguna cantidad de reintentos lo abre.
+
+   El 443 no lo bloquea nadie, porque es por donde va la web entera. Y Brevo
+   verifica UNA DIRECCIÓN suelta en vez de un dominio, que es lo que lo hace
+   posible aquí: el taller no tiene dominio propio —el sitio vive en el
+   subdominio de Render, cuyo DNS es de Render—, así que los proveedores que
+   piden dominio verificado quedaban descartados.
+
+   Ya no hace falta nodemailer, así que `pg` vuelve a ser la única dependencia.
+   Lo que costaba escribir a mano de SMTP era codificar los mensajes —tildes y
+   «ñ» significan MIME, quoted-printable y cabeceras codificadas—, y por HTTPS
+   eso desaparece: el cuerpo va en un JSON en UTF-8 y de las cabeceras se
+   encarga Brevo.
 
    NINGUNO DE LOS DOS PUEDE TUMBAR UNA SOLICITUD. Para cuando se envían, la
    fila ya está en la base y el cliente ya tiene su código en pantalla. Que un
@@ -32,69 +41,44 @@
    notifyNewRequest() no lanza ni rechaza nunca: los fallos se registran y ya.
 
    NO SALEN EN EL ACTO: van a una cola (OUTBOX) que los manda de uno en uno y
-   reintenta los que fallan durante casi una hora. Eso no es un lujo. Desde
-   Render, las conexiones a Gmail se pierden a ratos —el SYN sale y no vuelve
-   nada—, y con un solo intento la mitad de los avisos no llegaba. Con la cola,
-   un correo que hoy fallaba se manda unos minutos más tarde y llega.
+   reintenta los que fallan. La cola se escribió para el problema de Gmail y se
+   queda ahora que no lo hay: una API caída un rato es algo que pasa, y volver
+   a intentarlo veinte minutos después no le cuesta nada a nadie.
 
-   Sin AUTOCOLOR_SMTP_USER y AUTOCOLOR_SMTP_PASS no se manda nada y el sitio
-   funciona igual. Es lo que pasa en la máquina de trabajo, donde no hace falta
-   una cuenta para probar el asistente.
+   Sin AUTOCOLOR_BREVO_KEY no se manda nada y el sitio funciona igual. Es lo
+   que pasa en la máquina de trabajo, donde no hace falta una cuenta para
+   probar el asistente.
    ========================================================================== */
 
-const dns = require('node:dns').promises;
-const fs = require('node:fs');
-const net = require('node:net');
-const path = require('node:path');
-const nodemailer = require('nodemailer');
 const mailhtml = require('./mailhtml');
 
-// La cuenta que manda. La contraseña NO es la del correo: es una «contraseña
-// de aplicación» de 16 caracteres que Google emite aparte (myaccount.google.com
-// → Seguridad → Verificación en dos pasos → Contraseñas de aplicaciones), y
-// que se puede revocar sola sin tocar la cuenta. Google no acepta la
-// contraseña normal por SMTP desde 2022.
-const SMTP_USER = process.env.AUTOCOLOR_SMTP_USER || '';
-const SMTP_PASS = process.env.AUTOCOLOR_SMTP_PASS || '';
+// La llave de la API de Brevo (Brevo → SMTP & API → API keys). Es lo único
+// secreto que hace falta: no hay usuario ni contraseña que guardar.
+const BREVO_KEY = process.env.AUTOCOLOR_BREVO_KEY || '';
 
-// Gmail por omisión, pero configurable: cambiar de proveedor —a uno del
-// dominio del taller, el día que lo haya— no debería ser un cambio de código.
-//
-// EL PUERTO ES EL 587 Y NO EL 465 POR UNA RAZÓN MEDIDA: Render deja salir por
-// el 587 y no por el 465. Con el 465 los dos avisos de cada solicitud morían
-// en «Connection timeout» —un tiempo agotado, no un rechazo: los paquetes se
-// pierden sin respuesta, que es como se ve un cortafuegos del alojamiento—.
-// Cambiar el puerto fue lo único que hizo falta.
-//
-// El 465 es TLS desde el primer byte; el 587 empieza en claro y sube con
-// STARTTLS, y `secure` se deduce del puerto para que no puedan contradecirse.
-const SMTP_HOST = process.env.AUTOCOLOR_SMTP_HOST || 'smtp.gmail.com';
-const SMTP_PORT = Number(process.env.AUTOCOLOR_SMTP_PORT) || 587;
+// Los dos extremos de la API. Configurables para poder apuntarlos a un
+// servidor de mentira en las pruebas sin tocar código; en producción no se
+// ponen.
+const SEND_URL = process.env.AUTOCOLOR_BREVO_URL || 'https://api.brevo.com/v3/smtp/email';
+// Sirve para comprobar la llave sin mandar ningún correo: ver verify().
+const ACCOUNT_URL = process.env.AUTOCOLOR_BREVO_ACCOUNT_URL || 'https://api.brevo.com/v3/account';
 
-// Los topes del diálogo SMTP.
+// Lo que se espera por una petición entera, desde que sale hasta la respuesta.
 //
-// ESTUVIERON EN 60 s Y NO ARREGLARON NADA. La idea era que Render duerme las
-// instancias del plan gratuito y que la primera conexión de un contenedor
-// recién despierto tardaría; la medida dice otra cosa: una conexión sana a
-// smtp.gmail.com:587 se establece en 22 milésimas de segundo. Las que fallan
-// no van lentas —se pierden—, así que esperar 60 s por ellas solo hacía que
-// cada fallo tardara un minuto en aparecer en el registro.
-//
-// Lo que sí rescata un correo es volver a intentarlo un rato después (ver
-// RETRY_DELAYS_MS), y para eso conviene que cada intento se rinda pronto.
-const CONNECT_TIMEOUT_MS = 15000;   // establecer el TCP
-const GREETING_TIMEOUT_MS = 15000;  // el 220 del servidor, ya conectados
-const SOCKET_TIMEOUT_MS = 30000;    // inactividad durante el diálogo
+// Quince segundos son muchísimos para un JSON de unos kilobytes: si Brevo
+// tarda más, es que algo va mal y lo que toca es reintentar, no seguir
+// esperando. Y como el envío va detrás de la respuesta al cliente, rendirse
+// pronto no le cuesta nada a nadie.
+const REQUEST_TIMEOUT_MS = 15000;
 
 // Cuánto se espera antes de cada reintento, contando desde el intento
 // anterior: seis intentos en total repartidos en unos 48 minutos.
 //
-// POR QUÉ TAN SEPARADOS. Desde Render el fallo es «Connection timeout» contra
-// Gmail: en un rato salen y en otro no. Reintentar a los dos segundos vuelve a
-// caer en el mismo rato malo. Además smtp.gmail.com resuelve a una dirección
-// distinta cada pocos minutos —el TTL de su registro A ronda los 135 s—, así
-// que esperar también cambia la IP contra la que se prueba, y con ella la ruta
-// que estaba tragándose los paquetes.
+// La escalera se escribió para el problema de Gmail —conexiones que en un rato
+// salían y en otro no— y con Brevo debería sobrar: por el 443 el primer
+// intento va a bastar casi siempre. Se queda porque el caso que cubre no
+// desaparece con el proveedor: una API puede estar caída un rato, y volver a
+// intentarlo a los veinte minutos no le cuesta nada a nadie.
 //
 // Que tarde no importa: cuando estos correos salen, la solicitud ya está
 // guardada y el cliente ya tiene su código en pantalla. Un aviso que llega
@@ -107,14 +91,23 @@ const RETRY_DELAYS_MS = [30000, 120000, 300000, 900000, 1800000];
 // del proceso, que es lo único que aquí no puede pasar.
 const MAX_OUTBOX = 100;
 
-// Gmail reescribe el remitente al de la cuenta autenticada, así que ponerlo
-// distinto no engaña a nadie: lo único que se elige es el nombre visible.
-const FROM = process.env.AUTOCOLOR_MAIL_FROM || (SMTP_USER ? `Autocolor <${SMTP_USER}>` : '');
-
 // A dónde va la copia del taller. Por ahora el Gmail personal que hace de
 // buzón; cuando el taller tenga el suyo, esto es una variable de entorno y no
 // un cambio de código.
 const SHOP = process.env.AUTOCOLOR_MAIL_SHOP || 'gabrielesarria167@gmail.com';
+
+// Quién firma los dos correos.
+//
+// LA DIRECCIÓN TIENE QUE ESTAR VERIFICADA EN BREVO (Brevo → Senders), o la API
+// contesta 400 y no manda nada. Verificar es recibir un correo de confirmación
+// y pinchar el enlace, así que se verifica una dirección que se pueda abrir:
+// por omisión la misma del taller, que es la que ya hace de buzón.
+//
+// El nombre visible sí es libre: es lo que se lee en la bandeja de entrada.
+const SENDER = {
+    name: process.env.AUTOCOLOR_MAIL_FROM_NAME || 'Autocolor',
+    email: process.env.AUTOCOLOR_MAIL_FROM || SHOP,
+};
 
 // Para los enlaces de los correos. RENDER_EXTERNAL_URL la pone el alojamiento
 // sola; en la máquina de trabajo no hay ninguna y los enlaces se omiten, que
@@ -122,31 +115,22 @@ const SHOP = process.env.AUTOCOLOR_MAIL_SHOP || 'gabrielesarria167@gmail.com';
 const SITE_URL = (process.env.AUTOCOLOR_SITE_URL || process.env.RENDER_EXTERNAL_URL || '')
     .replace(/\/+$/, '');
 
-// El logotipo se manda pegado al mensaje y el HTML lo referencia por su
-// identificador (cid:). Ni una URL —muchos clientes no bajan imágenes remotas
-// sin permiso— ni un data: URI, que Gmail borra. Es una versión de 480 px y
-// 18 KB hecha para esto: la del sitio pesa 218 KB y se pagaría en cada correo.
+// El logotipo, servido desde el propio sitio.
 //
-// Se lee UNA VEZ, al cargar el módulo, y no con `path:`, que le pide a
-// nodemailer un createReadStream por cada correo que sale. Son 18 KB y el
-// proceso vive semanas.
-const LOGO = readLogo();
-
-function readLogo() {
-    try {
-        return [{
-            filename: 'autocolor.jpg',
-            content: fs.readFileSync(path.join(__dirname, '..', 'imgs', 'logoEmail.jpg')),
-            cid: mailhtml.LOGO_CID,
-        }];
-    } catch (err) {
-        // Sin logotipo los correos salen igual, con el texto alternativo donde
-        // iba la imagen. Que falte un adjunto no puede impedir que arranque el
-        // sitio entero.
-        console.warn(`[mail] los correos saldrán sin logotipo: ${err.message}`);
-        return [];
-    }
-}
+// IBA PEGADO AL MENSAJE Y AHORA NO PUEDE. Un logotipo dentro del correo se
+// referencia por su identificador (cid:), y eso es una cabecera MIME que la
+// API de Brevo no expone: su lista de adjuntos acepta un archivo con nombre,
+// no un adjunto en línea. Un data: URI tampoco vale —Gmail lo borra—, así que
+// queda la URL, que es lo que hacen casi todos los correos que uno recibe.
+//
+// El sitio es público y sirve /imgs/ (ver serveStatic en server/server.js), y
+// esta es la versión de 480 px y 18 KB hecha para esto: la del sitio pesa
+// 218 KB y se pagaría en cada apertura.
+//
+// Si el cliente de correo no baja imágenes remotas, se ve el texto alternativo
+// y ya; y sin sitio conocido —la máquina de trabajo— no hay URL que poner, así
+// que mailhtml.js escribe el nombre del taller en su lugar.
+const LOGO_URL = SITE_URL ? `${SITE_URL}/imgs/logoEmail.jpg` : '';
 
 // Copia de src/staff.js. Son dos y no pueden leerse entre ellas —una corre en
 // el navegador y la otra aquí—, así que las dos tienen que decir lo mismo, del
@@ -275,100 +259,12 @@ function vehicleName(data, withYear) {
 function htmlContext() {
     return { oneLine, partLabel, qualityLabel, bodyTypeLabel, vehicleLabel,
              formatPhone, mileageLabel, zoneLabel, vehicleName,
-             siteUrl: SITE_URL,
+             siteUrl: SITE_URL, logoUrl: LOGO_URL,
              partsLabel: (parts) => parts.map(partLabel).join(', ') };
 }
 
 function isConfigured() {
-    return SMTP_USER.length > 0 && SMTP_PASS.length > 0;
-}
-
-/**
- * Resuelve el servidor de correo a una dirección IPv4.
- *
- * Hace falta porque Render no tiene salida IPv6 y smtp.gmail.com responde con
- * las dos familias. nodemailer pide los registros A y los AAAA, los junta y
- * ELIGE UNO AL AZAR (shared/index.js: `addresses[Math.floor(Math.random() *
- * …)]`), así que sin esto, una de cada dos solicitudes salía con:
- *
- *     connect ENETUNREACH 2607:f8b0:4004:c19::6c:465 - Local (:::0)
- *
- * Tiene una lista de reserva para reintentar con otra dirección, pero solo
- * durante el saludo inicial, y el tope del saludo la cortaba: el segundo
- * correo de la misma solicitud terminaba en «Connection timeout».
- *
- * Dándole una IP ya resuelta se salta su resolución entera —`net.isIP()` la
- * ataja— y solo quedan direcciones alcanzables. El nombre viaja aparte, en
- * `servername`, para que el certificado se siga comprobando contra
- * smtp.gmail.com y no contra un número.
- *
- * Si el servidor no tuviera registros A —un servidor solo IPv6—, se devuelve
- * el nombre sin tocar y que nodemailer resuelva como sabe: forzar IPv4 no
- * puede convertirse en no poder conectar nunca.
- */
-// Se llama una vez POR INTENTO y no una vez por proceso: con el TTL de Gmail
-// —unos 135 s— un reintento de dentro de media hora resuelve a otra IP, y con
-// ella a otra ruta, que es media razón para reintentar.
-async function resolveIpv4(host) {
-    if (net.isIP(host)) return host;
-    try {
-        const addresses = await dns.resolve4(host);
-        return addresses.length > 0 ? addresses[0] : host;
-    } catch {
-        return host;
-    }
-}
-
-// UN TRANSPORTE POR INTENTO, Y SIN POOL.
-//
-// Antes había uno solo para todo el proceso, con un pool de una conexión, para
-// no rehacer el saludo TLS en cada correo. Salía mucho más caro de lo que
-// ahorraba, por dos motivos que costaron sendos correos perdidos:
-//
-//   - EL POOL ES ESTADO COMPARTIDO. Cerrarlo desde el código de una solicitud
-//     —para tirar una conexión que se creía muerta— se llevaba por delante el
-//     correo que tenía otra esperando en la cola. Y peor: sendMail() sobre un
-//     pool ya cerrado no resuelve NI rechaza, así que ese correo desaparecía
-//     sin dejar un solo renglón en el registro.
-//   - LA IP SE QUEDABA FIJA. Se resolvía una vez y valía para toda la vida del
-//     proceso, de modo que si la primera resolución caía en una dirección que
-//     Render no alcanza, TODOS los avisos de esa instancia iban a esa
-//     dirección hasta el siguiente despliegue.
-//
-// Con un transporte por intento no hay nada compartido que cerrar, cada
-// reintento vuelve a resolver el nombre —y con el TTL de Gmail eso suele dar
-// otra IP, que es medio arreglo por sí solo— y la cola de abajo manda de uno
-// en uno, así que tampoco hay dos conexiones simultáneas que reaprovechar.
-// Lo que se paga es un saludo TLS por correo: 22 ms medidos, en un envío que
-// de todos modos va detrás de la respuesta al cliente.
-
-// La dirección con la que se conectó la última vez, para describe() y para los
-// mensajes de error. `null` mientras no se haya intentado nada.
-let lastAddress = null;
-
-async function createTransport() {
-    const host = await resolveIpv4(SMTP_HOST);
-    lastAddress = host;
-    return nodemailer.createTransport({
-        host,
-        port: SMTP_PORT,
-        secure: SMTP_PORT === 465,   // 465 es TLS directo; 587 sube con STARTTLS
-        // Con el 587 la conexión empieza en claro y se sube con STARTTLS. Sin
-        // esto, un servidor que no lo ofrezca haría que la contraseña saliera
-        // sin cifrar: con requireTLS el envío falla antes de autenticarse, que
-        // es lo que tiene que pasar. Con el 465 no cambia nada, porque ahí ya
-        // es TLS desde el primer byte.
-        requireTLS: true,
-        // El certificado se comprueba contra el nombre, no contra la IP que
-        // se acaba de resolver. Si lo configurado ya era una IP no hay nombre
-        // que comprobar, y ponerla como SNI lo prohíbe el RFC 6066: Node avisa
-        // de que lo ignorará.
-        ...(net.isIP(SMTP_HOST) ? {} : { tls: { servername: SMTP_HOST } }),
-        auth: { user: SMTP_USER, pass: SMTP_PASS },
-        connectionTimeout: CONNECT_TIMEOUT_MS,
-        greetingTimeout: GREETING_TIMEOUT_MS,
-        socketTimeout: SOCKET_TIMEOUT_MS,
-    });
+    return BREVO_KEY.length > 0;
 }
 
 /**
@@ -377,8 +273,8 @@ async function createTransport() {
  * validateRequest() recorta los extremos pero no toca lo de dentro, así que un
  * nombre pegado desde otro sitio puede traer saltos de línea. En un cuerpo de
  * texto plano eso solo descuadra la lista de datos —no hay cabeceras que
- * inyectar: nodemailer codifica las cabeceras y es él quien arma el mensaje—,
- * pero un correo cuadrado se lee mejor.
+ * inyectar: el mensaje va en un JSON y las cabeceras las arma Brevo—, pero un
+ * correo cuadrado se lee mejor.
  */
 function oneLine(value) {
     if (value === undefined || value === null || value === '') return '';
@@ -402,116 +298,152 @@ function block(title, rows) {
     return `${title}\n${kept.join('\n')}`;
 }
 
-// UN SOLO DIÁLOGO SMTP A LA VEZ EN TODO EL PROCESO, la cola y la comprobación
-// del arranque incluidas. Dos conexiones simultáneas a Gmail desde la IP
-// compartida del plan gratuito de Render es justo el patrón que hace que
-// empiecen a perderse paquetes, y aquí no hay ninguna prisa que justifique el
-// paralelismo: estos correos van detrás de una respuesta que ya salió.
-//
-// Hace falta que sea del proceso y no solo de la cola porque en Render las dos
-// cosas se pisan de verdad: la instancia dormida se despierta CON una
-// solicitud, así que la comprobación del arranque cae encima del primer envío.
-let inFlight = Promise.resolve();
-
-function oneAtATime(work) {
-    const next = inFlight.then(work, work);
-    // La cadena nunca se queda en rechazado: el siguiente de la fila no tiene
-    // nada que ver con el fallo del anterior, y si se quedara, arrastraría el
-    // error a un envío que no lo cometió.
-    inFlight = next.then(() => {}, () => {});
-    return next;
-}
-
 /**
- * Abre un transporte, hace con él lo que se le pida y lo suelta.
+ * Un intento de envío: una petición a la API de Brevo.
  *
- * El error sale diciendo a dónde iba y cuánto tardó, que es lo que hace que un
- * fallo se lea sin adivinar: «ETIMEDOUT tras 15,0 s contra
- * 142.251.127.108:587» dice que el alojamiento no llega, y uno de 0,2 s con un
- * 535 dice que sí llega y que lo que está mal es la cuenta.
- */
-function withTransport(work) {
-    return oneAtATime(async () => {
-        const started = Date.now();
-        const transport = await createTransport();
-        try {
-            return await work(transport);
-        } catch (err) {
-            err.message = `${err.message} (${SMTP_HOST} ${lastAddress || '?'}:${SMTP_PORT}, tras ${((Date.now() - started) / 1000).toFixed(1)} s)`;
-            throw err;
-        } finally {
-            // Suelta lo que el transporte tuviera cogido. Sin pool no hay
-            // conexión compartida detrás, así que esto no puede cortarle nada
-            // a nadie: era justo lo que sí pasaba antes.
-            transport.close();
-        }
-    });
-}
-
-/**
- * Un intento de envío. Rechaza si falta la cuenta, si no se puede conectar o
- * si el servidor rechaza el mensaje; quien llama decide si reintentar —lo hace
- * drain()— o rendirse.
+ * Rechaza si falta la llave, si no se llega a la API o si la API contesta que
+ * no. Quien llama decide si reintentar —lo hace drain()— o rendirse.
  */
 async function attemptSend(message) {
-    if (!isConfigured()) throw new Error('Faltan AUTOCOLOR_SMTP_USER y AUTOCOLOR_SMTP_PASS');
-    await withTransport((transport) => transport.sendMail(message));
+    if (!isConfigured()) throw new Error('Falta AUTOCOLOR_BREVO_KEY');
+    await request(SEND_URL, { method: 'POST', body: brevoBody(message) });
+}
+
+/**
+ * El mensaje, en la forma que pide la API.
+ *
+ * Los cuerpos se arman igual que antes y se traducen aquí: así el resto del
+ * archivo —y mailhtml.js entero— no sabe por dónde salen los correos, que es
+ * lo que hizo que cambiar de transporte fuera solo este trozo.
+ */
+function brevoBody(message) {
+    const body = {
+        sender: SENDER,
+        to: message.to.map((email) => ({ email })),
+        subject: message.subject,
+        // Los dos cuerpos viajan juntos y Brevo arma el multipart/alternative.
+        // El de texto no es un resto: es lo que se ve en los clientes que no
+        // pintan HTML y en los avisos del reloj o del móvil.
+        htmlContent: message.html,
+        textContent: message.text,
+    };
+    if (message.replyTo) body.replyTo = { email: message.replyTo };
+    return body;
+}
+
+/**
+ * Una petición a la API, con su tope de tiempo y sus errores ya interpretados.
+ *
+ * El error sale diciendo qué contestó y cuánto tardó, que es lo que hace que
+ * un fallo se lea sin adivinar: un 401 en 200 ms dice que la llave está mal, y
+ * un tiempo agotado a los 15 s dice que no se llega a la API.
+ */
+async function request(url, { method = 'GET', body } = {}) {
+    const started = Date.now();
+    let response;
+    try {
+        response = await fetch(url, {
+            method,
+            headers: {
+                'api-key': BREVO_KEY,
+                'content-type': 'application/json',
+                accept: 'application/json',
+            },
+            body: body === undefined ? undefined : JSON.stringify(body),
+            signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        });
+    } catch (err) {
+        // Ni siquiera hubo respuesta. Se conserva el error original en `cause`
+        // porque es donde viene el código que dice si se llegó a conectar, y
+        // de eso depende si se puede reintentar sin duplicar (ver
+        // isDeliveryUnknown).
+        throw decorate(new Error(reasonFor(err)), { cause: err, started });
+    }
+
+    if (response.ok) return readJson(response);
+
+    // La API contesta el motivo en el cuerpo, y es el dato que convierte «400»
+    // en «el remitente no está verificado». Si no viniera, queda el número.
+    const detail = await readJson(response).then(
+        (data) => (data && (data.message || data.code)) || '',
+        () => '',
+    );
+    throw decorate(new Error(`${response.status} ${response.statusText}${detail ? ` — ${detail}` : ''}`),
+                   { status: response.status, started });
+}
+
+function decorate(err, { cause, status, started }) {
+    if (cause !== undefined) err.cause = cause;
+    if (status !== undefined) err.status = status;
+    err.message = `${err.message} (Brevo, tras ${((Date.now() - started) / 1000).toFixed(1)} s)`;
+    return err;
+}
+
+/** El cuerpo de la respuesta, o null si no era JSON. Nunca lanza. */
+async function readJson(response) {
+    try {
+        return await response.json();
+    } catch {
+        return null;
+    }
+}
+
+/** Un motivo legible para un fallo que no llegó a tener respuesta. */
+function reasonFor(err) {
+    if (err.name === 'TimeoutError') return 'la API no contestó a tiempo';
+    if (err.name === 'AbortError') return 'la petición se canceló';
+    const code = err.cause?.code || err.code;
+    return code ? `no se pudo conectar (${code})` : `no se pudo conectar (${err.message})`;
 }
 
 /**
  * ¿Tiene sentido volver a intentarlo?
  *
- * Un 5xx es el servidor contestando que no: la contraseña de aplicación está
- * mal (535), la dirección no existe (550). Repetirlo cinco veces no lo
- * arregla, y en el caso de la contraseña le regala a Google cinco intentos
- * fallidos de autenticación desde la misma IP.
+ * Un 4xx es la API contestando que no, y siempre por algo que repetir no
+ * cambia: la llave está mal (401), el remitente no está verificado o el cuerpo
+ * está mal armado (400). La excepción es el 429, que es «ahora no» y no «no»:
+ * ese es exactamente para lo que existe la escalera de reintentos.
  *
- * Todo lo demás —tiempos agotados, conexiones cortadas, fallos de DNS, 4xx—
- * es pasajero por definición, y es exactamente lo que falla desde Render.
+ * Todo lo demás —5xx, tiempos agotados, fallos de red— es pasajero por
+ * definición.
  */
 function isPermanent(err) {
-    if (err.code === 'EAUTH') return true;
-    return Number.isInteger(err.responseCode) && err.responseCode >= 500 && err.responseCode < 600;
+    return Number.isInteger(err.status) && err.status >= 400 && err.status < 500 && err.status !== 429;
 }
 
-/**
- * ¿Sabemos con certeza que el mensaje NO llegó a entregarse?
- *
- * Un fallo de conexión lo dice sin ambigüedad: si el saludo TCP no se
- * completó, o el servidor no llegó a contestar su 220, no salió ni un byte del
- * mensaje. Reintentar eso es gratis. Es el caso de TODO lo que está fallando
- * hoy desde Render.
- *
- * La excepción es la ventana entre que se manda el cuerpo y llega el «250 OK»
- * final. Si ahí se corta la conexión, Gmail puede haberlo aceptado y ser la
- * respuesta lo que se perdió: reintentar entrega el mismo correo dos veces.
- * Nunca se ha visto pasar aquí —los fallos son todos de conexión—, pero un
- * cliente que recibe su código por duplicado es un error visible, y no hay
- * forma de preguntar después.
- *
- * SE DISTINGUE POR EL TEXTO del error, que es lo único que nodemailer deja
- * fuera: `command` vale 'CONN' tanto para el tope de conexión como para el de
- * inactividad a media conversación (smtp-connection/index.js: `_onTimeout()`
- * pasa 'CONN'), así que no sirve para separarlos. Los tres mensajes de la
- * lista sí son inequívocos.
- *
- * Si algún día nodemailer los reescribe, esto deja de reconocerlos y el correo
- * vuelve a reintentarse siempre: se pierde la protección contra el duplicado,
- * pero no se pierde ningún correo. Es el lado bueno por el que equivocarse.
- */
-const NEVER_SENT = new Set([
-    'Connection timeout',      // no se llegó a establecer el TCP
-    'Greeting never received', // conectado, pero sin el 220 del servidor
-    'Connection closed',       // el servidor cortó antes de empezar
+// Los códigos que solo aparecen cuando la conexión NO llegó a establecerse. Si
+// no hubo conexión, no salió ni un byte del mensaje.
+const NEVER_CONNECTED = new Set([
+    'ENOTFOUND',               // el nombre no resuelve
+    'EAI_AGAIN',               // el DNS no contesta
+    'ECONNREFUSED',            // hay ruta, no hay nadie escuchando
+    'ENETUNREACH',             // no hay ruta
+    'EHOSTUNREACH',            // no se alcanza la máquina
+    'UND_ERR_CONNECT_TIMEOUT', // se agotó estableciendo la conexión
+    'CERT_HAS_EXPIRED',        // TLS: se rechazó antes de mandar nada
 ]);
 
+/**
+ * ¿Nos quedamos sin saber si el correo se entregó?
+ *
+ * Con respuesta no hay duda: un 2xx es que Brevo lo aceptó y cualquier otro
+ * código es que no. Sin respuesta, depende de dónde se cortó:
+ *
+ *   - Si no se llegó a conectar, el mensaje no salió. Reintentar es gratis.
+ *   - Si se cortó ESPERANDO la respuesta, la petición ya iba de camino y Brevo
+ *     puede haberla aceptado: reintentar entregaría el mismo correo dos veces.
+ *     Ahí se para, aunque signifique quedarse sin saberlo.
+ *
+ * Un error que no encaje en ninguno de los dos se reintenta, que es el lado
+ * por el que conviene equivocarse: un duplicado se ve y se explica, un correo
+ * que no llegó no se ve.
+ */
 function isDeliveryUnknown(err) {
-    if (err.command === 'DATA') return true;
-    const transient = err.code === 'ETIMEDOUT' || err.code === 'ESOCKET' || err.code === 'ECONNECTION';
-    if (!transient) return false;
-    // El mensaje trae pegado el «(host ip:port, tras N s)» que le añade
-    // withTransport(), así que se compara por el principio.
-    return !Array.from(NEVER_SENT).some((known) => err.message.startsWith(known));
+    if (Number.isInteger(err.status)) return false;
+    const code = err.cause?.cause?.code || err.cause?.code;
+    if (NEVER_CONNECTED.has(code)) return false;
+    const name = err.cause?.name;
+    return name === 'TimeoutError' || name === 'AbortError';
 }
 
 /* -----------------------------------------------------------------------------
@@ -542,18 +474,12 @@ function customerMessage(created, data) {
     lines.push('', '— Autocolor');
 
     return {
-        from: FROM,
         to: [data.email],
         // Solo el código, que lo genera el servidor. Nada que haya escrito
         // quien rellenó el formulario entra en el asunto.
         subject: `Tu solicitud en Autocolor — código ${created.id}`,
-        // Los dos cuerpos viajan juntos (multipart/alternative). El texto no
-        // es un resto: es lo que se ve en los clientes que no pintan HTML y en
-        // los avisos del reloj o del móvil, y lo que salva el mensaje si las
-        // imágenes vienen bloqueadas.
         text: lines.join('\n'),
         html: mailhtml.customerHtml(created, data, htmlContext()),
-        attachments: LOGO,
     };
 }
 
@@ -593,14 +519,12 @@ function shopMessage(created, data) {
     ];
 
     const message = {
-        from: FROM,
         to: [SHOP],
         // La placa ya pasó por PLATE_RE y el código lo genera el servidor: los
         // dos son seguros de poner en el asunto.
         subject: `Solicitud ${created.id} — ${data.plate}`,
         text: blocks.filter(Boolean).join('\n\n'),
         html: mailhtml.shopHtml(created, data, htmlContext()),
-        attachments: LOGO,
     };
 
     // Responder al correo del taller le escribe al cliente, que es lo que uno
@@ -768,38 +692,34 @@ function scheduleNextAttempt() {
  * Devuelve { ok: true } o { ok: false, error } — no lanza.
  */
 async function verify() {
-    if (!isConfigured()) return { ok: false, error: 'faltan AUTOCOLOR_SMTP_USER y AUTOCOLOR_SMTP_PASS' };
+    if (!isConfigured()) return { ok: false, error: 'falta AUTOCOLOR_BREVO_KEY' };
 
     let detail = null;
     // DOS INTENTOS Y NO UNO. Este renglón del arranque es una alarma, y una
-    // alarma que salta cada dos despliegues por un tiempo agotado pasajero
-    // —que es justo lo que hace la red de Render— deja de mirarse, que es lo
-    // único que esta comprobación no se puede permitir.
+    // alarma que salta de vez en cuando por un tropiezo pasajero deja de
+    // mirarse, que es lo único que esta comprobación no se puede permitir.
     for (let attempt = 0; attempt < 2; attempt += 1) {
         try {
-            await withTransport((transport) => transport.verify());
-            return { ok: true, address: lastAddress };
+            // Se pregunta por la cuenta y no se manda un correo de prueba:
+            // comprueba la llave y el camino hasta la API, no gasta uno de los
+            // 300 envíos diarios del plan gratuito y no le llega nada a nadie.
+            const account = await request(ACCOUNT_URL);
+            return { ok: true, account: account && account.email };
         } catch (err) {
             detail = err.message;
-            // Una contraseña mal puesta no mejora repitiéndola.
+            // Una llave mal puesta no mejora repitiéndola.
             if (isPermanent(err)) break;
         }
     }
     return { ok: false, error: detail };
 }
 
-/** La configuración del correo, sin la contraseña. Para /api/staff/whoami. */
+/** La configuración del correo, sin la llave. Para /api/staff/whoami. */
 function describe() {
     return {
         configured: isConfigured(),
-        host: SMTP_HOST,
-        port: SMTP_PORT,
-        // La dirección con la que se conectó de verdad, que es distinta del
-        // nombre de arriba: tiene que ser IPv4 (ver resolveIpv4). Es lo que
-        // habría dicho a la primera de qué iba el ENETUNREACH de Render.
-        // `null` mientras no se haya mandado nada todavía.
-        address: lastAddress,
-        from: FROM,
+        endpoint: SEND_URL,
+        from: SENDER,
         shop: SHOP,
         // Cuántos avisos están esperando su turno o su reintento. Un número
         // que no baja entre dos consultas es la señal de que el correo está
@@ -812,9 +732,9 @@ function describe() {
  * Abandona la cola. SOLO la llama el apagado ordenado de server.js, y después
  * de server.close(): la cola no es de nadie más.
  *
- * No cierra conexiones —cada envío tiene y suelta la suya (ver attemptSend)—;
- * lo que hace es cancelar el reloj de los reintentos y DEJAR DICHO qué se
- * queda sin mandar. Es la contrapartida de tener la cola en memoria: si Render
+ * No cierra nada —cada envío es una petición que se acaba sola—; lo que hace
+ * es cancelar el reloj de los reintentos y DEJAR DICHO qué se queda sin
+ * mandar. Es la contrapartida de tener la cola en memoria: si Render
  * apaga la instancia con avisos pendientes, se pierden, y el registro del
  * despliegue tiene que decir cuáles para que nadie se entere por una llamada.
  */

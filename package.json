@@ -18,7 +18,6 @@
     "db:migrate": "node server/migrate.js"
   },
   "dependencies": {
-    "nodemailer": "^10.0.0",
     "pg": "^8.13.1"
   }
 }

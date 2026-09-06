@@ -41,11 +41,6 @@ const MUTED = '#8a8681';    // etiquetas y letra pequeña
 const FONT = "'Poppins',Arial,Helvetica,sans-serif";
 const MONO = "'Courier New',Courier,monospace";
 
-// El logotipo viaja pegado al mensaje y se referencia por este identificador
-// (ver LOGO en server/mail.js). No es una URL: una imagen remota depende de
-// que el cliente quiera bajarla —muchos no lo hacen sin permiso— y un
-// data: URI Gmail lo borra directamente.
-const LOGO_CID = 'autocolor-logo';
 
 // Los datos del taller en el pie de los dos correos.
 //
@@ -138,13 +133,33 @@ function button(href, text) {
 }
 
 /**
+ * El logotipo de arriba, o el nombre escrito si no hay dónde ir a buscarlo.
+ *
+ * VIAJABA PEGADO AL CORREO y ahora es una URL del propio sitio. Un logotipo
+ * incrustado se referencia por un identificador (cid:), que es una cabecera
+ * MIME, y la API por la que salen hoy los correos no la expone (ver LOGO_URL
+ * en server/mail.js). La imagen la sirve el sitio, que es público.
+ *
+ * Sin sitio conocido —la máquina de trabajo, donde no hay RENDER_EXTERNAL_URL—
+ * no hay URL que poner, y una imagen rota se ve peor que un nombre bien
+ * escrito. El texto alternativo hace lo mismo en los clientes que no bajan
+ * imágenes remotas.
+ */
+function wordmark(logoUrl) {
+    if (!logoUrl) {
+        return `<div style="font-family:${FONT}; font-size:26px; line-height:32px; letter-spacing:4px; color:${INK}; font-weight:bold; text-transform:uppercase;">Autocolor</div>`;
+    }
+    return `<img src="${escapeHtml(logoUrl)}" width="240" alt="Autocolor" style="display:block; width:240px; max-width:70%; height:auto; margin:0 auto;">`;
+}
+
+/**
  * El armazón: fondo, tarjeta centrada de 600 px y el logotipo arriba.
  *
  * `preheader` es la línea que la bandeja de entrada enseña junto al asunto.
  * Va escondida en el cuerpo: sin ella, lo que se lee en la lista es el
  * principio del texto del correo, que casi nunca es lo que uno resumiría.
  */
-function shell({ title, preheader, kicker, body, footerNote }) {
+function shell({ title, preheader, kicker, body, footerNote, logoUrl }) {
     return `<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -185,7 +200,7 @@ function shell({ title, preheader, kicker, body, footerNote }) {
 
         <tr>
           <td class="px" align="center" style="padding:36px 48px 24px 48px;">
-            <img src="cid:${LOGO_CID}" width="240" alt="Autocolor" style="display:block; width:240px; max-width:70%; height:auto; margin:0 auto;">
+            ${wordmark(logoUrl)}
             <div style="font-family:${FONT}; font-size:12px; line-height:16px; letter-spacing:3px; color:${MUTED}; padding-top:14px; text-transform:uppercase;">${escapeHtml(kicker)}</div>
           </td>
         </tr>
@@ -288,6 +303,7 @@ ${hairline('36px 48px 0 48px')}
         kicker: 'Taller de pintura automotriz',
         body,
         footerNote: 'Recibiste este correo porque enviaste una solicitud en Autocolor.',
+        logoUrl: ctx.logoUrl,
     });
 }
 
@@ -419,11 +435,11 @@ ${panelUrl ? `
         kicker: 'Aviso interno del taller',
         body,
         footerNote: 'Aviso automático del asistente de cotización. Responder a este correo le escribe al cliente.',
+        logoUrl: ctx.logoUrl,
     });
 }
 
 module.exports = {
     customerHtml,
     shopHtml,
-    LOGO_CID,
 };
