@@ -274,6 +274,39 @@ async function notifyNewRequest(created, data) {
 }
 
 /**
+ * Comprueba que se puede conectar y autenticar, sin mandar nada. Es lo que
+ * server.js dice al arrancar.
+ *
+ * Existe porque el fallo del correo es invisible: las solicitudes se siguen
+ * guardando y el sitio se ve perfecto, así que sin esto la primera señal de
+ * que la cuenta está mal es que alguien no recibió su código, días después.
+ * Preguntarlo al arrancar convierte eso en un renglón del registro del
+ * despliegue, que es donde se mira.
+ *
+ * Devuelve { ok: true } o { ok: false, error } — no lanza.
+ */
+async function verify() {
+    if (!isConfigured()) return { ok: false, error: 'faltan AUTOCOLOR_SMTP_USER y AUTOCOLOR_SMTP_PASS' };
+    try {
+        await getTransport().verify();
+        return { ok: true };
+    } catch (err) {
+        return { ok: false, error: err.message };
+    }
+}
+
+/** La configuración del correo, sin la contraseña. Para /api/staff/whoami. */
+function describe() {
+    return {
+        configured: isConfigured(),
+        host: SMTP_HOST,
+        port: SMTP_PORT,
+        from: FROM,
+        shop: SHOP,
+    };
+}
+
+/**
  * Cierra la conexión SMTP del pool. Solo la llama el apagado ordenado de
  * server.js, junto al cierre del pool de Postgres: sin esto queda un socket
  * abierto contra Gmail mientras el proceso termina de irse.
@@ -287,6 +320,8 @@ function close() {
 
 module.exports = {
     isConfigured,
+    verify,
+    describe,
     notifyNewRequest,
     close,
     // Exportados para poder revisar los cuerpos sin mandar nada (ver

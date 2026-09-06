@@ -31,8 +31,8 @@ const PASSWORD = process.env.AUTOCOLOR_STAFF_PASSWORD || '';
 
 // Los códigos de trabajador válidos, en AUTOCOLOR_WORKER_IDS, separados por
 // comas. Cada uno es la inicial del nombre, la del apellido y cinco dígitos
-// (JP64723). Se guardan normalizados —sin espacios y en mayúsculas— para que
-// «jp64723» al entrar case con «JP64723» del .env. La contraseña sigue siendo
+// (AB12345). Se guardan normalizados —sin espacios y en mayúsculas— para que
+// «ab12345» al entrar case con «AB12345» del .env. La contraseña sigue siendo
 // el secreto compartido; el código dice además quién entró.
 const WORKER_IDS = new Set(
     (process.env.AUTOCOLOR_WORKER_IDS || '')

@@ -594,6 +594,7 @@ function whoami(req, ip) {
         trustProxy: TRUST_PROXY,
         forwarding,                                    // de dónde podría salir
         workerId: auth.sessionWorkerId(req),           // quién tiene la sesión
+        mail: mail.describe(),                         // a qué cuenta salen los avisos
     };
 }
 
@@ -832,8 +833,26 @@ async function start() {
         // Sin cuenta de correo el sitio funciona igual y las solicitudes se
         // guardan; lo que no sale es el aviso. Se dice para que nadie se
         // quede esperando un correo que nunca se intentó mandar.
+        //
+        // Y si la hay, se prueba de verdad: conectar y autenticar sin mandar
+        // nada. El fallo del correo es invisible desde fuera —el sitio se ve
+        // perfecto y las solicitudes se guardan—, así que la alternativa a
+        // este renglón es enterarse días después, porque alguien no recibió
+        // su código. No se espera para atender: la comprobación va por su
+        // cuenta y el sitio ya está sirviendo.
         if (!mail.isConfigured()) {
             console.log('Correos de aviso: apagados — faltan AUTOCOLOR_SMTP_USER y AUTOCOLOR_SMTP_PASS.');
+        } else {
+            mail.verify().then((result) => {
+                if (result.ok) {
+                    console.log(`Correos de aviso: listos (${mail.describe().host}, de ${mail.describe().from}).`);
+                } else {
+                    console.error(`\nCorreos de aviso: NO FUNCIONAN — ${result.error}`);
+                    console.error('  Las solicitudes se siguen guardando; lo que no sale es el aviso.');
+                    console.error('  Repasa AUTOCOLOR_SMTP_USER y AUTOCOLOR_SMTP_PASS (que es la contraseña');
+                    console.error('  de aplicación de 16 caracteres de Google, no la del correo).\n');
+                }
+            });
         }
         if (ALLOWED_ORIGINS.size > 0) {
             console.log(`Orígenes permitidos: ${[...ALLOWED_ORIGINS].join(', ')}`);

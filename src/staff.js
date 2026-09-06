@@ -503,7 +503,7 @@
     loginForm.addEventListener("submit", function (event) {
         event.preventDefault();
         // Se normaliza igual que en el servidor: sin espacios y en mayúsculas,
-        // para que «jp64723» entre igual que «JP64723».
+        // para que «ab12345» entre igual que «AB12345».
         var workerId = workerIdInput.value.trim().toUpperCase();
         var password = passwordInput.value;
         if (!workerId) {
@@ -512,7 +512,7 @@
             return;
         }
         if (!WORKER_ID_RE.test(workerId)) {
-            setError("El código de trabajador es dos letras y cinco dígitos (ej. JP64723).");
+            setError("El código de trabajador es dos letras y cinco dígitos (ej. AB12345).");
             workerIdInput.focus();
             return;
         }

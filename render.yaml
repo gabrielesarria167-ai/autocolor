@@ -87,7 +87,7 @@ services:
         sync: false
 
       # Los códigos de trabajador del panel, separados por comas
-      # (JP64723,MG06602,…). Hacen falta junto con la contraseña: sin ellos
+      # (AB12345,CD67890,…). Hacen falta junto con la contraseña: sin ellos
       # /api/staff/login responde 503 con «El panel del taller no está
       # configurado en este servidor», igual que sin contraseña. No van en el
       # repositorio porque dicen quién trabaja en el taller, y como la

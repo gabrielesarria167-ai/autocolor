@@ -461,6 +461,7 @@ Las del panel del taller, todas detrás de la contraseña compartida:
 | --- | --- |
 | `POST /api/staff/login` | Abre sesión con la contraseña del taller |
 | `POST /api/staff/logout` | La cierra |
+| `GET /api/staff/whoami` | Qué ve el servidor: IP, proxies y la cuenta de correo configurada |
 | `GET /api/staff/requests?status=` | La cola de trabajo, opcionalmente por estado |
 | `PATCH /api/staff/requests/:id` | Cambia el estado de una solicitud |
 
@@ -492,6 +493,35 @@ bloqueado— queda en el registro y nada más:
 ```
 [mail] no salió el aviso al taller de 4820175639: Invalid login: 535-5.7.8 …
 ```
+
+### Si no llega ningún correo
+
+El fallo del correo es invisible desde fuera: el sitio se ve perfecto y las
+solicitudes se siguen guardando. Por eso el servidor lo comprueba **al
+arrancar** —conecta y se autentica sin mandar nada— y lo dice en el registro
+del despliegue, que es donde se mira:
+
+```
+Correos de aviso: listos (smtp.gmail.com, de Autocolor <eltaller@gmail.com>).
+```
+
+Si algo está mal, sale esto en su lugar, con el motivo:
+
+```
+Correos de aviso: NO FUNCIONAN — Invalid login: 535-5.7.8 …
+```
+
+Lo que suele ser, en orden:
+
+| Lo que dice el registro | Qué pasa |
+| --- | --- |
+| `apagados — faltan AUTOCOLOR_SMTP_USER…` | Las variables no están puestas en el alojamiento, o el servicio no se reinició después de ponerlas |
+| `Invalid login: 535-5.7.8` | La contraseña no es una *contraseña de aplicación*, o se revocó |
+| `ECONNREFUSED` / `ETIMEDOUT` | El alojamiento bloquea la salida SMTP. Toca un proveedor por HTTP, y entonces hace falta un dominio |
+
+El panel también lo enseña sin entrar al registro: `GET /api/staff/whoami`
+devuelve un bloque `mail` con la cuenta y el servidor configurados (nunca la
+contraseña).
 
 ### Por qué Gmail y no un servicio por API
 
@@ -545,7 +575,7 @@ del taller y la lista de códigos de trabajador. Lo normal es dejarlas en el
 ```bash
 # .env
 AUTOCOLOR_STAFF_PASSWORD=la-del-taller
-AUTOCOLOR_WORKER_IDS=JP64723,MG06602,CQ01447
+AUTOCOLOR_WORKER_IDS=AB12345,CD67890,EF13579
 ```
 
 La contraseña es el secreto que abre; el código —dos letras y cinco dígitos,
