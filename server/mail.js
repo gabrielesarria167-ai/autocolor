@@ -63,8 +63,23 @@ const SMTP_PASS = process.env.AUTOCOLOR_SMTP_PASS || '';
 const SMTP_HOST = process.env.AUTOCOLOR_SMTP_HOST || 'smtp.gmail.com';
 const SMTP_PORT = Number(process.env.AUTOCOLOR_SMTP_PORT) || 587;
 
-// Tope para conectar, para el saludo y para cada operación del diálogo SMTP.
-const TIMEOUT_MS = 10000;
+// Los topes del diálogo SMTP.
+//
+// Están para que un alojamiento que bloquee el puerto de salida falle y se
+// registre en vez de dejar la promesa colgada para siempre. Eso NO pide que
+// sean cortos: los dos correos salen después de contestar el 201, así que
+// esperar un minuto por una conexión lenta no le cuesta nada a nadie —solo
+// retrasa un renglón del registro—, mientras que cortar demasiado pronto sí
+// cuesta el correo entero.
+//
+// Estuvieron en 10 s los tres y se quedaban cortos: Render duerme las
+// instancias del plan gratuito, y la primera conexión de salida de un
+// contenedor recién despierto no siempre entra en diez segundos. El síntoma
+// era «Connection timeout» —el nombre que nodemailer le da justo a este
+// tope—, con la solicitud guardada y ningún correo.
+const CONNECT_TIMEOUT_MS = 60000;   // establecer el TCP
+const GREETING_TIMEOUT_MS = 30000;  // el 220 del servidor, ya conectados
+const SOCKET_TIMEOUT_MS = 60000;    // inactividad durante el diálogo
 
 // Gmail reescribe el remitente al de la cuenta autenticada, así que ponerlo
 // distinto no engaña a nadie: lo único que se elige es el nombre visible.
@@ -231,12 +246,29 @@ async function resolveIpv4(host) {
 //
 // Se crea perezosamente para que no cueste nada en la máquina de trabajo, que
 // arranca sin cuenta configurada y no manda ningún correo.
-let transport = null;
+//
+// SE GUARDA LA PROMESA, NO EL TRANSPORTE. Los dos correos de una solicitud
+// salen a la vez (Promise.all en notifyNewRequest), y resolver la IP es una
+// espera: guardando el transporte, los dos pasaban el `if` antes de que
+// ninguno hubiera asignado y se creaban DOS, con dos conexiones a Gmail de las
+// que una quedaba huérfana —y sin cerrar, porque close() solo conocía la
+// última—. Guardando la promesa, el segundo espera a la del primero.
+let transportPromise = null;
 
-async function getTransport() {
-    if (transport) return transport;
+// La dirección con la que se acabó conectando, para describe(). Sale del
+// transporte, pero pedírselo obligaría a esperar la promesa en un sitio que no
+// puede.
+let resolvedAddress = null;
+
+function getTransport() {
+    if (!transportPromise) transportPromise = createTransport();
+    return transportPromise;
+}
+
+async function createTransport() {
     const host = await resolveIpv4(SMTP_HOST);
-    transport = nodemailer.createTransport({
+    resolvedAddress = host;
+    return nodemailer.createTransport({
         host,
         port: SMTP_PORT,
         secure: SMTP_PORT === 465,   // 465 es TLS directo; 587 sube con STARTTLS
@@ -254,14 +286,10 @@ async function getTransport() {
         auth: { user: SMTP_USER, pass: SMTP_PASS },
         pool: true,
         maxConnections: 1,
-        // Los tres topes están para que un alojamiento que bloquee el puerto
-        // de salida —cosa que pasa— falle y se registre, en vez de dejar la
-        // promesa colgada para siempre.
-        connectionTimeout: TIMEOUT_MS,
-        greetingTimeout: TIMEOUT_MS,
-        socketTimeout: TIMEOUT_MS,
+        connectionTimeout: CONNECT_TIMEOUT_MS,
+        greetingTimeout: GREETING_TIMEOUT_MS,
+        socketTimeout: SOCKET_TIMEOUT_MS,
     });
-    return transport;
 }
 
 /**
@@ -298,9 +326,15 @@ function block(title, rows) {
  */
 async function send(message) {
     if (!isConfigured()) throw new Error('Faltan AUTOCOLOR_SMTP_USER y AUTOCOLOR_SMTP_PASS');
+    const started = Date.now();
     try {
         await (await getTransport()).sendMail(message);
     } catch (err) {
+        // Con a dónde y cuánto tardó, un fallo se lee sin tener que adivinar:
+        // «ETIMEDOUT tras 60,0 s contra 142.251.127.108:587» dice que el
+        // alojamiento no llega, y uno de 0,2 s con un 535 dice que sí llega y
+        // que lo que está mal es la cuenta.
+        err.message = `${err.message} (${SMTP_HOST} ${resolvedAddress || '?'}:${SMTP_PORT}, tras ${((Date.now() - started) / 1000).toFixed(1)} s)`;
         // El transporte guarda la IP con la que se creó y una conexión del
         // pool. Si el envío falló, cualquiera de las dos puede haber quedado
         // inservible —Gmail rota direcciones y cierra conexiones ociosas—, así
@@ -459,12 +493,16 @@ async function notifyNewRequest(created, data) {
  */
 async function verify() {
     if (!isConfigured()) return { ok: false, error: 'faltan AUTOCOLOR_SMTP_USER y AUTOCOLOR_SMTP_PASS' };
+    const started = Date.now();
     try {
         await (await getTransport()).verify();
-        return { ok: true };
+        return { ok: true, address: resolvedAddress };
     } catch (err) {
+        // El mensaje se arma ANTES de cerrar: close() olvida la dirección
+        // resuelta, que es justo el dato que hace falta para leer el fallo.
+        const detail = `${err.message} (${SMTP_HOST} ${resolvedAddress || '?'}:${SMTP_PORT}, tras ${((Date.now() - started) / 1000).toFixed(1)} s)`;
         close();
-        return { ok: false, error: err.message };
+        return { ok: false, error: detail };
     }
 }
 
@@ -478,7 +516,7 @@ function describe() {
         // nombre de arriba: tiene que ser IPv4 (ver resolveIpv4). Es lo que
         // habría dicho a la primera de qué iba el ENETUNREACH de Render.
         // `null` mientras no se haya mandado nada todavía.
-        address: transport ? transport.options.host : null,
+        address: resolvedAddress,
         from: FROM,
         shop: SHOP,
     };
@@ -490,10 +528,13 @@ function describe() {
  * abierto contra Gmail mientras el proceso termina de irse.
  */
 function close() {
-    if (transport) {
-        transport.close();
-        transport = null;
-    }
+    if (!transportPromise) return;
+    const pending = transportPromise;
+    transportPromise = null;
+    resolvedAddress = null;
+    // La promesa puede seguir en marcha (resolviendo la IP): se cierra cuando
+    // termine, y si terminó en error no hay nada que cerrar.
+    pending.then((t) => t.close()).catch(() => {});
 }
 
 module.exports = {

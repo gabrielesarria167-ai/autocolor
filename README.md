@@ -543,10 +543,31 @@ Lo que suele ser, en orden:
 | `Invalid login: 535-5.7.8` | La contraseña no es una *contraseña de aplicación*, o se revocó |
 | `ENETUNREACH` con una dirección tipo `2607:f8b0:…` | IPv6. Ya no debería pasar: ver abajo |
 | `Connection timeout` en el 465 | El alojamiento bloquea ese puerto. Render lo hace: usa el 587, que es el de por omisión |
+| `Connection timeout` en el 587, tras 60 s | El alojamiento no llega a Gmail. Si tarda menos, mira los topes de `server/mail.js`: cortarlos demasiado da este mismo error con una conexión que iba a funcionar |
 | `ECONNREFUSED` / `ETIMEDOUT` en los dos puertos | El alojamiento bloquea la salida SMTP entera. Toca un proveedor por HTTP, y entonces hace falta un dominio o un remitente verificado |
 
 `GET /api/staff/whoami` trae en su bloque `mail` la dirección con la que se
-conectó de verdad (`address`), que es lo que distingue estos dos casos.
+conectó de verdad (`address`), que es lo que distingue estos dos casos. Cada
+fallo dice además a dónde iba y cuánto tardó, que es lo que separa «no llego»
+de «llego y me rechazan»:
+
+```
+[mail] no salió el aviso al taller de 7822278010: Connection timeout (smtp.gmail.com 142.251.127.108:587, tras 60.0 s)
+```
+
+#### Los topes de tiempo no son cortos a propósito
+
+Estuvieron en 10 s los tres y se quedaban cortos. Render duerme las instancias
+del plan gratuito, y la primera conexión de salida de un contenedor recién
+despierto no siempre entra en diez segundos: el resultado era un
+`Connection timeout` —el nombre que nodemailer le da justo a ese tope— con la
+solicitud guardada y ningún correo.
+
+Ahora son 60 s para conectar, 30 para el saludo y 60 de inactividad. Los topes
+están para que un puerto bloqueado falle y se registre en vez de dejar la
+promesa colgada para siempre; eso no pide que sean cortos. Los dos correos
+salen **después** de contestar el 201, así que esperar un minuto no le cuesta
+nada a quien envió la solicitud: solo retrasa un renglón del registro.
 
 #### El puerto es el 587, no el 465
 

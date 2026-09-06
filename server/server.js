@@ -845,7 +845,8 @@ async function start() {
         } else {
             mail.verify().then((result) => {
                 if (result.ok) {
-                    console.log(`Correos de aviso: listos (${mail.describe().host}, de ${mail.describe().from}).`);
+                    const m = mail.describe();
+                    console.log(`Correos de aviso: listos (${m.host} ${m.address}:${m.port}, de ${m.from}).`);
                 } else {
                     console.error(`\nCorreos de aviso: NO FUNCIONAN — ${result.error}`);
                     console.error('  Las solicitudes se siguen guardando; lo que no sale es el aviso.');
