@@ -133,6 +133,12 @@ async function getTransport() {
         host,
         port: SMTP_PORT,
         secure: SMTP_PORT === 465,   // 465 es TLS directo; 587 sube con STARTTLS
+        // Con el 587 la conexión empieza en claro y se sube con STARTTLS. Sin
+        // esto, un servidor que no lo ofrezca haría que la contraseña saliera
+        // sin cifrar: con requireTLS el envío falla antes de autenticarse, que
+        // es lo que tiene que pasar. Con el 465 no cambia nada, porque ahí ya
+        // es TLS desde el primer byte.
+        requireTLS: true,
         // El certificado se comprueba contra el nombre, no contra la IP que
         // se acaba de resolver.
         tls: { servername: SMTP_HOST },
