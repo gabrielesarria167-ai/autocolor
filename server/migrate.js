@@ -31,7 +31,7 @@ require('./env');
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { pool, describe } = require('./db');
+const { pool, describe, DATABASE_URL } = require('./db');
 
 const SCHEMA_PATH = path.join(__dirname, 'schema.sql');
 
@@ -45,10 +45,26 @@ async function main() {
 main()
     .then(() => pool.end())
     .catch(async (err) => {
-        console.error(`\nNo se pudo aplicar el esquema: ${err.message}`);
+        // Cuando la base no responde, Node agrupa un intento por dirección (::1
+        // y 127.0.0.1) en un AggregateError cuyo propio .message viene vacío, y
+        // sin este respaldo el aviso terminaba en «: » y parecía que el SQL
+        // falló. Mismo trato que en server.js al arrancar.
+        const detail = err.message
+            || (err.errors || []).map((e) => e.message).join('; ')
+            || err.code
+            || String(err);
+        console.error(`\nNo se pudo aplicar el esquema: ${detail}`);
         // Postgres dice en qué carácter del archivo tropezó; sin esto hay que
         // adivinar cuál de las ciento ochenta líneas fue.
         if (err.position) console.error(`  (carácter ${err.position} de schema.sql)`);
+        // ECONNREFUSED no es un problema del esquema: es que la base no está
+        // levantada. Si es la local, hay un comando para encenderla.
+        const refused = err.code === 'ECONNREFUSED'
+            || (err.errors || []).some((e) => e.code === 'ECONNREFUSED');
+        if (refused && !DATABASE_URL) {
+            console.error('\n  La base local no responde. Levántala primero:\n');
+            console.error('      npm run db:start        # o  npm run db:init  la primera vez\n');
+        }
         await pool.end().catch(() => {});
         process.exit(1);
     });
