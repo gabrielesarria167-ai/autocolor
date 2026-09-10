@@ -790,9 +790,14 @@
         show(loginEl, view === "login");
         show(profileEl, view === "profile");
         show(panelEl, view === "panel");
-        // El botón de salir y el reloj acompañan a todo lo que hay pasado el
-        // acceso: en la ficha también se está dentro.
+
+        // El botón de arriba a la derecha hace dos cosas distintas, y lo dice.
+        // En la tabla termina el turno y devuelve a la ficha: la sesión sigue
+        // abierta, que es lo que deja volver a entrar sin la contraseña. En la
+        // ficha sí cierra la sesión y saca al formulario de acceso —es la
+        // única salida de verdad, y por eso está donde se acaba el paso—.
         show(logoutBtn, view !== "login");
+        logoutBtn.textContent = view === "panel" ? "Terminar sesión" : "Salir";
         if (view === "login") stopClock();
         else startClock();
 
@@ -809,6 +814,14 @@
         if (mineBtn) mineBtn.setAttribute("aria-pressed", "false");
         paintView();
         workerIdInput.focus();
+    }
+
+    // De vuelta a la ficha. El modo se olvida: al entrar otra vez se vuelve a
+    // elegir con cuál de los dos botones.
+    function showProfile() {
+        view = "profile";
+        readOnly = false;
+        paintView();
     }
 
     // Se llega aquí desde la ficha, con las solicitudes ya cargadas: se elige
@@ -995,9 +1008,18 @@
     });
 
     logoutBtn.addEventListener("click", function () {
-        // El listado se quita llegue o no la petición al servidor: el clic es
-        // para dejar de tener los datos de los clientes a la vista, y una red
-        // caída no es razón para dejarlos ahí creyendo que se salió.
+        // Desde la tabla no se sale de la sesión: se termina el turno y se
+        // vuelve a la ficha. Los datos de los clientes dejan de verse, que es
+        // lo que importa de un vistazo, y volver a la tabla no pide contraseña.
+        if (view === "panel") {
+            showProfile();
+            return;
+        }
+
+        // Desde la ficha sí. El listado se quita llegue o no la petición al
+        // servidor: el clic es para dejar de tener los datos de los clientes a
+        // la vista, y una red caída no es razón para dejarlos ahí creyendo que
+        // se salió.
         var clear = function () {
             saveNotes();
             allRequests = [];

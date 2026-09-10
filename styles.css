@@ -3148,7 +3148,11 @@ body.staff {
    decisión, y encerrarla en la caja del sitio la dejaba flotando en el medio
    con la mitad de la pantalla vacía a los lados. */
 .staff-page:has(#staffProfile:not([hidden])) {
-    max-width: 100%;
+    /* `none` y no `100%`: la columna tiene una transición de max-width, y entre
+       una medida y un porcentaje el navegador interpola un calc() que se queda
+       a medio camino. Con la palabra clave no hay nada que interpolar, y el
+       salto de ancho cae en el mismo instante en que se cambia de pantalla. */
+    max-width: none;
 }
 
 /* El panel entero es un hijo flex de .staff-page, así que reparte su propio
@@ -3748,6 +3752,13 @@ body.staff {
    resto de los textos largos del sitio (ver `.field textarea`). */
 .staff-profile__notes-input {
     width: 100%;
+    /* `field-sizing: content` estira el campo por los dos lados, no solo a lo
+       alto: una palabra larga sin espacios —de esas que salen al apoyarse en
+       el teclado— lo sacaba de la tarjeta y ensanchaba la página entera. Con
+       el tope de ancho el campo se queda dentro, y `anywhere` parte la palabra
+       donde toque en vez de empujar. */
+    max-inline-size: 100%;
+    overflow-wrap: anywhere;
     background: var(--surface);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
