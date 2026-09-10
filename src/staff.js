@@ -851,39 +851,47 @@
        libreta nueva.
     --------------------------------------------------------------------- */
 
-    /* La foto es tan alta como la columna de al lado —nombre, código y notas—
-       y guarda la proporción de un retrato. El alto lo pone el CSS estirando
-       la fila; el ancho hay que calcularlo aquí.
+    /* La foto es tan alta como la columna de al lado —nombre, código y notas—,
+       hasta un tope, y guarda la proporción de un retrato. Las dos medidas se
+       escriben aquí; el CSS solo pone de qué tamaño se ve si esto no corre.
 
-       No es por gusto: en una fila flexible el ancho de cada caja se resuelve
-       antes que el alto, así que un `aspect-ratio` sobre una caja estirada no
-       tiene todavía de dónde sacar el ancho —el navegador se queda con el que
-       le pida su contenido, que es el icono—. Medir y escribir es la salida.
+       Se escriben las dos y no solo el ancho, y la fila alinea arriba y no
+       estira, porque estirando había un trinquete: una caja estirada mide lo
+       que mide la fila, no su propio contenido, y la fila la estaba levantando
+       la propia foto a través de su `aspect-ratio`. Así, al borrar las notas la
+       medida seguía siendo la de antes y la foto no volvía a bajar nunca. Con
+       el alto puesto a mano —y siempre menor o igual que el de la columna— la
+       foto ya no puede inflar lo que la mide.
+
+       El tope es lo que impide que una lista larga de recordatorios convierta
+       la foto en un cartel. La caja de notas tiene el suyo (ver styles.css) y
+       este cubre lo que quede.
 
        Al estrechar la foto, la columna de al lado se ensancha y su texto puede
        recolocarse, y entonces el alto ya no es el que se midió. Por eso se
-       repite hasta que deje de moverse, con un tope: el caso corriente cierra
-       a la primera, porque la caja de notas está en su alto mínimo y no depende
-       del ancho. */
+       repite hasta que deje de moverse, con un límite de vueltas: el caso
+       corriente cierra a la primera. */
     var PHOTO_RATIO = 4 / 5;
+    var PHOTO_MAX_HEIGHT = 420;
     var PHOTO_STACKED = "(max-width: 700px)";
 
     function sizePhoto() {
         // Sin la ficha a la vista no hay nada que medir: las cajas escondidas
         // no ocupan, y saldría cero.
         if (view !== "profile") return;
-        // Apilada, la foto tiene su propio ancho en el CSS y estirarla sería a
-        // lo ancho de la pantalla.
+        // Apilada, la foto tiene sus medidas en el CSS: se le devuelven.
         if (window.matchMedia(PHOTO_STACKED).matches) {
             profilePhotoEl.style.width = "";
+            profilePhotoEl.style.height = "";
             return;
         }
         for (var pass = 0; pass < 3; pass++) {
-            var height = profileMainEl.getBoundingClientRect().height;
-            if (!height) return;
-            var width = Math.round(height * PHOTO_RATIO);
-            if (Math.abs(width - profilePhotoEl.getBoundingClientRect().width) < 2) return;
-            profilePhotoEl.style.width = width + "px";
+            var column = profileMainEl.getBoundingClientRect().height;
+            if (!column) return;
+            var height = Math.round(Math.min(column, PHOTO_MAX_HEIGHT));
+            if (Math.abs(height - profilePhotoEl.getBoundingClientRect().height) < 2) return;
+            profilePhotoEl.style.height = height + "px";
+            profilePhotoEl.style.width = Math.round(height * PHOTO_RATIO) + "px";
         }
     }
 

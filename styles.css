@@ -3674,7 +3674,10 @@ body.staff {
 
 .staff-profile__top {
     display: flex;
-    align-items: stretch;
+    /* Arriba y no estirada: con el tope de alto, la foto suele ser más corta
+       que la columna de al lado, y colgarla hasta abajo la separaría del
+       nombre, que es con lo que va. */
+    align-items: flex-start;
     gap: 34px;
 }
 
@@ -3682,11 +3685,11 @@ body.staff {
    lee como un hueco por llenar y no como un avatar vacío. */
 .staff-profile__photo {
     flex: 0 0 auto;
-    /* Tan alto como la columna de al lado —nombre, código y tarjeta de notas—
-       y con la proporción de un retrato: el ancho sale del alto, no al revés,
-       así que la foto acompaña a lo que crezcan las notas en vez de quedar de
-       sello al lado. */
-    width: auto;
+    /* Tan alta como la columna de al lado —nombre, código y tarjeta de notas—,
+       hasta un tope, y con la proporción de un retrato. Las dos medidas las
+       escribe src/staff.js midiendo esa columna: aquí solo queda de qué tamaño
+       se ve si el script no llega a correr, y entonces manda la proporción. */
+    width: clamp(180px, 18vw, 300px);
     aspect-ratio: 4 / 5;
     display: flex;
     flex-direction: column;
@@ -3771,7 +3774,12 @@ body.staff {
     line-height: 1.6;
     field-sizing: content;
     min-block-size: 6lh;
-    max-block-size: 45dvh;
+    /* Crece con lo escrito hasta aquí, y de ahí en adelante se desplaza por
+       dentro. El tope no es un capricho de la caja: la foto de al lado va tan
+       alta como esta columna, y sin techo una lista larga de recordatorios la
+       convertía en un cartel. El `dvh` es para la pantalla baja, donde 320px
+       ya serían media ventana. */
+    max-block-size: min(320px, 50dvh);
     resize: vertical;
     transition: border-color 0.2s var(--ease-out), background 0.2s var(--ease-out);
 }
