@@ -138,6 +138,36 @@
         show(clockEl, false);
     }
 
+    /* ---------------------------------------------------------------------
+       Shift stopwatch
+
+       Starts when the worker enters the panel to work and stops when the
+       session ends. It is never shown: the only output is one console line
+       with how long the shift lasted. Browse-only does not count as work.
+    --------------------------------------------------------------------- */
+
+    var shiftStart = null;
+
+    function startShift() {
+        // Coming back to the table from the browse-only notice must not
+        // restart a shift that is already running.
+        if (shiftStart === null) shiftStart = Date.now();
+    }
+
+    function stopShift() {
+        if (shiftStart === null) return;
+        var elapsed = Date.now() - shiftStart;
+        shiftStart = null;
+        console.log("[taller] worked session: " + formatElapsed(elapsed));
+    }
+
+    function formatElapsed(ms) {
+        var total = Math.round(ms / 1000);
+        return pad(Math.floor(total / 3600)) + ":"
+            + pad(Math.floor((total % 3600) / 60)) + ":"
+            + pad(total % 60);
+    }
+
     function setError(message) {
         errorEl.textContent = message || "";
         errorEl.hidden = !message;
@@ -811,6 +841,7 @@
     }
 
     function showLogin() {
+        stopShift();
         view = "login";
         readOnly = false;
         // El siguiente que entre empieza con la fila de filtros limpia.
@@ -823,6 +854,7 @@
     // De vuelta a la ficha. El modo se olvida: al entrar otra vez se vuelve a
     // elegir con cuál de los dos botones.
     function showProfile() {
+        stopShift();
         view = "profile";
         readOnly = false;
         paintView();
@@ -836,6 +868,8 @@
     function showPanel(browseOnly) {
         saveNotes();
         readOnly = !!browseOnly;
+        if (readOnly) stopShift();
+        else startShift();
         view = "panel";
         paintView();
         render();
