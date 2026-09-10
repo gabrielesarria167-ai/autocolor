@@ -3128,6 +3128,19 @@ body.staff {
     display: flex;
     flex-direction: column;
     gap: 18px;
+    /* Como el paso ancho del asistente (ver `.wizard .repair`), la columna se
+       ensancha sola cuando hace falta y vuelve con una transición. */
+    transition: max-width 0.35s var(--ease-out);
+}
+
+/* Con la tabla a la vista el ancho normal queda corto: son nueve datos por
+   fila más el estado y quién la ocupa, y encogerlos en la caja del sitio
+   obligaba a desplazar en horizontal y recortaba la píldora de «Ocupado» al
+   estirarse. Así la columna se estira hasta donde dé el viewport y la tabla
+   (width:100%) reparte ese espacio de más entre sus columnas, que es lo que le
+   da holgura a la de la derecha. En el acceso —sin tabla— se queda estrecha. */
+.staff-page:has(#staffPanel:not([hidden])) {
+    max-width: min(1340px, calc(100vw - 40px));
 }
 
 /* El panel entero es un hijo flex de .staff-page, así que reparte su propio
@@ -3512,7 +3525,6 @@ body.staff {
 .staff-occupied__mine {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
     padding: 6px 12px;
     border: none;
     border-radius: 999px;
@@ -3530,20 +3542,28 @@ body.staff {
     background: #d5ecdc;
 }
 
-/* «Liberar» aparece al pasar por encima o al enfocar, para no cargar la celda
-   cuando solo se está leyendo la lista. */
+/* «Liberar» sale al pasar por encima o al enfocar, y la píldora se estira para
+   darle sitio en vez de reservarlo siempre: en reposo mide 0 de ancho —sin él,
+   el nombre quedaba con un hueco vacío a la derecha— y crece con la transición
+   de max-width. El margen se anima aparte para que tampoco separe cuando está
+   plegado. */
 .staff-occupied__free {
+    max-width: 0;
+    margin-left: 0;
+    overflow: hidden;
     font-size: 0.7rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: #2f9e5c;
     opacity: 0;
-    transition: opacity 0.12s var(--ease-out);
+    transition: max-width 0.18s var(--ease-out), margin-left 0.18s var(--ease-out), opacity 0.14s var(--ease-out);
 }
 
 .staff-occupied__mine:hover .staff-occupied__free,
 .staff-occupied__mine:focus-visible .staff-occupied__free {
+    max-width: 6rem;
+    margin-left: 8px;
     opacity: 1;
 }
 
