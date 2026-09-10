@@ -3143,6 +3143,14 @@ body.staff {
     max-width: min(1340px, calc(100vw - 40px));
 }
 
+/* La ficha se suelta del todo: la foto contra el borde izquierdo y los dos
+   botones repartiéndose la ventana entera. Es una pantalla de una sola
+   decisión, y encerrarla en la caja del sitio la dejaba flotando en el medio
+   con la mitad de la pantalla vacía a los lados. */
+.staff-page:has(#staffProfile:not([hidden])) {
+    max-width: 100%;
+}
+
 /* El panel entero es un hijo flex de .staff-page, así que reparte su propio
    espacio: título, herramientas, tarjeta y nota. */
 .staff-panel {
@@ -3247,6 +3255,41 @@ body.staff {
     background: var(--ink);
     border-color: transparent;
     color: #f6f2e6;
+}
+
+/* «Mis vehículos» no recorta por etapa sino por quién tiene el vehículo, así
+   que se combina con cualquiera de los estados en vez de reemplazarlo. Va al
+   principio de la fila, separado por una raya, y encendido se pinta del azul
+   de la marca y no del negro de los estados: en el mismo renglón conviven dos
+   filtros que no hacen lo mismo, y tienen que verse distintos. */
+.staff-chip--mine {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    margin-right: 9px;
+}
+
+.staff-chip--mine svg {
+    width: 15px;
+    height: 15px;
+}
+
+.staff-chip--mine::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    right: -8px;
+    transform: translateY(-50%);
+    width: 1px;
+    height: 18px;
+    background: var(--border-strong);
+}
+
+.staff-chip--mine[aria-pressed="true"] {
+    background: var(--brand);
+    border-color: transparent;
+    color: #fff;
 }
 
 /* -----------------------------------------------------------------------------
@@ -3609,6 +3652,237 @@ body.staff {
 .staff-login {
     max-width: 380px;
     margin: 6vh auto 0;
+}
+
+/* -----------------------------------------------------------------------------
+   Ficha del trabajador
+
+   El paso entre el acceso y la tabla: la foto, el nombre, la libreta de
+   recordatorios y las dos formas de seguir —con la sesión iniciada o solo a
+   mirar—. Como el acceso, se queda estrecha y centrada: aquí no hay tabla que
+   pida ancho.
+   -------------------------------------------------------------------------- */
+
+.staff-profile {
+    width: 100%;
+    margin: 4vh 0 0;
+}
+
+.staff-profile__top {
+    display: flex;
+    align-items: flex-start;
+    gap: 34px;
+}
+
+/* El recuadro de la foto, mientras no haya foto. Va punteado a propósito: se
+   lee como un hueco por llenar y no como un avatar vacío. */
+.staff-profile__photo {
+    flex: 0 0 auto;
+    /* Crece con la ventana: a lo ancho de la pantalla, un recuadro fijo de
+       200px al lado de una tarjeta de notas de mil quedaba de sello. */
+    width: clamp(180px, 18vw, 300px);
+    aspect-ratio: 4 / 5;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    border: 1px dashed var(--border-strong);
+    border-radius: var(--radius-md);
+    background: var(--surface-tint);
+    color: var(--text-faint);
+}
+
+.staff-profile__photo svg {
+    width: 58px;
+    height: 58px;
+}
+
+.staff-profile__photo-note {
+    font-size: 0.75rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+/* min-width:0 para que el nombre largo no estire la fila y empuje la foto. */
+.staff-profile__main {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.staff-profile__name {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: clamp(1.8rem, 1.3rem + 2vw, 2.5rem);
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+}
+
+.staff-profile__code {
+    margin: 6px 0 0;
+    font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+    font-size: 0.85rem;
+    letter-spacing: 0.1em;
+    color: var(--text-dim);
+}
+
+.staff-profile__notes {
+    margin-top: 20px;
+    padding: 18px 20px 20px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface-tint);
+}
+
+.staff-profile__notes-title {
+    display: block;
+    margin-bottom: 10px;
+    font-weight: 600;
+    font-size: 1.02rem;
+    color: var(--ink);
+}
+
+/* Las notas son texto suelto: ni listas ni campos, lo que al trabajador le
+   sirva recordar. Crece con lo escrito y se puede estirar a mano, como el
+   resto de los textos largos del sitio (ver `.field textarea`). */
+.staff-profile__notes-input {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+    color: black;
+    font-family: inherit;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    field-sizing: content;
+    min-block-size: 6lh;
+    max-block-size: 45dvh;
+    resize: vertical;
+    transition: border-color 0.2s var(--ease-out), background 0.2s var(--ease-out);
+}
+
+.staff-profile__notes-input:hover {
+    border-color: var(--text-faint);
+}
+
+.staff-profile__notes-input:focus-visible {
+    border-color: var(--focus);
+    outline: none;
+}
+
+.staff-profile__notes-hint {
+    margin: 8px 0 0;
+    min-height: 1.2em;
+    font-size: 0.78rem;
+    color: var(--text-faint);
+}
+
+/* Las dos maneras de seguir, del mismo tamaño y en la misma fila: ninguna es
+   un rincón de la otra. */
+.staff-profile__actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 30px;
+}
+
+.staff-profile__action {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 15px 20px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s var(--ease-out), border-color 0.2s var(--ease-out),
+        transform 0.1s var(--ease-out);
+}
+
+.staff-profile__action svg {
+    width: 20px;
+    height: 20px;
+}
+
+.staff-profile__action:active {
+    transform: scale(0.99);
+}
+
+.staff-profile__action--primary {
+    background: var(--brand);
+    color: #fff;
+}
+
+.staff-profile__action--primary:hover {
+    background: var(--brand-dark);
+}
+
+.staff-profile__action--ghost {
+    background: var(--surface);
+    border-color: var(--border-strong);
+    color: var(--ink);
+}
+
+.staff-profile__action--ghost:hover {
+    border-color: var(--text-faint);
+    background: var(--surface-tint);
+}
+
+/* Aviso del modo consulta, encima de la tabla: sin él, una tabla con todo
+   inerte se lee como una tabla rota. */
+.staff-readonly {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin: 0;
+    padding: 11px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface-tint);
+    font-size: 0.86rem;
+    color: var(--text-dim);
+}
+
+.staff-readonly span {
+    flex: 1 1 20rem;
+}
+
+.staff-readonly__enter {
+    flex: 0 0 auto;
+    padding: 8px 16px;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: var(--brand);
+    color: #fff;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s var(--ease-out);
+}
+
+.staff-readonly__enter:hover {
+    background: var(--brand-dark);
+}
+
+/* La foto encima del nombre en cuanto la fila de dos columnas deja de caber
+   sin apretar el texto. */
+@media (max-width: 700px) {
+    .staff-profile__top {
+        flex-direction: column;
+        gap: 22px;
+    }
+
+    .staff-profile__photo {
+        width: 160px;
+    }
+
+    .staff-profile__actions {
+        grid-template-columns: 1fr;
+    }
 }
 
 @media (max-width: 560px) {

@@ -31,6 +31,16 @@
     var countEl = document.getElementById("staffCount");
     var emptyEl = document.getElementById("staffEmpty");
     var errorEl = document.getElementById("staffError");
+    var profileEl = document.getElementById("staffProfile");
+    var profileNameEl = document.getElementById("staffProfileName");
+    var profileCodeEl = document.getElementById("staffProfileCode");
+    var notesEl = document.getElementById("staffNotes");
+    var notesHintEl = document.getElementById("staffNotesHint");
+    var profileEnterBtn = document.getElementById("staffProfileEnter");
+    var profileBrowseBtn = document.getElementById("staffProfileBrowse");
+    var readOnlyEl = document.getElementById("staffReadOnly");
+    var readOnlyEnterBtn = document.getElementById("staffReadOnlyEnter");
+    var noteEl = document.getElementById("staffNote");
 
     // Vacío es el mismo origen. El panel solo funciona contra el servidor Node
     // que tiene la base al lado; en una publicación estática (GitHub Pages) no
@@ -60,12 +70,30 @@
     var allRequests = [];
     var statusFilter = "";
     var searchTerm = "";
+    // «Mis vehículos»: recorta a los que tiene ocupados quien está mirando.
+    var mineOnly = false;
+    var mineBtn = null;
 
     // Quién entró: lo manda el servidor con el listado (ver /api/staff/requests).
     // Con esto se decide qué filas puede tocar —una ocupada solo la mueve quien
     // la tiene—, pero es solo para la interfaz: la regla de verdad la aplica el
     // servidor, que no se fía de lo que diga el navegador.
     var viewer = { workerId: "", name: "" };
+
+    // Qué se está enseñando: el acceso, la ficha del trabajador o la tabla.
+    // loadRequests trae los datos, pero no decide esto.
+    var view = "login";
+
+    // Se entró a mirar —«Ver solicitudes» en la ficha— y no a trabajar: la
+    // tabla se pinta entera pero sin un solo control.
+    //
+    // Es la interfaz y nada más. El servidor no sabe de estos dos modos: para
+    // él hay una sesión, y con ella se puede tomar un vehículo y moverle el
+    // estado. Así que esto no encierra a nadie —quien entró a mirar podría
+    // cambiar cosas por su cuenta desde la consola—; es la elección de quien
+    // entra, no una barrera. Lo que sí impide el servidor es tocar lo que
+    // tiene otro (ver server/db.js), y eso vale en los dos modos.
+    var readOnly = false;
 
     /* ---------------------------------------------------------------------
        Reloj
@@ -137,7 +165,51 @@
        Filtros y buscador
     --------------------------------------------------------------------- */
 
+    // Un filtro que no es de estado: recorta por quién tiene el vehículo, no
+    // por la etapa del trabajo. Por eso es un interruptor aparte y no una
+    // opción más del grupo —se combinan: «los míos, en pintura»—, y por eso va
+    // al principio de la fila, con su raya y su propio color al encenderse.
+    function buildMineFilter() {
+        mineBtn = document.createElement("button");
+        mineBtn.type = "button";
+        mineBtn.className = "staff-chip staff-chip--mine";
+        mineBtn.setAttribute("aria-pressed", "false");
+
+        var icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        icon.setAttribute("viewBox", "0 0 24 24");
+        icon.setAttribute("fill", "none");
+        icon.setAttribute("stroke", "currentColor");
+        icon.setAttribute("stroke-width", "2");
+        icon.setAttribute("stroke-linecap", "round");
+        icon.setAttribute("stroke-linejoin", "round");
+        icon.setAttribute("aria-hidden", "true");
+        var head = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        head.setAttribute("cx", "12");
+        head.setAttribute("cy", "8.5");
+        head.setAttribute("r", "3.5");
+        var body = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        body.setAttribute("d", "M5 20c0-3.31 3.13-5.5 7-5.5s7 2.19 7 5.5");
+        icon.appendChild(head);
+        icon.appendChild(body);
+
+        mineBtn.appendChild(icon);
+        mineBtn.appendChild(document.createTextNode("Mis vehículos"));
+
+        mineBtn.addEventListener("click", function () {
+            mineOnly = !mineOnly;
+            mineBtn.setAttribute("aria-pressed", String(mineOnly));
+            // Se recorta sobre lo que ya está en memoria, como hace el
+            // buscador: quién ocupa cada solicitud viene en la propia fila, así
+            // que no hay nada que volver a preguntarle al servidor.
+            applySearch();
+        });
+
+        filtersEl.appendChild(mineBtn);
+    }
+
     function buildFilters() {
+        buildMineFilter();
+
         var choices = [{ value: "", label: "Todas" }];
         STATUS_ORDER.forEach(function (value) {
             choices.push({ value: value, label: FILTER_LABELS[value] || STATUS_LABELS[value] });
@@ -167,7 +239,9 @@
     }
 
     function syncFilters() {
-        var buttons = filtersEl.querySelectorAll(".staff-chip");
+        // Solo los de estado: el de «Mis vehículos» no lleva data-value y se
+        // enciende por su cuenta.
+        var buttons = filtersEl.querySelectorAll(".staff-chip[data-value]");
         Array.prototype.forEach.call(buttons, function (button) {
             button.setAttribute("aria-pressed", String(button.dataset.value === statusFilter));
         });
@@ -254,10 +328,13 @@
         if (!editable) {
             pill.disabled = true;
             pill.classList.add("staff-status__pill--locked");
-            // Por qué no se puede: libre —hay que tomarlo— o lo tiene otro.
-            pill.title = request.occupiedBy
-                ? "Lo tiene " + (request.occupiedName || "otro trabajador")
-                : "Toma el vehículo para cambiarle el estado";
+            // Por qué no se puede: se entró solo a mirar, o —con la sesión
+            // iniciada— está libre y hay que tomarlo, o lo tiene otro.
+            pill.title = readOnly
+                ? "Inicia sesión para cambiar el estado"
+                : request.occupiedBy
+                    ? "Lo tiene " + (request.occupiedName || "otro trabajador")
+                    : "Toma el vehículo para cambiarle el estado";
         }
 
         var dot = document.createElement("span");
@@ -441,6 +518,19 @@
         var td = document.createElement("td");
         td.className = "staff-occupied";
 
+        // A mirar y nada más: quién lo tiene, en texto. Un botón aquí
+        // prometería un cambio que este modo no hace.
+        if (readOnly) {
+            var seen = document.createElement("span");
+            seen.className = "staff-occupied__other";
+            seen.textContent = request.occupiedBy
+                ? (request.occupiedName || request.occupiedBy)
+                : "Disponible";
+            td.appendChild(seen);
+            row.appendChild(td);
+            return;
+        }
+
         if (!request.occupiedBy) {
             // Disponible: un botón para tomarlo.
             var claim = document.createElement("button");
@@ -606,6 +696,9 @@
         var shown = 0;
         allRequests.forEach(function (request) {
             var visible = !term || request.searchText.indexOf(term) !== -1;
+            if (visible && mineOnly) {
+                visible = !!viewer.workerId && request.occupiedBy === viewer.workerId;
+            }
             if (request.row) request.row.hidden = !visible;
             if (visible) shown++;
         });
@@ -627,6 +720,7 @@
     // abierto: un vehículo disponible lo toma cualquiera desde la columna
     // «Ocupado». El servidor aplica la misma regla (ver server/db.js).
     function canEditStatus(request) {
+        if (readOnly) return false;
         return !!viewer.workerId && request.occupiedBy === viewer.workerId;
     }
 
@@ -684,14 +778,119 @@
         applySearch();
     }
 
-    function showLogin() {
+    /* ---------------------------------------------------------------------
+       Las tres vistas: acceso, ficha y tabla
+
+       Una sola función enseña y esconde, para que no haya dos sitios que
+       puedan dejar media pantalla puesta.
+    --------------------------------------------------------------------- */
+
+    function paintView() {
         show(loadingEl, false);
-        show(panelEl, false);
-        show(logoutBtn, false);
-        stopClock();
-        show(loginEl, true);
+        show(loginEl, view === "login");
+        show(profileEl, view === "profile");
+        show(panelEl, view === "panel");
+        // El botón de salir y el reloj acompañan a todo lo que hay pasado el
+        // acceso: en la ficha también se está dentro.
+        show(logoutBtn, view !== "login");
+        if (view === "login") stopClock();
+        else startClock();
+
+        show(readOnlyEl, view === "panel" && readOnly);
+        // Sin controles no hay nada que se guarde solo.
+        show(noteEl, view === "panel" && !readOnly);
+    }
+
+    function showLogin() {
+        view = "login";
+        readOnly = false;
+        // El siguiente que entre empieza con la fila de filtros limpia.
+        mineOnly = false;
+        if (mineBtn) mineBtn.setAttribute("aria-pressed", "false");
+        paintView();
         workerIdInput.focus();
     }
+
+    // Se llega aquí desde la ficha, con las solicitudes ya cargadas: se elige
+    // el modo y se repinta la tabla, que es lo que decide si las filas llevan
+    // controles o no.
+    function showPanel(browseOnly) {
+        saveNotes();
+        readOnly = !!browseOnly;
+        view = "panel";
+        paintView();
+        render();
+        searchEl.focus();
+    }
+
+    /* ---------------------------------------------------------------------
+       Ficha del trabajador
+
+       Las notas son recordatorios suyos, no datos del taller: se quedan en
+       este navegador, guardadas bajo su código, y no pasan por el servidor
+       —que hoy no tiene dónde ponerlas—. Cambiar de máquina es empezar una
+       libreta nueva.
+    --------------------------------------------------------------------- */
+
+    var NOTES_PREFIX = "autocolor.taller.notas.";
+    var notesTimer = null;
+    // Lo último que se guardó, para no reescribir lo mismo cada vez que se sale
+    // de la ficha ni anunciar un guardado que no hizo falta.
+    var notesSaved = "";
+
+    function notesKey() {
+        return viewer.workerId ? NOTES_PREFIX + viewer.workerId : "";
+    }
+
+    function paintProfile() {
+        profileNameEl.textContent = viewer.name || viewer.workerId || "Trabajador";
+        profileCodeEl.textContent = viewer.workerId || "";
+
+        var key = notesKey();
+        var saved = "";
+        // El navegador puede tener el almacenamiento cerrado (ventana privada,
+        // ajustes): sin notas se sigue trabajando igual, así que no se avisa de
+        // nada que el trabajador no pueda arreglar.
+        if (key) {
+            try {
+                saved = window.localStorage.getItem(key) || "";
+            } catch (err) {
+                saved = "";
+            }
+        }
+        notesEl.value = saved;
+        notesSaved = saved;
+        notesHintEl.textContent = "Se guardan en este dispositivo, bajo tu código.";
+    }
+
+    function saveNotes() {
+        if (notesTimer) {
+            window.clearTimeout(notesTimer);
+            notesTimer = null;
+        }
+        var key = notesKey();
+        if (!key || notesEl.value === notesSaved) return;
+        try {
+            window.localStorage.setItem(key, notesEl.value);
+            notesSaved = notesEl.value;
+            notesHintEl.textContent = "Guardado.";
+        } catch (err) {
+            notesHintEl.textContent = "No pudimos guardar las notas en este navegador.";
+        }
+    }
+
+    // Al escribir no se guarda en cada tecla: se espera a que pare.
+    notesEl.addEventListener("input", function () {
+        if (notesTimer) window.clearTimeout(notesTimer);
+        notesTimer = window.setTimeout(saveNotes, 600);
+    });
+
+    profileEnterBtn.addEventListener("click", function () { showPanel(false); });
+    profileBrowseBtn.addEventListener("click", function () { showPanel(true); });
+
+    // Desde el aviso del modo consulta se pasa a trabajar sin volver a pedir
+    // nada: la sesión ya está abierta, lo que faltaba era decidirlo.
+    readOnlyEnterBtn.addEventListener("click", function () { showPanel(false); });
 
     function loadRequests() {
         var query = statusFilter ? "?status=" + encodeURIComponent(statusFilter) : "";
@@ -708,11 +907,6 @@
                     if (!response.ok) {
                         throw new Error((body && body.error) || "No pudimos cargar las solicitudes.");
                     }
-                    show(loadingEl, false);
-                    show(loginEl, false);
-                    show(panelEl, true);
-                    show(logoutBtn, true);
-                    startClock();
                     setError("");
                     // Quién entró, para decidir qué filas puede tocar. Si el
                     // servidor no lo mandó, queda vacío y todo se ve como de
@@ -722,6 +916,13 @@
                     allRequests.forEach(function (request) {
                         request.searchText = haystack(request);
                     });
+                    paintProfile();
+                    // Recién entrado —o recién abierta la página con la sesión
+                    // puesta— se pasa por la ficha, que es donde se elige cómo
+                    // seguir. Si ya se estaba en la tabla —un filtro, un
+                    // reintento— no se mueve de ahí.
+                    if (view !== "panel") view = "profile";
+                    paintView();
                     render();
                     return body;
                 });
@@ -798,6 +999,7 @@
         // para dejar de tener los datos de los clientes a la vista, y una red
         // caída no es razón para dejarlos ahí creyendo que se salió.
         var clear = function () {
+            saveNotes();
             allRequests = [];
             rowsEl.textContent = "";
             setError("");

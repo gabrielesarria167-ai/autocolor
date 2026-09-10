@@ -67,12 +67,79 @@
             </form>
         </section>
 
+        <!-- La ficha del trabajador: el paso intermedio entre el acceso y la
+             tabla. Aquí se decide cómo se entra —con la sesión iniciada, que
+             es lo que deja tomar vehículos y moverles el estado, o solo a
+             mirar—, y de paso queda a mano la libreta de recordatorios. -->
+        <section class="staff-profile" id="staffProfile" aria-labelledby="staffProfileName" hidden>
+
+            <div class="staff-profile__top">
+
+                <!-- TO-DO: la foto del trabajador. Todavía no hay de dónde
+                     sacarla —nadie la sube y el servidor no la guarda—, así
+                     que por ahora queda el recuadro con la silueta. -->
+                <div class="staff-profile__photo" role="img" aria-label="Foto del trabajador (pendiente)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <circle cx="12" cy="8.5" r="3.75" />
+                        <path d="M4.5 20c0-3.6 3.36-6 7.5-6s7.5 2.4 7.5 6" />
+                    </svg>
+                    <span class="staff-profile__photo-note">Foto pendiente</span>
+                </div>
+
+                <div class="staff-profile__main">
+                    <h1 class="staff-profile__name" id="staffProfileName">Trabajador</h1>
+                    <p class="staff-profile__code" id="staffProfileCode"></p>
+
+                    <div class="staff-profile__notes">
+                        <label class="staff-profile__notes-title" for="staffNotes">Notas personales</label>
+                        <textarea class="staff-profile__notes-input" id="staffNotes" rows="7"
+                            placeholder="Escribe aquí tus recordatorios…"
+                            aria-describedby="staffNotesHint"></textarea>
+                        <p class="staff-profile__notes-hint" id="staffNotesHint"></p>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="staff-profile__actions">
+                <button type="button" class="staff-profile__action staff-profile__action--primary"
+                    id="staffProfileEnter">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <circle cx="12" cy="8.5" r="3.5" />
+                        <path d="M5 20c0-3.31 3.13-5.5 7-5.5s7 2.19 7 5.5" />
+                    </svg>
+                    Iniciar sesión
+                </button>
+                <button type="button" class="staff-profile__action staff-profile__action--ghost"
+                    id="staffProfileBrowse">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M7 3.5h7.5L19 8v12.5H7z" />
+                        <path d="M10 12h6M10 15.5h6M10 8.5h2.5" />
+                    </svg>
+                    Ver solicitudes
+                </button>
+            </div>
+
+        </section>
+
         <section class="staff-panel" id="staffPanel" aria-labelledby="staffPanelTitle" hidden>
 
             <header>
                 <h1 id="staffPanelTitle">Autocolor Taller</h1>
                 <p class="staff-page__count" id="staffCount"></p>
             </header>
+
+            <!-- Modo consulta: se llegó por «Ver solicitudes», así que la
+                 tabla se ve entera pero no se puede tocar nada. El botón
+                 inicia la sesión sin volver a pedir la contraseña —ya se
+                 entró—, y la tabla se rehace con sus controles. -->
+            <p class="staff-readonly" id="staffReadOnly" hidden>
+                <span>Estás viendo las solicitudes sin iniciar sesión: no puedes tomar vehículos ni cambiarles el estado.</span>
+                <button type="button" class="staff-readonly__enter" id="staffReadOnlyEnter">Iniciar sesión</button>
+            </p>
 
             <div class="staff-tools">
                 <div class="staff-search">
@@ -111,7 +178,7 @@
                 <p class="staff-empty" id="staffEmpty" hidden>No se encontraron solicitudes con esos criterios.</p>
             </div>
 
-            <p class="staff-note">Los cambios de estado se guardan solos.</p>
+            <p class="staff-note" id="staffNote">Los cambios de estado se guardan solos.</p>
         </section>
 
         <p class="form-error" id="staffError" role="alert" hidden></p>
