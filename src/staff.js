@@ -397,6 +397,46 @@
        poder tocarlo. La regla la aplica el servidor; esto solo la refleja.
     --------------------------------------------------------------------- */
 
+    // Desplaza la tabla lo justo para que el «Liberar» de una píldora propia se
+    // vea entero, cuando la tabla no cabe y esa columna queda contra el borde.
+    // `free.scrollWidth` da el ancho de «Liberar» aunque esté plegado (max-width
+    // 0 no lo esconde del cálculo), así que no hay que esperar a la transición.
+    // Guarda el desplazamiento previo para volver a él al salir.
+    function revealRelease(pill, free) {
+        var scroller = document.querySelector(".staff-table__scroll");
+        if (!scroller) return;
+        // Si la tabla cabe entera no hay nada que desplazar: la píldora ya se ve.
+        if (scroller.scrollWidth <= scroller.clientWidth) return;
+        var edge = 12;                          // aire hasta el borde
+        var grow = 8 + free.scrollWidth;        // margen + «Liberar» al estirarse
+        var expandedRight = pill.getBoundingClientRect().right + grow;
+        if (expandedRight <= scroller.getBoundingClientRect().right - edge) return; // ya se ve
+        // «Ocupado» es la última columna y la píldora vive contra el borde de su
+        // columna reservada, así que llevar la tabla al tope de la derecha la
+        // enseña entera —nombre y «Liberar»— sin depender de una cuenta al píxel
+        // que el ancho inestable de la vista volvería frágil. No se vuelve sola
+        // al salir: devolver la tabla mientras el ratón sigue encima provoca un
+        // vaivén —la píldora se corre bajo el cursor y dispara entrar/salir—, y
+        // una vez a la vista la columna, pasar por otra píldora ya no mueve nada
+        // (esta comprobación de «ya se ve» corta antes). La barra horizontal
+        // sigue ahí para volver a mano.
+        scroller.scrollTo({ left: scroller.scrollWidth - scroller.clientWidth, behavior: "smooth" });
+    }
+
+    // Abrir «Liberar» (clase, no :hover, para que no se cierre mientras la tabla
+    // se mueve) y correr la tabla para que se vea entero.
+    function startPeek(td, pill, free) {
+        // revealRelease mide la píldora aún sin estirar (su borde ya estirado es
+        // el actual más `8 + free.scrollWidth`, que suma), así que se llama antes
+        // de abrir el «Liberar»; si no, contaría el estirón dos veces.
+        revealRelease(pill, free);
+        td.classList.add("is-peeking");
+    }
+
+    function endPeek(td) {
+        td.classList.remove("is-peeking");
+    }
+
     function buildOccupiedCell(row, request) {
         var td = document.createElement("td");
         td.className = "staff-occupied";
@@ -415,8 +455,9 @@
             var mine = document.createElement("button");
             mine.type = "button";
             mine.className = "staff-occupied__mine";
+            // Sin title: la píldora ya muestra «Liberar» al pasar por encima, y
+            // el globo nativo encima de eso sobra y tapa.
             mine.setAttribute("aria-label", "Liberar el vehículo de la solicitud " + request.id);
-            mine.title = "Liberar";
 
             var name = document.createElement("span");
             name.textContent = request.occupiedName || viewer.name || viewer.workerId;
@@ -429,6 +470,18 @@
 
             mine.addEventListener("click", function () { setOccupied(request, false); });
             td.appendChild(mine);
+            // Al ser la última columna, el «Liberar» que sale al pasar por
+            // encima puede quedar tapado por el borde derecho cuando la tabla no
+            // cabe entera. Se desplaza la tabla a la derecha para enseñarlo y se
+            // vuelve al salir. Los escuchas van en la CELDA, no en la píldora:
+            // al desplazar, la píldora se corre bajo el cursor, y en la píldora
+            // el mouseleave saltaría y desharía el gesto —la celda, más ancha,
+            // aguanta el puntero—. Y el «Liberar» se abre con una clase, no con
+            // :hover, para que no se cierre mientras la tabla se mueve.
+            td.addEventListener("mouseenter", function () { startPeek(td, mine, free); });
+            td.addEventListener("mouseleave", function () { endPeek(td); });
+            mine.addEventListener("focus", function () { startPeek(td, mine, free); });
+            mine.addEventListener("blur", function () { endPeek(td); });
         } else {
             // Lo tiene otro: solo el nombre, sin tocar.
             var other = document.createElement("span");

@@ -3496,6 +3496,12 @@ body.staff {
 
 .staff-occupied {
     white-space: nowrap;
+    /* Reserva sitio para la píldora ya estirada (nombre + «Liberar»). La píldora
+       en reposo sigue ajustada al nombre; lo que reserva es la columna, para que
+       al pasar por encima el «Liberar» quepa dentro de la propia columna —sin
+       ensanchar la tabla ni recortarse— y, cuando la tabla no entra y hay que
+       desplazarla, haya hacia dónde. */
+    min-width: 15rem;
 }
 
 /* Disponible: un botón discreto que invita a tomarlo. */
@@ -3560,8 +3566,9 @@ body.staff {
     transition: max-width 0.18s var(--ease-out), margin-left 0.18s var(--ease-out), opacity 0.14s var(--ease-out);
 }
 
-.staff-occupied__mine:hover .staff-occupied__free,
-.staff-occupied__mine:focus-visible .staff-occupied__free {
+/* La clase la pone staff.js al entrar en la celda (no :hover), para que el
+   «Liberar» no se cierre mientras la tabla se desplaza a enseñarlo. */
+.staff-occupied.is-peeking .staff-occupied__free {
     max-width: 6rem;
     margin-left: 8px;
     opacity: 1;
