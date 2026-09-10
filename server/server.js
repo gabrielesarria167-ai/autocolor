@@ -681,11 +681,15 @@ async function handleStaff(req, res, pathname, ip) {
             if (!result.ok && result.reason === 'not_found') {
                 return sendJson(res, 404, { error: 'No encontramos ninguna solicitud con ese código.' });
             }
-            // La tiene otro: solo quien la ocupa le cambia el estado. El error
-            // nombra a quien la tiene para que quede claro a quién pedírsela.
+            // Solo quien ocupa el vehículo le cambia el estado. Si estaba
+            // libre, el error dice que hay que tomarlo; si lo tenía otro, lo
+            // nombra para que quede claro a quién pedírselo.
             if (!result.ok) {
-                const holder = names.nameFor(result.occupiedBy) || 'otro trabajador';
-                return sendJson(res, 403, { error: `${holder} tiene este vehículo. Solo esa persona puede cambiarle el estado.` });
+                const holder = names.nameFor(result.occupiedBy);
+                const message = holder
+                    ? `${holder} tiene este vehículo. Solo esa persona puede cambiarle el estado.`
+                    : 'Toma el vehículo (columna «Ocupado») antes de cambiarle el estado.';
+                return sendJson(res, 403, { error: message });
             }
             console.log(`[taller] ${result.id} -> ${result.status}`);
             return sendJson(res, 200, withOccupiedName(result));

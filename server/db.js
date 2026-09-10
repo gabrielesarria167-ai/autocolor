@@ -192,14 +192,16 @@ async function listRequests(options) {
 }
 
 /**
- * Cambia el estado de una solicitud, pero solo si quien lo pide puede: una
- * disponible la mueve cualquiera; una ocupada, únicamente el trabajador que la
- * tiene. El filtro va en el propio WHERE para que la comprobación y el cambio
- * sean un solo paso y no haya hueco entre «miré quién la tiene» y «la cambié».
+ * Cambia el estado de una solicitud, pero solo si quien lo pide la tiene
+ * ocupada: un trabajador únicamente mueve los vehículos en los que trabaja.
+ * Uno disponible no se toca —hay que tomarlo primero—, y uno de otro, tampoco.
+ * El filtro va en el propio WHERE para que la comprobación y el cambio sean un
+ * solo paso y no haya hueco entre «miré quién la tiene» y «la cambié».
  *
  * Devuelve { ok: true, ... } con la fila; o { ok: false, reason } —'not_found'
- * si el código no existe, 'forbidden' si la tiene otro— para que server.js
- * responda 404 o 403. `updated_at` lo pone el trigger de la base.
+ * si el código no existe, 'forbidden' si no la tiene quien lo pide (con
+ * `occupiedBy`: null si estaba libre, el código del otro si la tenía otro)—
+ * para que server.js responda 404 o 403. `updated_at` lo pone el trigger.
  *
  * `viewerId` es el código de la sesión (ver server/auth.js); nunca llega del
  * cuerpo de la petición, así que no se puede falsear para tocar la de otro.
@@ -207,7 +209,7 @@ async function listRequests(options) {
 async function updateRequestStatus(id, status, viewerId) {
     const { rows } = await pool.query(
         `UPDATE requests SET status = $2
-          WHERE id = $1 AND (occupied_by IS NULL OR occupied_by = $3)
+          WHERE id = $1 AND occupied_by = $3
       RETURNING id, status, occupied_by, updated_at`,
         [id, status, viewerId]
     );

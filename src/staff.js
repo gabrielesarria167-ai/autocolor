@@ -254,7 +254,10 @@
         if (!editable) {
             pill.disabled = true;
             pill.classList.add("staff-status__pill--locked");
-            pill.title = "Lo tiene " + (request.occupiedName || "otro trabajador");
+            // Por qué no se puede: libre —hay que tomarlo— o lo tiene otro.
+            pill.title = request.occupiedBy
+                ? "Lo tiene " + (request.occupiedName || "otro trabajador")
+                : "Toma el vehículo para cambiarle el estado";
         }
 
         var dot = document.createElement("span");
@@ -566,11 +569,12 @@
             : shown + " de " + total + " " + noun;
     }
 
-    // Quién puede tocar esta fila: si está disponible, cualquiera; si la ocupa
-    // alguien, solo esa persona. Es lo que decide tanto la píldora de estado
-    // como el botón de ocupar/liberar.
-    function isMine(request) {
-        return !request.occupiedBy || request.occupiedBy === viewer.workerId;
+    // Solo se le cambia el estado a un vehículo que uno mismo ocupa: ni a los
+    // libres (hay que tomarlos primero) ni a los de otro. Ocupar sí queda
+    // abierto: un vehículo disponible lo toma cualquiera desde la columna
+    // «Ocupado». El servidor aplica la misma regla (ver server/db.js).
+    function canEditStatus(request) {
+        return !!viewer.workerId && request.occupiedBy === viewer.workerId;
     }
 
     function makeRow(request) {
@@ -594,7 +598,7 @@
         cell(row, formatDate(request.createdAt), "staff-table__muted");
         cell(row, request.partCount, "staff-table__num");
         cell(row, QUALITY_LABELS[request.quality] || request.quality, "staff-table__nowrap");
-        buildStatusCell(row, request, isMine(request));
+        buildStatusCell(row, request, canEditStatus(request));
         buildOccupiedCell(row, request);
         // Guardada para que el buscador la esconda en vez de rehacerla, y para
         // poder rehacerla sola cuando cambia la ocupación (ver rebuildRow).
