@@ -32,6 +32,8 @@
     var emptyEl = document.getElementById("staffEmpty");
     var errorEl = document.getElementById("staffError");
     var profileEl = document.getElementById("staffProfile");
+    var profilePhotoEl = document.getElementById("staffProfilePhoto");
+    var profileMainEl = document.getElementById("staffProfileMain");
     var profileNameEl = document.getElementById("staffProfileName");
     var profileCodeEl = document.getElementById("staffProfileCode");
     var notesEl = document.getElementById("staffNotes");
@@ -791,13 +793,15 @@
         show(profileEl, view === "profile");
         show(panelEl, view === "panel");
 
-        // El botón de arriba a la derecha hace dos cosas distintas, y lo dice.
-        // En la tabla termina el turno y devuelve a la ficha: la sesión sigue
-        // abierta, que es lo que deja volver a entrar sin la contraseña. En la
-        // ficha sí cierra la sesión y saca al formulario de acceso —es la
-        // única salida de verdad, y por eso está donde se acaba el paso—.
+        // El botón de arriba a la derecha dice en cada pantalla lo que hace.
+        // Solo en la ficha cierra la sesión; desde la tabla nunca se sale del
+        // todo, se vuelve a la ficha —y la sesión sigue abierta, que es lo que
+        // deja entrar otra vez sin la contraseña—. En modo consulta ni siquiera
+        // se había empezado un turno: ahí lo único que cabe es volver.
         show(logoutBtn, view !== "login");
-        logoutBtn.textContent = view === "panel" ? "Terminar sesión" : "Salir";
+        logoutBtn.textContent = view !== "panel"
+            ? "Salir"
+            : readOnly ? "Volver al perfil" : "Terminar sesión";
         if (view === "login") stopClock();
         else startClock();
 
@@ -822,6 +826,8 @@
         view = "profile";
         readOnly = false;
         paintView();
+        // Se mide con la ficha ya visible: escondida no ocupa y daría cero.
+        sizePhoto();
     }
 
     // Se llega aquí desde la ficha, con las solicitudes ya cargadas: se elige
@@ -844,6 +850,44 @@
        —que hoy no tiene dónde ponerlas—. Cambiar de máquina es empezar una
        libreta nueva.
     --------------------------------------------------------------------- */
+
+    /* La foto es tan alta como la columna de al lado —nombre, código y notas—
+       y guarda la proporción de un retrato. El alto lo pone el CSS estirando
+       la fila; el ancho hay que calcularlo aquí.
+
+       No es por gusto: en una fila flexible el ancho de cada caja se resuelve
+       antes que el alto, así que un `aspect-ratio` sobre una caja estirada no
+       tiene todavía de dónde sacar el ancho —el navegador se queda con el que
+       le pida su contenido, que es el icono—. Medir y escribir es la salida.
+
+       Al estrechar la foto, la columna de al lado se ensancha y su texto puede
+       recolocarse, y entonces el alto ya no es el que se midió. Por eso se
+       repite hasta que deje de moverse, con un tope: el caso corriente cierra
+       a la primera, porque la caja de notas está en su alto mínimo y no depende
+       del ancho. */
+    var PHOTO_RATIO = 4 / 5;
+    var PHOTO_STACKED = "(max-width: 700px)";
+
+    function sizePhoto() {
+        // Sin la ficha a la vista no hay nada que medir: las cajas escondidas
+        // no ocupan, y saldría cero.
+        if (view !== "profile") return;
+        // Apilada, la foto tiene su propio ancho en el CSS y estirarla sería a
+        // lo ancho de la pantalla.
+        if (window.matchMedia(PHOTO_STACKED).matches) {
+            profilePhotoEl.style.width = "";
+            return;
+        }
+        for (var pass = 0; pass < 3; pass++) {
+            var height = profileMainEl.getBoundingClientRect().height;
+            if (!height) return;
+            var width = Math.round(height * PHOTO_RATIO);
+            if (Math.abs(width - profilePhotoEl.getBoundingClientRect().width) < 2) return;
+            profilePhotoEl.style.width = width + "px";
+        }
+    }
+
+    window.addEventListener("resize", sizePhoto);
 
     var NOTES_PREFIX = "autocolor.taller.notas.";
     var notesTimer = null;
@@ -896,6 +940,9 @@
     notesEl.addEventListener("input", function () {
         if (notesTimer) window.clearTimeout(notesTimer);
         notesTimer = window.setTimeout(saveNotes, 600);
+        // La caja de notas crece con lo escrito (ver `field-sizing` en
+        // styles.css), así que la foto tiene que seguirla.
+        sizePhoto();
     });
 
     profileEnterBtn.addEventListener("click", function () { showPanel(false); });
@@ -936,6 +983,9 @@
                     // reintento— no se mueve de ahí.
                     if (view !== "panel") view = "profile";
                     paintView();
+                    // Después de pintar: la ficha escondida no ocupa y la foto
+                    // saldría de cero.
+                    sizePhoto();
                     render();
                     return body;
                 });

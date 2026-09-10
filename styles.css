@@ -3674,7 +3674,7 @@ body.staff {
 
 .staff-profile__top {
     display: flex;
-    align-items: flex-start;
+    align-items: stretch;
     gap: 34px;
 }
 
@@ -3682,9 +3682,11 @@ body.staff {
    lee como un hueco por llenar y no como un avatar vacío. */
 .staff-profile__photo {
     flex: 0 0 auto;
-    /* Crece con la ventana: a lo ancho de la pantalla, un recuadro fijo de
-       200px al lado de una tarjeta de notas de mil quedaba de sello. */
-    width: clamp(180px, 18vw, 300px);
+    /* Tan alto como la columna de al lado —nombre, código y tarjeta de notas—
+       y con la proporción de un retrato: el ancho sale del alto, no al revés,
+       así que la foto acompaña a lo que crezcan las notas en vez de quedar de
+       sello al lado. */
+    width: auto;
     aspect-ratio: 4 / 5;
     display: flex;
     flex-direction: column;
@@ -3884,6 +3886,9 @@ body.staff {
 @media (max-width: 700px) {
     .staff-profile__top {
         flex-direction: column;
+        /* En columna, estirar sería a lo ancho: la foto ocuparía la pantalla
+           entera. Vuelve a un ancho suyo. */
+        align-items: flex-start;
         gap: 22px;
     }
 
