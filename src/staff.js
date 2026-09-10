@@ -147,18 +147,23 @@
     --------------------------------------------------------------------- */
 
     var shiftStart = null;
+    // Whoever started the shift, kept aside so the line still names them when
+    // the session ends by logging out or by the server dropping it.
+    var shiftWorkerId = "";
 
     function startShift() {
         // Coming back to the table from the browse-only notice must not
         // restart a shift that is already running.
-        if (shiftStart === null) shiftStart = Date.now();
+        if (shiftStart !== null) return;
+        shiftStart = Date.now();
+        shiftWorkerId = viewer.workerId || "?";
     }
 
     function stopShift() {
         if (shiftStart === null) return;
         var elapsed = Date.now() - shiftStart;
         shiftStart = null;
-        console.log("[taller] worked session: " + formatElapsed(elapsed));
+        console.log("[taller] worked session: " + shiftWorkerId + " " + formatElapsed(elapsed));
     }
 
     function formatElapsed(ms) {
