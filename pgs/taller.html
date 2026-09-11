@@ -18,7 +18,23 @@
     <!-- Brands and models for the walk-in form. A plain window global with no
          dependencies, and its image paths are already relative to pgs/. -->
     <script src="../src/carModels.js" defer></script>
+    <!-- Panel names for the walk-in form's 3D picker, shared with the public
+         wizard so the two cannot disagree. -->
+    <script src="../src/parts.js" defer></script>
     <script src="../src/staff.js" defer></script>
+    <!-- The 3D viewer (src/carVisual.js) is an ES module and resolves `three`
+         through this map. staff.js pulls it in with a dynamic import() the
+         first time a silhouette is chosen, so a panel that never registers a
+         vehicle never fetches three.js at all. Same versions as
+         pgs/repair.html, which mounts the very same viewer. -->
+    <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.169.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.169.0/examples/jsm/"
+      }
+    }
+    </script>
     <title>Autocolor · Taller</title>
 </head>
 
@@ -252,6 +268,58 @@
                         <div class="field">
                             <label for="intakeModel">Modelo</label>
                             <select id="intakeModel" class="is-placeholder" disabled></select>
+                        </div>
+                    </div>
+
+
+                    <!-- The same 3D picker the customer's wizard uses, mounted
+                         from the same module (src/carVisual.js) against the
+                         silhouette chosen above. It appears once there is a
+                         silhouette to draw, because the model to load is what
+                         the choice decides.
+
+                         Optional, like the rest of the second card: a vehicle
+                         can enter the shop before anybody has decided what gets
+                         painted, and `parts` defaults to an empty array. -->
+                    <div class="staff-intake__parts" id="intakeParts" hidden>
+                        <p class="staff-intake__parts-title">
+                            Piezas a pintar <span>— opcional, toca el vehículo</span>
+                        </p>
+
+                        <div class="car-view-3d" id="intake3d">
+                            <div class="car-view-3d__stage">
+                                <div class="car-view-3d__canvas-wrap" id="intake3dCanvasWrap">
+                                    <canvas id="intake3dCanvas" class="car-view-3d__canvas"></canvas>
+                                    <div class="car-view-3d__overlay" id="intake3dOverlay">
+                                        <div class="car-view-3d__progress-track">
+                                            <div class="car-view-3d__progress-bar" id="intake3dProgressBar"></div>
+                                        </div>
+                                        <p class="car-view-3d__loading-label" id="intake3dLoadingLabel">Cargando modelo 3D…</p>
+                                        <p class="car-view-3d__error" id="intake3dError" role="alert" hidden></p>
+                                    </div>
+                                </div>
+
+                                <div class="view-tabs car-view-3d__buttons" id="intake3dButtons" role="group"
+                                    aria-label="Ángulo de cámara">
+                                    <button type="button" class="view-tab" data-view="front" aria-pressed="true">Frente</button>
+                                    <button type="button" class="view-tab" data-view="right" aria-pressed="false">Derecha</button>
+                                    <button type="button" class="view-tab" data-view="back" aria-pressed="false">Atrás</button>
+                                    <button type="button" class="view-tab" data-view="left" aria-pressed="false">Izquierda</button>
+                                    <button type="button" class="view-tab" data-view="top" aria-pressed="false">Arriba</button>
+                                    <button type="button" class="view-tab" data-view="intro" aria-pressed="false">Reiniciar</button>
+                                </div>
+                            </div>
+
+                            <aside class="car-view-3d__summary" aria-label="Resumen de piezas seleccionadas">
+                                <div class="car-view-3d__summary-head">
+                                    <h2>Piezas</h2>
+                                    <span class="car-view-3d__count"><span id="intake3dCount">0</span> piezas</span>
+                                </div>
+                                <ul class="car-view-3d__list" id="intake3dList">
+                                    <li class="car-view-3d__empty">Ninguna pieza seleccionada.</li>
+                                </ul>
+                                <button type="button" class="car-view-3d__clear" id="intake3dClear" disabled>Quitar todas</button>
+                            </aside>
                         </div>
                     </div>
 

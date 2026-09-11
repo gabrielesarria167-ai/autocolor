@@ -73,9 +73,10 @@ lo abre a propósito, por ejemplo para probar el sitio desde el móvil.
 | --- | --- |
 | `index.html`, `src/home.js` | Portada |
 | `pgs/repair.html`, `src/repair.js` | Asistente de cotización |
-| `src/carVisual.js` | Visor 3D del paso 3 (three.js, un modelo por carrocería) |
+| `src/carVisual.js` | Visor 3D de piezas (three.js, un modelo por silueta). Lo montan el asistente y el panel |
+| `src/parts.js` | El nombre de cada pieza de carrocería, compartido por los dos |
 | `src/lookup.js` | Consulta de una solicitud por su código |
-| `pgs/taller.html`, `src/staff.js` | Panel del taller: la cola de trabajo y el cambio de estado |
+| `pgs/taller.html`, `src/staff.js` | Panel del taller: la cola de trabajo, el monitor del jefe y el registro de vehículos del local |
 | `src/cities.js` | Departamentos y provincias del Perú |
 | `styles.css` | Todos los estilos del sitio |
 | `server/server.js` | Sirve el sitio y la API |
@@ -836,10 +837,15 @@ request.
 
 His third button, **«Registrar vehículo»**, is for a car driven straight to the
 shop. It asks six things — nombres, apellidos, email, teléfono, la silueta 3D y
-el acabado — on one page, with marca, modelo, placa and notas below as optional.
+el acabado — on one page, with marca, modelo, placa, notas and the panels to
+paint below as optional.
 Everything else the row can hold is left null and can be filled in from the
 table later. Picking a model sets the matching silhouette on its own, since the
-catalogue already maps one to the other, and he can still change it. The row
+catalogue already maps one to the other, and he can still change it. Choosing a
+silhouette also brings up the same 3D picker the customer's wizard uses —
+literally the same viewer, `mountCar3D` in `src/carVisual.js` — so panels are
+picked by tapping the car rather than off a list. The panel names both pages
+show live in `src/parts.js`. The row
 that comes out is an ordinary one: same ten-digit code, same `recibido`, and a
 worker takes it and moves it like any other.
 

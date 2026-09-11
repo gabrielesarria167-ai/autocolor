@@ -58,6 +58,19 @@
     var intakeModelEl = document.getElementById("intakeModel");
     var intakePlateEl = document.getElementById("intakePlate");
     var intakeNotesEl = document.getElementById("intakeNotes");
+    var intakePartsEl = document.getElementById("intakeParts");
+    var intake3dCanvasWrapEl = document.getElementById("intake3dCanvasWrap");
+    // Reassigned on every teardown: a canvas whose WebGL context was dropped
+    // cannot be drawn into again (see replaceIntakeCanvas).
+    var intake3dCanvasEl = document.getElementById("intake3dCanvas");
+    var intake3dOverlayEl = document.getElementById("intake3dOverlay");
+    var intake3dProgressBarEl = document.getElementById("intake3dProgressBar");
+    var intake3dLoadingLabelEl = document.getElementById("intake3dLoadingLabel");
+    var intake3dErrorEl = document.getElementById("intake3dError");
+    var intake3dButtonsEl = document.getElementById("intake3dButtons");
+    var intake3dListEl = document.getElementById("intake3dList");
+    var intake3dCountEl = document.getElementById("intake3dCount");
+    var intake3dClearEl = document.getElementById("intake3dClear");
     var intakeErrorEl = document.getElementById("intakeError");
     var intakeSubmitEl = document.getElementById("intakeSubmit");
     var intakeCancelEl = document.getElementById("intakeCancel");
@@ -853,6 +866,10 @@
         if (view === "monitor") startMonitorTimer();
         else stopMonitorTimer();
 
+        // Leaving the walk-in form takes the 3D viewer with it. Its model is
+        // tens of megabytes on the GPU, and nothing off that screen can see it.
+        if (view !== "intake") destroyIntake3d();
+
         show(readOnlyEl, view === "panel" && readOnly);
         // For the boss the table is for looking at and nothing else: there is no
         // working mode to switch into, so the notice says so and loses its
@@ -1503,6 +1520,9 @@
 
     var vehicleChoice = buildChoices(intakeVehicleEl, VEHICLE_CHOICES, function (value) {
         intakeVehicle = value;
+        // The silhouette is what decides which model the picker loads, so the
+        // viewer follows the choice rather than sitting there empty.
+        mountIntake3d(value);
     });
 
     // The same three the website offers, from the same map the table reads.
@@ -1555,9 +1575,187 @@
         if (!catalog || !car.bodyType) return;
         var body = catalog.bodyTypes[car.bodyType];
         if (!body || !body.vehicle) return;
+        if (intakeVehicle !== body.vehicle) mountIntake3d(body.vehicle);
         intakeVehicle = body.vehicle;
         vehicleChoice.select(body.vehicle);
     }
+
+    /* ---------------------------------------------------------------------
+       The 3D part picker, inside the walk-in form
+
+       The very same viewer the customer's wizard mounts (mountCar3D in
+       src/carVisual.js), against the silhouette chosen above it. Not a second
+       implementation and not a checkbox list: the ids a panel goes by come out
+       of each GLB, and a list written by hand would be a fourth place to keep
+       them in step with the models.
+
+       The module is an ES module and reaches three.js through the importmap in
+       pgs/taller.html. It is pulled in with a dynamic import() the first time a
+       silhouette is picked, so a panel that never registers a vehicle never
+       fetches three.js at all.
+
+       Optional throughout: `parts` may come out empty, which is what the column
+       defaults to and what a vehicle that entered before anybody decided looks
+       like.
+    --------------------------------------------------------------------- */
+
+    var PART_LABELS = window.AUTOCOLOR_PARTS ? window.AUTOCOLOR_PARTS.LABELS : {};
+
+    var intakeParts = [];
+    var intake3d = null;         // the mounted viewer, if any
+    var intake3dVehicle = null;  // which silhouette it is mounted for
+    var intake3dModule = null;   // cached import() of the viewer module
+    var intake3dRetries = 0;     // bumped per failed import, for a fresh URL
+    var intake3dMountId = 0;     // guards a superseded mount finishing last
+
+    function toggleIntakePart(id) {
+        var at = intakeParts.indexOf(id);
+        if (at === -1) intakeParts.push(id);
+        else intakeParts.splice(at, 1);
+        if (intake3d) intake3d.refreshSelection();
+        renderIntakeParts();
+    }
+
+    function renderIntakeParts() {
+        intake3dListEl.textContent = "";
+        if (intakeParts.length === 0) {
+            var empty = document.createElement("li");
+            empty.className = "car-view-3d__empty";
+            empty.textContent = "Ninguna pieza seleccionada.";
+            intake3dListEl.appendChild(empty);
+        } else {
+            intakeParts.forEach(function (id) {
+                var label = PART_LABELS[id] || id;
+                var item = document.createElement("li");
+                item.className = "car-view-3d__list-item";
+
+                var name = document.createElement("span");
+                name.textContent = label;
+                item.appendChild(name);
+
+                var remove = document.createElement("button");
+                remove.type = "button";
+                remove.className = "car-view-3d__list-item-remove";
+                remove.setAttribute("aria-label", "Quitar " + label);
+                remove.textContent = "✕";
+                remove.addEventListener("click", function () { toggleIntakePart(id); });
+                item.appendChild(remove);
+
+                intake3dListEl.appendChild(item);
+            });
+        }
+        intake3dCountEl.textContent = String(intakeParts.length);
+        intake3dClearEl.disabled = intakeParts.length === 0;
+    }
+
+    // A canvas is single-use: tearing a viewer down drops its WebGL context
+    // (see destroy() in src/carVisual.js), so the next silhouette gets a fresh
+    // element to draw into. Same dance as src/repair.js.
+    function replaceIntakeCanvas() {
+        var fresh = document.createElement("canvas");
+        fresh.id = intake3dCanvasEl.id;
+        fresh.className = intake3dCanvasEl.className;
+        intake3dCanvasWrapEl.replaceChild(fresh, intake3dCanvasEl);
+        intake3dCanvasEl = fresh;
+    }
+
+    // Puts the loading overlay back the way a fresh mount expects it: a
+    // previous viewer leaves it faded out, and an earlier failure leaves an
+    // error where the progress bar belongs.
+    function resetIntakeOverlay() {
+        intake3dOverlayEl.classList.remove("hidden");
+        intake3dProgressBarEl.style.width = "0%";
+        if (intake3dProgressBarEl.parentElement) intake3dProgressBarEl.parentElement.style.display = "";
+        intake3dLoadingLabelEl.hidden = false;
+        intake3dLoadingLabelEl.textContent = "Cargando modelo 3D…";
+        intake3dErrorEl.hidden = true;
+        intake3dErrorEl.textContent = "";
+    }
+
+    function showIntake3dError(message) {
+        intake3dOverlayEl.classList.remove("hidden");
+        intake3dLoadingLabelEl.hidden = true;
+        if (intake3dProgressBarEl.parentElement) intake3dProgressBarEl.parentElement.style.display = "none";
+        intake3dErrorEl.textContent = message;
+        intake3dErrorEl.hidden = false;
+    }
+
+    function destroyIntake3d() {
+        if (intake3d) {
+            intake3d.destroy();
+            intake3d = null;
+            replaceIntakeCanvas();
+        }
+        intake3dVehicle = null;
+    }
+
+    // Called whenever the silhouette changes. Each one is its own model, so the
+    // viewer is rebuilt rather than reused, and the panels already picked are
+    // dropped: an id from the pickup does not exist on the van, and keeping it
+    // would send the workshop a part nobody can point at.
+    function mountIntake3d(vehicle) {
+        show(intakePartsEl, !!vehicle);
+        if (!vehicle) {
+            destroyIntake3d();
+            return;
+        }
+        if (intake3dVehicle === vehicle && intake3d && !intake3d.loadFailed()) {
+            intake3d.resize();
+            return;
+        }
+
+        destroyIntake3d();
+        intakeParts = [];
+        renderIntakeParts();
+        intake3dVehicle = vehicle;
+        resetIntakeOverlay();
+
+        // The module is fetched once; only the viewer inside it is rebuilt per
+        // silhouette. A retry needs a URL the browser has not already written
+        // off — its module map remembers a failed fetch — hence the query
+        // string, which is only ever added after a failure.
+        if (!intake3dModule) {
+            intake3dModule = import("../src/carVisual.js" +
+                (intake3dRetries ? "?reintento=" + intake3dRetries : ""));
+        }
+        var mountId = ++intake3dMountId;
+        var canvasEl = intake3dCanvasEl;
+
+        intake3dModule.then(function (mod) {
+            // A later choice already claimed the canvas while this import was
+            // in flight, so this mount has nothing left to draw into.
+            if (mountId !== intake3dMountId) return;
+            intake3d = mod.mountCar3D({
+                vehicle: vehicle,
+                canvasEl: canvasEl,
+                canvasWrapEl: intake3dCanvasWrapEl,
+                overlayEl: intake3dOverlayEl,
+                progressBarEl: intake3dProgressBarEl,
+                loadingLabelEl: intake3dLoadingLabelEl,
+                errorEl: intake3dErrorEl,
+                buttonsEl: intake3dButtonsEl,
+                isPartSelected: function (id) { return intakeParts.indexOf(id) !== -1; },
+                onPartToggle: toggleIntakePart
+            });
+        }).catch(function (err) {
+            if (mountId !== intake3dMountId) return;
+            // All of it cleared so the next choice retries the mount. The
+            // module promise too: holding a rejected one means the retry
+            // re-runs this handler without fetching anything.
+            intake3dModule = null;
+            intake3dRetries++;
+            intake3dVehicle = null;
+            console.error("[taller] No se pudo cargar el visor 3D:", err);
+            showIntake3dError("No se pudo cargar el visor 3D. Puedes registrar el vehículo sin elegir piezas.");
+        });
+    }
+
+    intake3dClearEl.addEventListener("click", function () {
+        if (!intakeParts.length) return;
+        intakeParts = [];
+        if (intake3d) intake3d.refreshSelection();
+        renderIntakeParts();
+    });
 
     function setIntakeError(message) {
         intakeErrorEl.textContent = message || "";
@@ -1601,7 +1799,10 @@
             // silueta no: esa la eligió el jefe mirando el vehículo.
             bodyType: car.bodyType,
             plate: plate,
-            notes: intakeNotesEl.value.trim()
+            notes: intakeNotesEl.value.trim(),
+            // May be empty, and that is a real answer: a vehicle can enter the
+            // shop before anybody decides what gets painted.
+            parts: intakeParts.slice()
         };
     }
 
@@ -1629,6 +1830,12 @@
         vehicleChoice.clear();
         qualityChoice.clear();
         buildModelOptions("");
+        // The viewer goes with the form: its model is tens of megabytes on the
+        // GPU, and the next vehicle registered may not even be the same shape.
+        destroyIntake3d();
+        intakeParts = [];
+        renderIntakeParts();
+        show(intakePartsEl, false);
         setIntakeError("");
         show(intakeFormEl, true);
         show(intakeDoneEl, false);
