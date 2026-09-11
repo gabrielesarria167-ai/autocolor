@@ -29,22 +29,46 @@ const COOKIE_NAME = 'autocolor_staff';
 const SESSION_MS = 8 * 60 * 60 * 1000;   // una jornada
 const PASSWORD = process.env.AUTOCOLOR_STAFF_PASSWORD || '';
 
-// Los códigos de trabajador válidos, en AUTOCOLOR_WORKER_IDS, separados por
-// comas. Cada uno es la inicial del nombre, la del apellido y cinco dígitos
-// (AB12345). Se guardan normalizados —sin espacios y en mayúsculas— para que
-// «ab12345» al entrar case con «AB12345» del .env. La contraseña sigue siendo
-// el secreto compartido; el código dice además quién entró.
-const WORKER_IDS = new Set(
-    (process.env.AUTOCOLOR_WORKER_IDS || '')
-        .split(',')
-        .map(function (id) { return id.trim().toUpperCase(); })
-        .filter(Boolean)
-);
+// Who may enter, from AUTOCOLOR_WORKER_IDS: comma-separated entries, each one a
+// code and, after a colon, the name of the person it belongs to.
+//
+//     AUTOCOLOR_WORKER_IDS=AB12345:Ana Bravo,CD67890:Carlos Díaz
+//
+// A code is the first initial, the surname initial and five digits (AB12345).
+// Codes are normalised — trimmed and upper-cased — so that typing «ab12345»
+// matches the «AB12345» of the .env; the name is kept as written, because it is
+// shown as written. The password is still the shared secret; the code says who
+// came in, and the name is what the panel puts on screen instead of it.
+//
+// The name is optional: an entry that is only a code still lets that person in,
+// and the panel falls back to showing the code. That keeps a deployment whose
+// AUTOCOLOR_WORKER_IDS predates the names working untouched.
+//
+// Both live in the environment and not in this repository on purpose: the
+// repository is public, and between them these two say who works at the shop.
+function parseRoster(raw) {
+    const codes = new Set();
+    const names = new Map();
+    for (const entry of String(raw || '').split(',')) {
+        const colon = entry.indexOf(':');
+        const code = (colon === -1 ? entry : entry.slice(0, colon)).trim().toUpperCase();
+        if (!code) continue;
+        codes.add(code);
+        const name = colon === -1 ? '' : entry.slice(colon + 1).trim();
+        if (name) names.set(code, name);
+    }
+    return { codes, names };
+}
 
-// The workshop boss's code, in AUTOCOLOR_BOSS_ID. One code, same shape as the
-// rest. It does not need to be repeated in AUTOCOLOR_WORKER_IDS — it is
-// accepted on its own (see verifyWorkerId): naming the boss and forgetting to
-// list him would lock out the very person just configured.
+const roster = parseRoster(process.env.AUTOCOLOR_WORKER_IDS);
+const WORKER_IDS = roster.codes;
+const WORKER_NAMES = roster.names;
+
+// The workshop boss, in AUTOCOLOR_BOSS_ID. One entry, written exactly like the
+// ones above — code, colon, name. It does not need to be repeated in
+// AUTOCOLOR_WORKER_IDS: it is accepted on its own (see verifyWorkerId), because
+// naming the boss and forgetting to list him would lock out the very person
+// just configured.
 //
 // What being the boss changes is the profile: instead of the start-session
 // button it carries the monitor, which shows the vehicle each worker is
@@ -54,7 +78,9 @@ const WORKER_IDS = new Set(
 //
 // Empty is the normal case: with no boss configured nobody sees the monitor
 // and the panel works as it always did.
-const BOSS_ID = (process.env.AUTOCOLOR_BOSS_ID || '').trim().toUpperCase();
+const bossRoster = parseRoster(process.env.AUTOCOLOR_BOSS_ID);
+const BOSS_ID = bossRoster.codes.values().next().value || '';
+for (const [code, name] of bossRoster.names) WORKER_NAMES.set(code, name);
 
 // Las sesiones viven en memoria y se pierden al reiniciar el servidor: el
 // panel es de una máquina y de un puñado de personas, y una tabla en la base
@@ -103,6 +129,16 @@ function isBoss(entered) {
  */
 function listWorkerIds() {
     return Array.from(WORKER_IDS).sort();
+}
+
+/**
+ * The name configured for a code, or an empty string when there is none — an
+ * entry written without one, or a code that is not on the roster at all (an old
+ * one still sitting on a row of the table). Callers fall back to the code, which
+ * always identifies somebody even when nothing names them.
+ */
+function workerName(code) {
+    return WORKER_NAMES.get(String(code || '').trim().toUpperCase()) || '';
 }
 
 /**
@@ -200,6 +236,7 @@ module.exports = {
     hasWorkerIds,
     isBoss,
     listWorkerIds,
+    workerName,
     verifyPassword,
     verifyWorkerId,
     createSession,

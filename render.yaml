@@ -86,21 +86,22 @@ services:
       - key: AUTOCOLOR_STAFF_PASSWORD
         sync: false
 
-      # Los códigos de trabajador del panel, separados por comas
-      # (AB12345,CD67890,…). Hacen falta junto con la contraseña: sin ellos
-      # /api/staff/login responde 503 con «El panel del taller no está
-      # configurado en este servidor», igual que sin contraseña. No van en el
-      # repositorio porque dicen quién trabaja en el taller, y como la
-      # contraseña se leen una sola vez al arrancar: cambiarlos exige
-      # reiniciar el servicio.
+      # The panel's workers, comma-separated, each one a code, a colon and the
+      # name it belongs to (AB12345:Ana Bravo,CD67890:Carlos Díaz,…). Needed
+      # alongside the password: without them /api/staff/login answers 503 with
+      # «El panel del taller no está configurado en este servidor», same as
+      # without a password. They are not in the repository because between the
+      # codes and the names they say who works at the shop, and like the
+      # password they are read once at startup: changing them means restarting
+      # the service.
       - key: AUTOCOLOR_WORKER_IDS
         sync: false
 
-      # The workshop boss's code, one only. It is accepted without being in the
-      # list above, and his profile carries the worker monitor — who is holding
-      # which vehicle — instead of the start-session button; in exchange he
-      # takes no vehicles. Optional: without it there is no boss and the panel
-      # works the same. Like the other two it is read once at startup.
+      # The workshop boss, one entry written like the ones above. It is accepted
+      # without being in the list, and his profile carries the worker monitor —
+      # who is holding which vehicle — instead of the start-session button; in
+      # exchange he takes no vehicles. Optional: without it there is no boss and
+      # the panel works the same. Read once at startup, like the other two.
       - key: AUTOCOLOR_BOSS_ID
         sync: false
 

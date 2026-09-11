@@ -760,13 +760,20 @@ del taller y la lista de códigos de trabajador. Lo normal es dejarlas en el
 ```bash
 # .env
 AUTOCOLOR_STAFF_PASSWORD=la-del-taller
-AUTOCOLOR_WORKER_IDS=AB12345,CD67890,EF13579
+AUTOCOLOR_WORKER_IDS=AB12345:Ana Bravo,CD67890:Carlos Díaz,EF13579:Elena Flores
 ```
 
 La contraseña es el secreto que abre; el código —dos letras y cinco dígitos,
 uno por persona— dice quién abrió, y queda en el registro del servidor y en
 `GET /api/staff/whoami`. Entrar pide los dos, y el error no distingue cuál de
 los dos falló, para que probar códigos a ciegas no revele cuáles existen.
+
+Después de los dos puntos va el nombre de quien tiene ese código, que es lo que
+el panel enseña en su lugar: en la ficha, en la columna «Ocupado» y en el
+monitor del jefe. Es opcional —una entrada que sea solo el código sigue
+dejando entrar, y entonces se muestra el código—, pero sin él la tabla dice
+`AB12345` donde debería decir una persona. Ni los códigos ni los nombres van en
+el repositorio: entre los dos dicen quién trabaja en el taller.
 
 y arrancar con `npm start` a secas. Ponerla delante del comando sigue
 funcionando y tiene prioridad sobre el archivo:
@@ -797,12 +804,13 @@ list above:
 
 ```bash
 # .env
-AUTOCOLOR_BOSS_ID=PS23077
+AUTOCOLOR_BOSS_ID=EF13579:Elena Flores
 ```
 
-It does not have to be repeated in `AUTOCOLOR_WORKER_IDS`: it is accepted on
-its own. The line is optional — without it there is no boss and the panel works
-as it always did — and, like the other two, it is read once at startup.
+It is written exactly like the entries above, and does not have to be repeated
+in `AUTOCOLOR_WORKER_IDS`: it is accepted on its own. The line is optional —
+without it there is no boss and the panel works as it always did — and, like
+the other two, it is read once at startup.
 
 His profile differs by one button: where everybody else has **«Iniciar
 sesión»**, he has **«Monitorear trabajadores»**. Behind it is one card per

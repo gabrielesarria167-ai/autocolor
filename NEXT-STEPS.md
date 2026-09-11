@@ -97,7 +97,7 @@ two that remain:
 
 ## 3. Chores that need you
 
-### 3.1 Rotate the worker codes
+### 3.1 Rotate the worker codes — done, with one step left for you
 
 Three real codes (`JP64723`, `MG06602`, `CQ01447`) were committed to a public
 repo in README, `render.yaml` and two source comments. They are removed from
@@ -107,10 +107,15 @@ Not a breach — the password is the secret, the code only identifies — but it
 undoes the design decision that login answers identically for a bad code and a
 bad password, so probing cannot map which codes exist.
 
-**Needs from you:** pick five new codes, update `AUTOCOLOR_WORKER_IDS` in
-Render and in your local `.env`, restart the service. Rotating is much less
-disruptive than rewriting history. Keep the `[A-Za-z]{2}[0-9]{5}` shape until
-finding #6 is fixed.
+The whole roster has since been replaced with the shop's real people on fresh
+codes, so none of the leaked three opens anything any more. The names now live
+beside the codes in `AUTOCOLOR_WORKER_IDS` (`CODE:Name` entries) instead of
+being invented from the initials, and neither is in the repository.
+
+**Needs from you:** set `AUTOCOLOR_WORKER_IDS` and `AUTOCOLOR_BOSS_ID` in Render
+to the new entries and restart the service, or the deployed panel still answers
+to the old codes. Keep the `[A-Za-z]{2}[0-9]{5}` shape until finding #6 is
+fixed.
 
 ### 3.2 GitGuardian alert — false positive
 
