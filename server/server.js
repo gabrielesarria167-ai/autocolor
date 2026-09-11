@@ -14,7 +14,9 @@
      POST  /api/staff/login        abre sesión
      POST  /api/staff/logout       la cierra
      GET   /api/staff/requests             lista la cola de trabajo
+     POST  /api/staff/requests             registers a walk-in vehicle (boss only)
      GET   /api/staff/workers              who holds which vehicle (boss only)
+     PUT   /api/staff/workers/:code/note   the boss's note on one worker
      PATCH /api/staff/requests/:id           cambia el estado de una solicitud
      PATCH /api/staff/requests/:id/occupancy ocupa o libera un vehículo
 
@@ -42,6 +44,7 @@ const path = require('node:path');
 const {
     createRequest, findRequest, listRequests, listOccupied, updateRequestStatus,
     occupyRequest, releaseRequest,
+    listWorkerNotes, findWorkerNote, setWorkerNote, clearWorkerNote,
     ping, describe, pool, DATABASE_URL,
 } = require('./db');
 const auth = require('./auth');
@@ -215,20 +218,56 @@ function integer(value, { min, max, required = false, field, agree = 'm' }) {
     return number;
 }
 
-function validateRequest(body) {
+// Which fields the public wizard demands. Everything the form asks for, which
+// is everything the row can hold except the three it marks optional.
+const WIZARD_REQUIRED = new Set([
+    'vehicle', 'bodyType', 'plate', 'quality', 'parts', 'phone', 'email',
+    'brand', 'model', 'year', 'firstName', 'lastName', 'department', 'province',
+]);
+
+// What the boss has to type for a vehicle driven straight to the shop. Far
+// less, on purpose: the customer is standing at the counter and the row can be
+// filled in from the panel afterwards. It is the floor the table itself
+// imposes — `vehicle`, `quality`, a name and a phone are NOT NULL in
+// server/schema.sql — plus the email, which is where the tracking code goes.
+//
+// Anything outside the set is still checked when it arrives: a malformed plate
+// is refused here exactly as it is on the website. Optional means it may be
+// missing, not that it may be wrong.
+const WALK_IN_REQUIRED = new Set([
+    'vehicle', 'quality', 'phone', 'email', 'firstName', 'lastName',
+]);
+
+/**
+ * Turns a request body into the row db.createRequest() writes, or throws a
+ * BadRequest naming the first thing wrong with it.
+ *
+ * `required` is what separates the two callers. The website passes
+ * WIZARD_REQUIRED and gets exactly the validation it has always had; the walk-in
+ * form passes WALK_IN_REQUIRED. The rules themselves are shared, which is the
+ * point: two validators would drift, and the one that drifted would be the one
+ * nobody was looking at.
+ */
+function validateRequest(body, required) {
     if (!body || typeof body !== 'object') throw new BadRequest('Cuerpo inválido.');
+    const need = (field) => required.has(field);
 
     if (!VEHICLES.has(body.vehicle)) throw new BadRequest('Tipo de vehículo no válido.');
-    if (!BODY_TYPES.has(body.bodyType)) throw new BadRequest('Carrocería no válida.');
+    if (need('bodyType') || body.bodyType) {
+        if (!BODY_TYPES.has(body.bodyType)) throw new BadRequest('Carrocería no válida.');
+    }
     // El catálogo de marcas y modelos vive en el navegador (src/carModels.js),
     // así que aquí no hay contra qué contrastarlos: se comprueba que vengan y
     // que sean texto corto, igual que con las piezas del visor 3D.
-    const plate = text(body.plate, { max: 7, required: true, field: 'la placa', agree: 'f' }).toUpperCase();
-    if (!PLATE_RE.test(plate)) throw new BadRequest('La placa no es válida.');
+    const plate = text(body.plate, { max: 7, required: need('plate'), field: 'la placa', agree: 'f' });
+    if (plate && !PLATE_RE.test(plate.toUpperCase())) throw new BadRequest('La placa no es válida.');
     if (!QUALITIES.has(body.quality)) throw new BadRequest('Nivel de acabado no válido.');
 
-    const parts = Array.isArray(body.parts) ? body.parts : null;
-    if (!parts || parts.length === 0) throw new BadRequest('Selecciona al menos una pieza.');
+    // Sin piezas es un arreglo vacío, que es lo que la columna trae por
+    // omisión: un vehículo que entra al taller antes de decidir qué se pinta.
+    const parts = Array.isArray(body.parts) ? body.parts : (body.parts == null ? [] : null);
+    if (!parts) throw new BadRequest('Selecciona al menos una pieza.');
+    if (need('parts') && parts.length === 0) throw new BadRequest('Selecciona al menos una pieza.');
     if (parts.length > MAX_PARTS) throw new BadRequest('Demasiadas piezas.');
     // Los ids de pieza salen del GLB de cada modelo ('hood', 'rear_door_left',
     // 'Object_26', …), así que se valida la forma y no una lista cerrada:
@@ -239,30 +278,31 @@ function validateRequest(body) {
         }
     }
 
-    const phone = text(body.phone, { max: 20, required: true, field: 'el teléfono' });
-    if (!PHONE_RE.test(phone)) throw new BadRequest('El teléfono debe tener 9 dígitos.');
+    const phone = text(body.phone, { max: 20, required: need('phone'), field: 'el teléfono' });
+    if (phone && !PHONE_RE.test(phone)) throw new BadRequest('El teléfono debe tener 9 dígitos.');
 
-    // El correo es obligatorio: es por donde sale la confirmación con el
-    // código de seguimiento (server/mail.js), así que una solicitud sin él
-    // deja al cliente sin más forma de recuperarlo que llamar al taller.
-    const email = text(body.email, { max: 254, required: true, field: 'el email' });
-    if (!EMAIL_RE.test(email)) throw new BadRequest('El email no es válido.');
+    // El correo es obligatorio en los dos formularios: es por donde sale la
+    // confirmación con el código de seguimiento (server/mail.js), así que una
+    // solicitud sin él deja al cliente sin más forma de recuperarlo que llamar
+    // al taller.
+    const email = text(body.email, { max: 254, required: need('email'), field: 'el email' });
+    if (email && !EMAIL_RE.test(email)) throw new BadRequest('El email no es válido.');
 
     return {
-        brand: text(body.brand, { max: 40, required: true, field: 'la marca', agree: 'f' }),
-        model: text(body.model, { max: 60, required: true, field: 'el modelo' }),
-        bodyType: body.bodyType,
-        year: integer(body.year, { min: YEAR_MIN, max: yearMax(), required: true, field: 'el año' }),
-        plate,
+        brand: text(body.brand, { max: 40, required: need('brand'), field: 'la marca', agree: 'f' }),
+        model: text(body.model, { max: 60, required: need('model'), field: 'el modelo' }),
+        bodyType: body.bodyType || null,
+        year: integer(body.year, { min: YEAR_MIN, max: yearMax(), required: need('year'), field: 'el año' }),
+        plate: plate ? plate.toUpperCase() : null,
         mileage: integer(body.mileage, { min: 0, max: MAX_MILEAGE, field: 'el kilometraje' }),
         colorCode: text(body.colorCode, { max: 20, field: 'el código de color' }),
         vehicle: body.vehicle,
         quality: body.quality,
         parts: [...new Set(parts)],
-        firstName: text(body.firstName, { max: 80, required: true, field: 'el nombre' }),
-        lastName: text(body.lastName, { max: 80, required: true, field: 'el apellido' }),
-        department: text(body.department, { max: 80, required: true, field: 'el departamento' }),
-        province: text(body.province, { max: 80, required: true, field: 'la provincia', agree: 'f' }),
+        firstName: text(body.firstName, { max: 80, required: need('firstName'), field: 'el nombre' }),
+        lastName: text(body.lastName, { max: 80, required: need('lastName'), field: 'el apellido' }),
+        department: text(body.department, { max: 80, required: need('department'), field: 'el departamento' }),
+        province: text(body.province, { max: 80, required: need('province'), field: 'la provincia', agree: 'f' }),
         phone,
         email,
         notes: text(body.notes, { max: 2000, field: 'las notas', agree: 'fp' }),
@@ -565,6 +605,11 @@ function applyCors(req, res) {
 
 const STAFF_PATH = /^\/api\/staff\/requests\/([0-9]{10})$/;
 const OCCUPANCY_PATH = /^\/api\/staff\/requests\/([0-9]{10})\/occupancy$/;
+const WORKER_NOTE_PATH = /^\/api\/staff\/workers\/([A-Za-z]{2}[0-9]{5})\/note$/;
+
+// Long enough for «Termina el Onix antes del viernes y avísame», short enough
+// that the card can show it whole. The column CHECKs the same number.
+const MAX_NOTE = 500;
 
 // Cada fila del panel lleva, además de su código, el nombre del trabajador que
 // la tiene ocupada. Se arma aquí y no en la base porque el nombre se inventa a
@@ -588,14 +633,14 @@ function requireStaff(req) {
     }
 }
 
-// The monitor is the boss's and nobody else's: it shows at a glance what each
-// worker is holding, which is for running the workshop, not for working in it.
-// A 403 and not a 404: whoever asks has a session and the route exists — what
-// they do not have is the boss's code.
+// The monitor, writing a note on a worker and registering a walk-in vehicle are
+// the boss's and nobody else's: all three are for running the workshop, not for
+// working in it. A 403 and not a 404: whoever asks has a session and the route
+// exists — what they do not have is the boss's code.
 function requireBoss(req) {
     requireStaff(req);
     if (!auth.isBoss(auth.sessionWorkerId(req))) {
-        throw new HttpError(403, 'El monitor de trabajadores es solo para el jefe del taller.');
+        throw new HttpError(403, 'Esto es solo para el jefe del taller.');
     }
 }
 
@@ -693,12 +738,40 @@ async function handleStaff(req, res, pathname, ip) {
         // the start-session button — and nothing else: it is the interface. Who
         // may ask for the monitor and who may take a vehicle is decided by
         // requireBoss and refuseBoss, here, without trusting the browser.
+        // Their own note from the boss, and nobody else's: it rides here so the
+        // profile — which this same response already paints — does not need a
+        // second request for one line of text. The boss reads everybody's from
+        // the monitor instead.
+        const own = viewerId ? await findWorkerNote(viewerId) : null;
         const viewer = {
             workerId: viewerId,
             name: names.nameFor(viewerId),
             isBoss: auth.isBoss(viewerId),
+            note: own ? { text: own.note, updatedAt: own.updatedAt } : null,
         };
         return sendJson(res, 200, { requests, viewer });
+    }
+
+    // A vehicle driven straight to the shop. Same table and same code as one
+    // that came through the website — the queue does not care how a car
+    // arrived — but far fewer questions, because the customer is at the counter
+    // and the rest can be filled in from the panel afterwards.
+    //
+    // No rate limit, unlike the public route: this one is behind the shop
+    // password, and the ten-a-minute cap there would bite a shop booking three
+    // cars in a row from a single address.
+    if (pathname === '/api/staff/requests' && req.method === 'POST') {
+        requireBoss(req);
+        const data = validateRequest(await readJsonBody(req), WALK_IN_REQUIRED);
+        const created = await createRequest(data);
+        const viewerId = auth.sessionWorkerId(req);
+        console.log(`[taller] ${created.id} registrado en el local por ${viewerId}`);
+        sendJson(res, 201, created);
+        // After the answer and without await, exactly as the public route does:
+        // the row is saved and the boss already has the code to read out, so a
+        // stumble in the mail cannot turn into a failed registration.
+        mail.notifyNewRequest(created, data, { walkIn: true });
+        return;
     }
 
     // The boss's monitor: every worker with the vehicles they are holding right
@@ -716,6 +789,12 @@ async function handleStaff(req, res, pathname, ip) {
         const held = new Map();
         for (const workerId of auth.listWorkerIds()) held.set(workerId, []);
 
+        // The notes come along for the ride: the monitor draws them on the same
+        // cards, and a second request would only be a second way for the two
+        // halves of one screen to disagree.
+        const notes = new Map();
+        for (const note of await listWorkerNotes()) notes.set(note.workerId, note);
+
         for (const row of await listOccupied()) {
             // A code that is no longer on the roster — somebody who left with a
             // vehicle still taken — goes in anyway: leaving it out would hide a
@@ -732,7 +811,16 @@ async function handleStaff(req, res, pathname, ip) {
         }
 
         const workers = Array.from(held, function ([workerId, requests]) {
-            return { workerId: workerId, name: names.nameFor(workerId), requests: requests };
+            const note = notes.get(workerId);
+            return {
+                workerId: workerId,
+                name: names.nameFor(workerId),
+                requests: requests,
+                // null and not an empty string: «no le he dicho nada» and «le
+                // escribí una nota vacía» are different, and only the first one
+                // exists (the column refuses a blank note).
+                note: note ? { text: note.note, updatedAt: note.updatedAt } : null,
+            };
         });
         // Whoever is working comes first, and within each group by name, which
         // is how the screen reads. Without this the order would be the one of the
@@ -745,6 +833,40 @@ async function handleStaff(req, res, pathname, ip) {
         });
 
         return sendJson(res, 200, { workers });
+    }
+
+    // The boss writes, replaces or removes the note on one worker. PUT and not
+    // POST because there is at most one note per worker: sending the same body
+    // twice leaves the same single note, not two.
+    //
+    // A body with text sets it; an empty one takes it away. That is one round
+    // trip for both, and it matches what the card offers — a textarea you can
+    // empty.
+    const noteMatch = WORKER_NOTE_PATH.exec(pathname);
+    if (noteMatch && req.method === 'PUT') {
+        requireBoss(req);
+        const workerId = noteMatch[1].toUpperCase();
+        // Against the roster, not just against the shape: a typo would
+        // otherwise write a note onto a code nobody has, where nobody would
+        // ever read it and the boss would believe he had said something.
+        if (auth.listWorkerIds().indexOf(workerId) === -1) {
+            return sendJson(res, 404, { error: 'Ese código no es de ningún trabajador del taller.' });
+        }
+
+        const body = requireObject(await readJsonBody(req));
+        const note = text(body.note, { max: MAX_NOTE, field: 'la nota', agree: 'f' });
+        if (!note) {
+            await clearWorkerNote(workerId);
+            console.log(`[taller] nota de ${workerId} borrada`);
+            return sendJson(res, 200, { workerId: workerId, note: null });
+        }
+
+        const saved = await setWorkerNote(workerId, note, auth.sessionWorkerId(req));
+        console.log(`[taller] nota escrita a ${workerId}`);
+        return sendJson(res, 200, {
+            workerId: workerId,
+            note: { text: saved.note, updatedAt: saved.updatedAt },
+        });
     }
 
     if (req.method === 'PATCH') {
@@ -827,7 +949,7 @@ async function handleApi(req, res, pathname) {
         if (!rateLimit(`post:${ip}`, 10)) {
             return sendJson(res, 429, { error: 'Demasiadas solicitudes. Espera un minuto.' });
         }
-        const data = validateRequest(await readJsonBody(req));
+        const data = validateRequest(await readJsonBody(req), WIZARD_REQUIRED);
         const created = await createRequest(data);
         console.log(`[requests] nueva solicitud ${created.id} (${data.vehicle}, ${data.parts.length} piezas)`);
         sendJson(res, 201, created);

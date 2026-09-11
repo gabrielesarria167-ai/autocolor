@@ -172,6 +172,34 @@ CREATE TRIGGER requests_touch_updated_at
 
 
 -- =============================================================================
+-- worker_notes — what the boss has told each worker
+-- =============================================================================
+--
+-- One row per worker, so writing a note replaces the one before it: the panel
+-- offers a single note per person and the primary key is what makes that true
+-- rather than a rule somebody has to remember.
+--
+-- The worker sees it on their profile, above their own notepad, and cannot edit
+-- it; only the boss writes here (see PUT /api/staff/workers/:code/note in
+-- server/server.js). The notepad below it on the same screen is the worker's
+-- own and never leaves their browser — these are two different things that look
+-- alike, which is why one lives in the database and the other does not.
+--
+-- No foreign key to anybody: the roster lives in the environment
+-- (AUTOCOLOR_WORKER_IDS, see server/auth.js), not in a table. The CHECK on the
+-- code shape is what keeps a typo out.
+--
+-- No trigger on updated_at, unlike `requests`. Nothing edits this table by hand
+-- from psql, so the upsert sets the timestamp and that is one less moving part.
+CREATE TABLE IF NOT EXISTS worker_notes (
+    worker_id  text        PRIMARY KEY CHECK (worker_id ~ '^[A-Z]{2}[0-9]{5}$'),
+    note       text        NOT NULL CHECK (length(btrim(note)) BETWEEN 1 AND 500),
+    written_by text        NOT NULL CHECK (written_by ~ '^[A-Z]{2}[0-9]{5}$'),
+    updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+
+-- =============================================================================
 -- Consultas útiles para el taller
 -- =============================================================================
 --

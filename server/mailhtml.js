@@ -288,9 +288,9 @@ ${body}
    reconozca su solicitud, y el enlace para consultarla. Nada operativo.
 -------------------------------------------------------------------------- */
 
-function customerHtml(created, data, ctx) {
+function customerHtml(created, data, ctx, walkIn) {
     const name = ctx.oneLine(data.firstName);
-    const vehicle = ctx.vehicleName(data, true);
+    const vehicle = ctx.vehicleName(data, true, true);
     const zone = ctx.zoneLabel(data);
     const lookupUrl = ctx.siteUrl ? `${ctx.siteUrl}/pgs/repair.html#consulta` : '';
 
@@ -299,17 +299,21 @@ function customerHtml(created, data, ctx) {
         { label: 'Placa', value: ctx.oneLine(data.plate) },
         { label: 'Acabado', value: ctx.qualityLabel(data.quality) },
         { label: 'Piezas a pintar', value: ctx.partsLabel(data.parts) },
+
         { label: 'Zona', value: zone },
     ]);
 
     const body = `
         <tr>
           <td class="px" align="left" style="padding:36px 48px 0 48px;">
-            ${eyebrow('Solicitud recibida')}
+            ${eyebrow(walkIn ? 'Vehículo recibido' : 'Solicitud recibida')}
             <div class="c-ink" style="font-family:${FONT}; font-size:30px; line-height:38px; color:${INK}; font-weight:normal;">${name ? `Gracias, ${escapeHtml(name)}` : 'Gracias'}</div>
             <div class="c-body" style="font-family:${FONT}; font-size:16px; line-height:26px; color:${BODY}; padding-top:16px;">
-              Recibimos tu solicitud de pintura y ya está registrada. Te contactaremos
-              en 24 horas con tu presupuesto personalizado.
+              ${walkIn
+                ? `Recibimos tu vehículo en el taller y ya está registrado. Cualquier
+                   cosa que necesitemos consultarte, te llamamos.`
+                : `Recibimos tu solicitud de pintura y ya está registrada. Te contactaremos
+                   en 24 horas con tu presupuesto personalizado.`}
             </div>
           </td>
         </tr>
@@ -317,7 +321,7 @@ function customerHtml(created, data, ctx) {
         <tr>
           <td class="px" style="padding:28px 48px 0 48px;">
             ${codePanel('Código de seguimiento', created.id)}
-            <div class="c-muted" style="font-family:${FONT}; font-size:13px; line-height:20px; color:${MUTED}; padding-top:10px;">Guárdalo: con este código puedes ver el estado de tu solicitud cuando quieras.</div>
+            <div class="c-muted" style="font-family:${FONT}; font-size:13px; line-height:20px; color:${MUTED}; padding-top:10px;">Guárdalo: con este código puedes ver el estado de tu ${walkIn ? 'vehículo' : 'solicitud'} cuando quieras.</div>
           </td>
         </tr>
 
@@ -331,7 +335,7 @@ ${rows}
 ${lookupUrl ? `
         <tr>
           <td class="px" align="center" style="padding:32px 48px 0 48px;">
-            ${button(lookupUrl, 'CONSULTAR MI SOLICITUD')}
+            ${button(lookupUrl, walkIn ? 'CONSULTAR MI VEHÍCULO' : 'CONSULTAR MI SOLICITUD')}
           </td>
         </tr>` : ''}
 
@@ -349,11 +353,17 @@ ${hairline('36px 48px 0 48px')}
         </tr>`;
 
     return shell({
-        title: `Tu solicitud en Autocolor — ${created.id}`,
-        preheader: `Tu código de seguimiento es ${created.id}. Te contactaremos en 24 horas con tu presupuesto.`,
+        title: walkIn
+            ? `Tu vehículo en Autocolor — ${created.id}`
+            : `Tu solicitud en Autocolor — ${created.id}`,
+        preheader: walkIn
+            ? `Tu código de seguimiento es ${created.id}. Con él puedes ver el avance de tu vehículo.`
+            : `Tu código de seguimiento es ${created.id}. Te contactaremos en 24 horas con tu presupuesto.`,
         kicker: 'Taller de pintura automotriz',
         body,
-        footerNote: 'Recibiste este correo porque enviaste una solicitud en Autocolor.',
+        footerNote: walkIn
+            ? 'Recibiste este correo porque dejaste tu vehículo en Autocolor.'
+            : 'Recibiste este correo porque enviaste una solicitud en Autocolor.',
         logoUrl: ctx.logoUrl,
         logoDarkUrl: ctx.logoDarkUrl,
     });
@@ -375,7 +385,7 @@ ${hairline('36px 48px 0 48px')}
      - Sin botón de marca ni promesas: el enlace lleva al panel.
 -------------------------------------------------------------------------- */
 
-function shopHtml(created, data, ctx) {
+function shopHtml(created, data, ctx, walkIn) {
     const fullName = [ctx.oneLine(data.firstName), ctx.oneLine(data.lastName)].filter(Boolean).join(' ');
     const vehicle = ctx.vehicleName(data, false);
     const zone = ctx.zoneLabel(data);
@@ -415,17 +425,23 @@ function shopHtml(created, data, ctx) {
         { label: 'Acabado', value: ctx.qualityLabel(data.quality) },
         {
             label: `Piezas (${data.parts.length})`,
-            value: ctx.partsLabel(data.parts),
-            html: `<ul style="margin:0; padding-left:18px;">${data.parts.map((p) => `<li style="padding-bottom:2px;">${escapeHtml(ctx.partLabel(p))}</li>`).join('')}</ul>`,
+            // Como en la versión de texto: sin piezas es un vehículo del local
+            // que entró antes de decidir qué se pinta, no un dato que falta. Y
+            // entonces sin la lista, que saldría como una viñeta vacía —
+            // detailRows prefiere `html` sobre `value` cuando lo hay.
+            value: ctx.partsLabel(data.parts) || 'Sin definir',
+            html: data.parts.length
+                ? `<ul style="margin:0; padding-left:18px;">${data.parts.map((p) => `<li style="padding-bottom:2px;">${escapeHtml(ctx.partLabel(p))}</li>`).join('')}</ul>`
+                : '',
         },
     ]);
 
     const body = `
         <tr>
           <td class="px" align="left" style="padding:36px 48px 0 48px;">
-            ${eyebrow('Nueva solicitud')}
+            ${eyebrow(walkIn ? 'Registrada en el local' : 'Nueva solicitud')}
             <div class="c-ink" style="font-family:${FONT}; font-size:26px; line-height:34px; color:${INK}; font-weight:normal;">${escapeHtml(fullName || 'Solicitud sin nombre')}</div>
-            <div class="c-accent" style="font-family:${MONO}; font-size:18px; line-height:26px; letter-spacing:2px; color:${RED}; padding-top:6px; font-weight:bold;">${escapeHtml(data.plate)}</div>
+            ${data.plate ? `<div class="c-accent" style="font-family:${MONO}; font-size:18px; line-height:26px; letter-spacing:2px; color:${RED}; padding-top:6px; font-weight:bold;">${escapeHtml(data.plate)}</div>` : ''}
           </td>
         </tr>
 
@@ -482,11 +498,16 @@ ${panelUrl ? `
         <tr><td class="px" style="padding:0 48px 36px 48px;">&nbsp;</td></tr>`;
 
     return shell({
-        title: `Solicitud ${created.id} — ${data.plate}`,
-        preheader: `${fullName || 'Cliente'} · ${data.plate} · ${vehicle} · ${data.parts.length} pieza(s)`,
+        title: data.plate ? `Solicitud ${created.id} — ${data.plate}` : `Solicitud ${created.id}`,
+        // Sin placa —un vehículo del local que todavía no la tiene anotada— se
+        // cae del renglón en vez de dejar un « ·  · » vacío.
+        preheader: [fullName || 'Cliente', data.plate, vehicle, `${data.parts.length} pieza(s)`]
+            .filter(Boolean).join(' · '),
         kicker: 'Aviso interno del taller',
         body,
-        footerNote: 'Aviso automático del asistente de cotización. Responder a este correo le escribe al cliente.',
+        footerNote: walkIn
+            ? 'Aviso automático del panel del taller. Responder a este correo le escribe al cliente.'
+            : 'Aviso automático del asistente de cotización. Responder a este correo le escribe al cliente.',
         logoUrl: ctx.logoUrl,
         logoDarkUrl: ctx.logoDarkUrl,
     });

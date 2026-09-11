@@ -255,10 +255,21 @@ function zoneLabel(data) {
 }
 
 /** «Toyota Corolla», y con el año si se pide. */
-function vehicleName(data, withYear) {
+/**
+ * Marca y modelo, con el año si se pide.
+ *
+ * `orSilhouette` es para el correo del cliente. Un vehículo registrado en el
+ * local puede no traer ni marca ni modelo —el jefe elige la silueta y se salta
+ * el catálogo—, y sin respaldo la línea «Vehículo» salía vacía y detailRows la
+ * quitaba, así que el correo no nombraba ningún vehículo. El del taller no lo
+ * pide: ya lleva su propia fila «Silueta 3D» justo debajo, y con el respaldo
+ * decía «SUV» dos veces seguidas.
+ */
+function vehicleName(data, withYear, orSilhouette) {
     const parts = [oneLine(data.brand), oneLine(data.model)];
     if (withYear) parts.push(data.year);
-    return parts.filter(Boolean).join(' ');
+    const named = parts.filter(Boolean).join(' ');
+    return named || (orSilhouette ? vehicleLabel(data.vehicle) : '');
 }
 
 // Lo que mailhtml.js necesita de aquí para armar las dos maquetas. Se pasa en
@@ -458,14 +469,20 @@ function isDeliveryUnknown(err) {
    Los dos mensajes
 -------------------------------------------------------------------------- */
 
-function customerMessage(created, data) {
+function customerMessage(created, data, walkIn) {
     const name = oneLine(data.firstName);
     const greeting = name ? `Hola ${name},` : 'Hola,';
     const lines = [
         greeting,
         '',
-        'Recibimos tu solicitud de pintura. Te contactaremos en 24 horas con tu',
-        'presupuesto personalizado.',
+        // Somebody who drove to the shop was not promised a quote in 24 hours
+        // and did not send a request from a website: telling them otherwise
+        // reads as a form letter that did not notice they were there.
+        ...(walkIn
+            ? ['Recibimos tu vehículo en el taller y ya está registrado. Cualquier',
+               'cosa que necesitemos consultarte, te llamamos.']
+            : ['Recibimos tu solicitud de pintura. Te contactaremos en 24 horas con tu',
+               'presupuesto personalizado.']),
         '',
         'Tu código de seguimiento es:',
         '',
@@ -476,8 +493,8 @@ function customerMessage(created, data) {
     // El mismo texto que la pantalla de éxito del asistente, para que el
     // correo no diga una cosa distinta de la que acaba de leer en el sitio.
     lines.push(SITE_URL
-        ? `Guárdalo: con este código puedes ver el estado de tu solicitud en\n${SITE_URL}/pgs/repair.html#consulta`
-        : 'Guárdalo: con este código puedes ver el estado de tu solicitud en nuestro sitio.');
+        ? `Guárdalo: con este código puedes ver el estado de tu ${walkIn ? 'vehículo' : 'solicitud'} en\n${SITE_URL}/pgs/repair.html#consulta`
+        : `Guárdalo: con este código puedes ver el estado de tu ${walkIn ? 'vehículo' : 'solicitud'} en nuestro sitio.`);
 
     lines.push('', '— Autocolor');
 
@@ -485,19 +502,23 @@ function customerMessage(created, data) {
         to: [data.email],
         // Solo el código, que lo genera el servidor. Nada que haya escrito
         // quien rellenó el formulario entra en el asunto.
-        subject: `Tu solicitud en Autocolor — código ${created.id}`,
+        subject: walkIn
+            ? `Tu vehículo en Autocolor — código ${created.id}`
+            : `Tu solicitud en Autocolor — código ${created.id}`,
         text: lines.join('\n'),
-        html: mailhtml.customerHtml(created, data, htmlContext()),
+        html: mailhtml.customerHtml(created, data, htmlContext(), walkIn),
     };
 }
 
-function shopMessage(created, data) {
+function shopMessage(created, data, walkIn) {
     const vehicle = vehicleName(data, false);
     const zone = zoneLabel(data);
     const quality = qualityLabel(data.quality);
 
     const blocks = [
-        `Nueva solicitud desde el asistente del sitio.`,
+        walkIn
+            ? 'Vehículo registrado en el local, desde el panel del taller.'
+            : 'Nueva solicitud desde el asistente del sitio.',
         block('CLIENTE', [
             row('Nombre', `${oneLine(data.firstName)} ${oneLine(data.lastName)}`),
             row('Teléfono', formatPhone(data.phone)),
@@ -518,7 +539,11 @@ function shopMessage(created, data) {
         ]),
         block('TRABAJO', [
             row('Acabado', quality),
-            row('Piezas', `(${data.parts.length}) ${data.parts.map(partLabel).join(', ')}`),
+            // Sin piezas es un vehículo del local que entró antes de decidir
+            // qué se pinta. «(0)» a secas se lee como un dato que se perdió.
+            row('Piezas', data.parts.length
+                ? `(${data.parts.length}) ${data.parts.map(partLabel).join(', ')}`
+                : 'Sin definir'),
         ]),
         // Las notas se dejan como las escribió el cliente, con sus saltos de
         // línea: son lo único del formulario donde el formato dice algo.
@@ -529,10 +554,13 @@ function shopMessage(created, data) {
     const message = {
         to: [SHOP],
         // La placa ya pasó por PLATE_RE y el código lo genera el servidor: los
-        // dos son seguros de poner en el asunto.
-        subject: `Solicitud ${created.id} — ${data.plate}`,
+        // dos son seguros de poner en el asunto. Sin placa —un vehículo del
+        // local todavía sin anotar— queda el código, que siempre está.
+        subject: data.plate
+            ? `Solicitud ${created.id} — ${data.plate}`
+            : `Solicitud ${created.id}`,
         text: blocks.filter(Boolean).join('\n\n'),
-        html: mailhtml.shopHtml(created, data, htmlContext()),
+        html: mailhtml.shopHtml(created, data, htmlContext(), walkIn),
     };
 
     // Responder al correo del taller le escribe al cliente, que es lo que uno
@@ -571,18 +599,23 @@ let retryTimer = null;
  * Devuelve en cuanto los mensajes están en la cola. Lo que tarden en salir es
  * asunto de drain().
  */
-function notifyNewRequest(created, data) {
+function notifyNewRequest(created, data, options) {
     if (!isConfigured()) return;
+    // Registered at the counter rather than sent from the website. Only the
+    // wording changes — both messages go out the same way, to the same two
+    // places — but a walk-in told «te contactaremos en 24 horas con tu
+    // presupuesto» would read as a letter that did not notice they came in.
+    const walkIn = !!(options && options.walkIn);
 
     // Uno y otro por separado: que armar el del taller falle no puede dejar al
     // cliente sin su código, ni al revés.
-    enqueue(`aviso al taller de ${created.id}`, () => shopMessage(created, data));
+    enqueue(`aviso al taller de ${created.id}`, () => shopMessage(created, data, walkIn));
 
     // El asistente ya lo exige, pero la guarda se queda: en la base hay
     // solicitudes anteriores a que el correo fuera obligatorio, y sin ella
     // reenviar una de esas mandaría un mensaje a `undefined`.
     if (data.email) {
-        enqueue(`confirmación al cliente de ${created.id}`, () => customerMessage(created, data));
+        enqueue(`confirmación al cliente de ${created.id}`, () => customerMessage(created, data, walkIn));
     }
 
     kick();

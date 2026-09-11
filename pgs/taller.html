@@ -15,6 +15,9 @@
     <link rel="stylesheet" href="../styles.css">
     <script src="../src/config.js" defer></script>
     <script src="../src/statuses.js" defer></script>
+    <!-- Brands and models for the walk-in form. A plain window global with no
+         dependencies, and its image paths are already relative to pgs/. -->
+    <script src="../src/carModels.js" defer></script>
     <script src="../src/staff.js" defer></script>
     <title>Autocolor · Taller</title>
 </head>
@@ -96,6 +99,22 @@
                          every name would say nothing. -->
                     <p class="staff-profile__role" id="staffProfileRole" hidden>Jefe de taller</p>
 
+                    <!-- What the boss wrote for this worker. Read-only on
+                         purpose: the notepad right below it looks similar and
+                         is theirs, this one is not. Hidden when there is
+                         nothing to say. -->
+                    <div class="staff-boss-note" id="staffBossNote" hidden>
+                        <p class="staff-boss-note__title">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M4 5.5h16v11H9l-5 4z" />
+                            </svg>
+                            Nota del jefe
+                        </p>
+                        <p class="staff-boss-note__text" id="staffBossNoteText"></p>
+                        <p class="staff-boss-note__date" id="staffBossNoteDate"></p>
+                    </div>
+
                     <div class="staff-profile__notes">
                         <label class="staff-profile__notes-title" for="staffNotes">Notas personales</label>
                         <textarea class="staff-profile__notes-input" id="staffNotes" rows="7"
@@ -131,6 +150,18 @@
                     </svg>
                     Iniciar sesión
                 </button>
+                <!-- Also his: a car that came to the shop without going
+                     through the website has nowhere else to be typed in. -->
+                <button type="button" class="staff-profile__action staff-profile__action--ghost"
+                    id="staffProfileIntake" hidden>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M3 13.5l1.8-5.2A2 2 0 0 1 6.7 7h8.6a2 2 0 0 1 1.9 1.3l1.3 3.7" />
+                        <path d="M3 13.5h13v4H3zM5.5 17.5v1.5M13.5 17.5v1.5" />
+                        <path d="M19 8.5v6M16 11.5h6" />
+                    </svg>
+                    Registrar vehículo
+                </button>
                 <button type="button" class="staff-profile__action staff-profile__action--ghost"
                     id="staffProfileBrowse">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
@@ -140,6 +171,123 @@
                     </svg>
                     Ver solicitudes
                 </button>
+            </div>
+
+        </section>
+
+        <!-- Registering a vehicle that came to the shop instead of through the
+             website. One page and six answers: the customer is standing at the
+             counter, and everything the row can still be missing (plate, brand,
+             model, notes) is right below, marked optional, or can be filled in
+             from the table afterwards.
+
+             Boss only. What actually enforces that is requireBoss on
+             POST /api/staff/requests, not this markup. -->
+        <section class="staff-intake" id="staffIntake" aria-labelledby="staffIntakeTitle" hidden>
+
+            <header class="staff-intake__head">
+                <h1 id="staffIntakeTitle">Registrar vehículo</h1>
+                <p>Para un vehículo que llegó al local sin pasar por el sitio.</p>
+            </header>
+
+            <form class="staff-intake__form" id="staffIntakeForm" novalidate>
+
+                <div class="staff-intake__card">
+                    <div class="field-row field-row--wide">
+                        <div class="field">
+                            <label for="intakeFirstName">Nombres</label>
+                            <input type="text" id="intakeFirstName" maxlength="80"
+                                autocomplete="off" required>
+                        </div>
+                        <div class="field">
+                            <label for="intakeLastName">Apellidos</label>
+                            <input type="text" id="intakeLastName" maxlength="80"
+                                autocomplete="off" required>
+                        </div>
+                    </div>
+
+                    <div class="field-row field-row--wide">
+                        <div class="field">
+                            <label for="intakeEmail">Email</label>
+                            <input type="email" id="intakeEmail" maxlength="254"
+                                spellcheck="false" autocomplete="off" required>
+                            <p class="field__hint">Ahí le llega su código de seguimiento.</p>
+                        </div>
+                        <div class="field">
+                            <label for="intakePhone">Teléfono</label>
+                            <!-- El +51 lo pone el navegador al enviar, como en
+                                 el asistente: el servidor lo exige. -->
+                            <div class="phone-input">
+                                <span class="phone-input__prefix">+51</span>
+                                <input type="tel" id="intakePhone" inputmode="numeric"
+                                    maxlength="9" placeholder="987654321"
+                                    autocomplete="off" required>
+                            </div>
+                        </div>
+                    </div>
+
+                    <fieldset class="staff-intake__group">
+                        <legend>Vehículo</legend>
+                        <div class="staff-intake__choices" id="intakeVehicle" role="radiogroup"
+                            aria-label="Tipo de vehículo"></div>
+                    </fieldset>
+
+                    <fieldset class="staff-intake__group">
+                        <legend>Acabado</legend>
+                        <div class="staff-intake__choices" id="intakeQuality" role="radiogroup"
+                            aria-label="Nivel de acabado"></div>
+                    </fieldset>
+                </div>
+
+                <div class="staff-intake__card">
+                    <p class="staff-intake__optional-title">
+                        Opcional <span>— se puede completar después desde la tabla</span>
+                    </p>
+
+                    <div class="field-row field-row--wide">
+                        <div class="field">
+                            <label for="intakeBrand">Marca</label>
+                            <select id="intakeBrand" class="is-placeholder"></select>
+                        </div>
+                        <div class="field">
+                            <label for="intakeModel">Modelo</label>
+                            <select id="intakeModel" class="is-placeholder" disabled></select>
+                        </div>
+                    </div>
+
+                    <div class="field-row field-row--wide">
+                        <div class="field">
+                            <label for="intakePlate">Placa</label>
+                            <input type="text" id="intakePlate" maxlength="7" placeholder="Ej. ABC-123"
+                                spellcheck="false" autocapitalize="characters" autocomplete="off">
+                        </div>
+                        <div class="field">
+                            <label for="intakeNotes">Notas</label>
+                            <input type="text" id="intakeNotes" maxlength="200"
+                                placeholder="Lo que dijo el cliente" autocomplete="off">
+                        </div>
+                    </div>
+                </div>
+
+                <p class="form-error" id="intakeError" role="alert" hidden></p>
+
+                <div class="staff-intake__actions">
+                    <button type="submit" class="staff-intake__submit" id="intakeSubmit">Registrar</button>
+                    <button type="button" class="staff-intake__cancel" id="intakeCancel">Cancelar</button>
+                </div>
+            </form>
+
+            <!-- Lo que se lee en voz alta al cliente que está delante, así que
+                 el código va grande y solo. -->
+            <div class="staff-intake__done" id="intakeDone" hidden>
+                <p class="staff-intake__done-title">Vehículo registrado</p>
+                <p class="staff-intake__done-name" id="intakeDoneName"></p>
+                <p class="staff-intake__done-code" id="intakeDoneCode"></p>
+                <p class="staff-intake__done-hint" id="intakeDoneHint"></p>
+                <div class="staff-intake__actions">
+                    <button type="button" class="staff-intake__submit" id="intakeAgain">Registrar otro</button>
+                    <button type="button" class="staff-intake__cancel" id="intakeBack">Volver al perfil</button>
+                </div>
             </div>
 
         </section>

@@ -36,12 +36,37 @@
     var profileMainEl = document.getElementById("staffProfileMain");
     var profileNameEl = document.getElementById("staffProfileName");
     var profileCodeEl = document.getElementById("staffProfileCode");
+    var bossNoteEl = document.getElementById("staffBossNote");
+    var bossNoteTextEl = document.getElementById("staffBossNoteText");
+    var bossNoteDateEl = document.getElementById("staffBossNoteDate");
     var notesEl = document.getElementById("staffNotes");
     var notesHintEl = document.getElementById("staffNotesHint");
     var profileRoleEl = document.getElementById("staffProfileRole");
     var profileEnterBtn = document.getElementById("staffProfileEnter");
     var profileMonitorBtn = document.getElementById("staffProfileMonitor");
     var profileBrowseBtn = document.getElementById("staffProfileBrowse");
+    var profileIntakeBtn = document.getElementById("staffProfileIntake");
+    var intakeEl = document.getElementById("staffIntake");
+    var intakeFormEl = document.getElementById("staffIntakeForm");
+    var intakeFirstNameEl = document.getElementById("intakeFirstName");
+    var intakeLastNameEl = document.getElementById("intakeLastName");
+    var intakeEmailEl = document.getElementById("intakeEmail");
+    var intakePhoneEl = document.getElementById("intakePhone");
+    var intakeVehicleEl = document.getElementById("intakeVehicle");
+    var intakeQualityEl = document.getElementById("intakeQuality");
+    var intakeBrandEl = document.getElementById("intakeBrand");
+    var intakeModelEl = document.getElementById("intakeModel");
+    var intakePlateEl = document.getElementById("intakePlate");
+    var intakeNotesEl = document.getElementById("intakeNotes");
+    var intakeErrorEl = document.getElementById("intakeError");
+    var intakeSubmitEl = document.getElementById("intakeSubmit");
+    var intakeCancelEl = document.getElementById("intakeCancel");
+    var intakeDoneEl = document.getElementById("intakeDone");
+    var intakeDoneNameEl = document.getElementById("intakeDoneName");
+    var intakeDoneCodeEl = document.getElementById("intakeDoneCode");
+    var intakeDoneHintEl = document.getElementById("intakeDoneHint");
+    var intakeAgainEl = document.getElementById("intakeAgain");
+    var intakeBackEl = document.getElementById("intakeBack");
     var monitorEl = document.getElementById("staffMonitor");
     var monitorListEl = document.getElementById("staffMonitorList");
     var monitorCountEl = document.getElementById("staffMonitorCount");
@@ -94,11 +119,11 @@
     // sesión». Who may ask for the monitor — and who may take a vehicle — is
     // decided by the server (see requireBoss and refuseBoss in
     // server/server.js), which does not trust any of this.
-    var viewer = { workerId: "", name: "", isBoss: false };
+    var viewer = { workerId: "", name: "", isBoss: false, note: null };
 
     // What is on screen: the login, the worker's profile, the table, or — for
-    // the boss only — the monitor. loadRequests brings the data, but does not
-    // decide this.
+    // the boss only — the monitor or the walk-in form. loadRequests brings the
+    // data, but does not decide this.
     var view = "login";
 
     // Se entró a mirar —«Ver solicitudes» en la ficha— y no a trabajar: la
@@ -807,6 +832,7 @@
         show(loginEl, view === "login");
         show(profileEl, view === "profile");
         show(monitorEl, view === "monitor");
+        show(intakeEl, view === "intake");
         show(panelEl, view === "panel");
 
         // El botón de arriba a la derecha dice en cada pantalla lo que hace.
@@ -817,7 +843,7 @@
         show(logoutBtn, view !== "login");
         logoutBtn.textContent = view === "login" || view === "profile"
             ? "Salir"
-            : view === "monitor" || readOnly ? "Volver al perfil" : "Terminar sesión";
+            : view === "panel" && !readOnly ? "Terminar sesión" : "Volver al perfil";
         if (view === "login") stopClock();
         else startClock();
 
@@ -960,7 +986,17 @@
         // notepad — is the same, because it is his too.
         show(profileRoleEl, !!viewer.isBoss);
         show(profileMonitorBtn, !!viewer.isBoss);
+        show(profileIntakeBtn, !!viewer.isBoss);
         show(profileEnterBtn, !viewer.isBoss);
+
+        // What the boss wrote for whoever is looking, above their own notepad.
+        // The card disappears entirely when there is nothing: an empty «Nota del
+        // jefe» box on every profile would read as something gone missing.
+        show(bossNoteEl, !!viewer.note);
+        if (viewer.note) {
+            bossNoteTextEl.textContent = viewer.note.text;
+            bossNoteDateEl.textContent = formatDate(viewer.note.updatedAt);
+        }
 
         var key = notesKey();
         var saved = "";
@@ -1006,6 +1042,7 @@
 
     profileEnterBtn.addEventListener("click", function () { showPanel(false); });
     profileMonitorBtn.addEventListener("click", showMonitor);
+    profileIntakeBtn.addEventListener("click", showIntake);
     profileBrowseBtn.addEventListener("click", function () { showPanel(true); });
 
     // Desde el aviso del modo consulta se pasa a trabajar sin volver a pedir
@@ -1030,6 +1067,10 @@
     // vehicle, somebody drops another — and a stale board is worse than none.
     var MONITOR_MS = 30000;
     var monitorTimer = null;
+
+    // The same ceiling the column CHECKs and the route enforces (MAX_NOTE in
+    // server/server.js). Here it only spares the round trip.
+    var NOTE_MAX = 500;
 
     function startMonitorTimer() {
         if (monitorTimer) return;
@@ -1114,19 +1155,242 @@
             idle.className = "staff-monitor__idle";
             idle.textContent = "Sin vehículos";
             card.appendChild(idle);
-            return card;
+        } else {
+            var list = document.createElement("ul");
+            list.className = "staff-monitor__vehicles";
+            worker.requests.forEach(function (request) {
+                list.appendChild(monitorVehicle(request));
+            });
+            card.appendChild(list);
         }
 
-        var list = document.createElement("ul");
-        list.className = "staff-monitor__vehicles";
-        worker.requests.forEach(function (request) {
-            list.appendChild(monitorVehicle(request));
-        });
-        card.appendChild(list);
+        // Third column, so it cannot land on top of a status badge the way a
+        // corner button would.
+        card.appendChild(buildNoteMenu(worker, card));
+
+        // What he already told this person, across the foot of the card. On the
+        // card and not behind the menu: the point of the board is what can be
+        // read without clicking.
+        if (worker.note) {
+            var note = document.createElement("p");
+            note.className = "staff-monitor__note";
+
+            var noteText = document.createElement("span");
+            noteText.textContent = worker.note.text;
+            note.appendChild(noteText);
+
+            var noteDate = document.createElement("span");
+            noteDate.className = "staff-monitor__note-date";
+            noteDate.textContent = formatDate(worker.note.updatedAt);
+            note.appendChild(noteDate);
+
+            card.appendChild(note);
+        }
+
         return card;
     }
 
+    /* ---------------------------------------------------------------------
+       The note the boss leaves on a worker
+
+       One per worker, replaced when he writes another (see worker_notes in
+       server/schema.sql). The worker reads it on their own profile and cannot
+       change it; this is the only place it is written.
+    --------------------------------------------------------------------- */
+
+    // Which worker's editor is open, if any. Only one at a time: two open
+    // textareas invite writing in one and saving the other.
+    var noteEditorFor = "";
+
+    // While an editor is open the half-minute refresh is off. It repaints the
+    // whole list, which would throw away whatever was half-typed — and the
+    // board being thirty seconds stale matters less than losing a sentence.
+    function holdMonitorRefresh(open) {
+        noteEditorFor = open;
+        if (open) stopMonitorTimer();
+        else if (view === "monitor") startMonitorTimer();
+    }
+
+    function buildNoteMenu(worker, card) {
+        var dots = document.createElement("button");
+        dots.type = "button";
+        dots.className = "staff-monitor__more";
+        dots.setAttribute("aria-haspopup", "menu");
+        dots.setAttribute("aria-expanded", "false");
+        dots.setAttribute("aria-label", "Nota para " + (worker.name || worker.workerId));
+        dots.textContent = "…";
+
+        var menu = document.createElement("div");
+        menu.className = "staff-cardmenu";
+        menu.setAttribute("role", "menu");
+        menu.hidden = true;
+
+        function item(label, onPick) {
+            var option = document.createElement("button");
+            option.type = "button";
+            option.className = "staff-cardmenu__option";
+            option.setAttribute("role", "menuitem");
+            option.textContent = label;
+            option.addEventListener("click", function () {
+                closeMenu(false);
+                onPick();
+            });
+            menu.appendChild(option);
+            return option;
+        }
+
+        item(worker.note ? "Editar nota" : "Escribir nota", function () {
+            openNoteEditor(card, worker);
+        });
+        // Nothing to remove when nothing was written.
+        if (worker.note) {
+            item("Quitar nota", function () { putNote(worker, "", card); });
+        }
+
+        function options() {
+            return menu.querySelectorAll(".staff-cardmenu__option");
+        }
+
+        // The same arrow-key walk as the status menu, with the same wrap.
+        function move(step) {
+            var list = Array.prototype.slice.call(options());
+            var index = list.indexOf(document.activeElement);
+            if (index === -1) index = 0;
+            else index = (index + step + list.length) % list.length;
+            list[index].focus();
+        }
+
+        function open() {
+            closeMenu(false);
+            menu.hidden = false;          // visible before it can be measured
+            placeMenu(dots, menu);
+            dots.setAttribute("aria-expanded", "true");
+            // Registered the way the status pill does, so the document-level
+            // click, Escape, arrows, scroll and resize handlers already written
+            // for that menu close this one too.
+            openMenu = { pill: dots, menu: menu, move: move };
+            options()[0].focus();
+        }
+
+        dots.addEventListener("click", function () {
+            if (openMenu && openMenu.pill === dots) closeMenu(true);
+            else open();
+        });
+
+        dots.addEventListener("keydown", function (event) {
+            if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                event.preventDefault();
+                open();
+            }
+        });
+
+        var wrap = document.createElement("div");
+        wrap.className = "staff-monitor__menu";
+        wrap.appendChild(dots);
+        wrap.appendChild(menu);
+        return wrap;
+    }
+
+    function openNoteEditor(card, worker) {
+        // A second click on «Editar nota» should not stack two editors.
+        var already = card.querySelector(".staff-noteedit");
+        if (already) {
+            already.querySelector("textarea").focus();
+            return;
+        }
+
+        holdMonitorRefresh(worker.workerId);
+
+        var box = document.createElement("div");
+        box.className = "staff-noteedit";
+
+        var label = document.createElement("label");
+        label.className = "staff-noteedit__title";
+        label.textContent = "Nota para " + (worker.name || worker.workerId);
+        var fieldId = "noteFor" + worker.workerId;
+        label.setAttribute("for", fieldId);
+        box.appendChild(label);
+
+        var input = document.createElement("textarea");
+        input.className = "staff-noteedit__input";
+        input.id = fieldId;
+        input.rows = 3;
+        input.maxLength = NOTE_MAX;
+        input.placeholder = "Lo que tiene que saber…";
+        input.value = worker.note ? worker.note.text : "";
+        box.appendChild(input);
+
+        var actions = document.createElement("div");
+        actions.className = "staff-noteedit__actions";
+
+        var save = document.createElement("button");
+        save.type = "button";
+        save.className = "staff-noteedit__save";
+        save.textContent = "Guardar";
+        save.addEventListener("click", function () {
+            save.disabled = true;
+            save.textContent = "Guardando…";
+            putNote(worker, input.value, card);
+        });
+        actions.appendChild(save);
+
+        var cancel = document.createElement("button");
+        cancel.type = "button";
+        cancel.className = "staff-noteedit__cancel";
+        cancel.textContent = "Cancelar";
+        cancel.addEventListener("click", function () {
+            box.remove();
+            holdMonitorRefresh("");
+        });
+        actions.appendChild(cancel);
+
+        box.appendChild(actions);
+        card.appendChild(box);
+        input.focus();
+    }
+
+    // Writes the note, or removes it when the text is empty — the same request
+    // either way, which is why the route is a PUT.
+    function putNote(worker, note, card) {
+        setError("");
+        fetch(API_BASE + "/api/staff/workers/" + encodeURIComponent(worker.workerId) + "/note", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify({ note: note })
+        })
+            .then(function (response) {
+                return response.json().catch(function () { return null; }).then(function (body) {
+                    if (response.status === 401) {
+                        showLogin();
+                        setError("Tu sesión venció. Vuelve a entrar.");
+                        return;
+                    }
+                    if (!response.ok) {
+                        throw new Error((body && body.error) || "No pudimos guardar la nota.");
+                    }
+                    // The editor closes and the board is asked again, so what
+                    // ends up on screen is what the server stored and not what
+                    // the browser hoped it stored.
+                    var open = card.querySelector(".staff-noteedit");
+                    if (open) open.remove();
+                    holdMonitorRefresh("");
+                    loadWorkers();
+                });
+            })
+            .catch(function (err) {
+                holdMonitorRefresh("");
+                setError(err instanceof TypeError ? NETWORK_MESSAGE : err.message);
+            });
+    }
+
     function renderWorkers(workers) {
+        // An open editor means somebody is typing into this list. Rebuilding it
+        // would take the textarea away mid-sentence; the refresh that asked for
+        // this is off while the editor is open, but a manual «Actualizar» is
+        // still one click away.
+        if (noteEditorFor) return;
+
         monitorListEl.textContent = "";
         workers.forEach(function (worker) {
             monitorListEl.appendChild(monitorCard(worker));
@@ -1170,6 +1434,274 @@
 
     monitorRefreshBtn.addEventListener("click", function () { loadWorkers(); });
 
+    /* ---------------------------------------------------------------------
+       Registering a walk-in vehicle
+
+       A car driven to the shop instead of booked through the website. It
+       becomes the same kind of row as any other — the queue does not care how
+       one arrived — but the form asks six things instead of thirteen, because
+       the customer is at the counter and the rest can be filled in later.
+
+       The checks here are the same ones the server applies (validateRequest in
+       server/server.js), repeated so a missing field costs nothing. The server
+       is still the one that decides: its message is what gets shown when
+       something slips through.
+    --------------------------------------------------------------------- */
+
+    // The four 3D silhouettes the workshop paints on, which is what the
+    // `vehicle` column stores. The website derives this from the body type the
+    // customer picks out of the catalogue; here it is picked directly, because
+    // the boss is looking at the car.
+    var VEHICLE_CHOICES = [
+        { value: "wagon", label: "Sedán / Familiar" },
+        { value: "suv", label: "SUV" },
+        { value: "pickup", label: "Pickup" },
+        { value: "van", label: "Furgoneta" }
+    ];
+
+    var PLATE_RE = /^[A-Z0-9]{3}-[A-Z0-9]{3}$/;
+    var EMAIL_RE = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
+    var intakeVehicle = "";
+    var intakeQuality = "";
+
+    // A row of buttons that behaves like a radio group: one pressed at a time,
+    // announced as such. Built rather than written out because the two lists it
+    // draws already exist in the page's own vocabularies.
+    function buildChoices(container, choices, onPick) {
+        var buttons = [];
+        choices.forEach(function (choice) {
+            var button = document.createElement("button");
+            button.type = "button";
+            button.className = "staff-intake__choice";
+            button.setAttribute("role", "radio");
+            button.setAttribute("aria-checked", "false");
+            button.textContent = choice.label;
+            button.addEventListener("click", function () {
+                buttons.forEach(function (other) {
+                    other.setAttribute("aria-checked", String(other === button));
+                });
+                onPick(choice.value);
+            });
+            button.dataset.value = choice.value;
+            buttons.push(button);
+            container.appendChild(button);
+        });
+        return {
+            clear: function () {
+                buttons.forEach(function (button) { button.setAttribute("aria-checked", "false"); });
+            },
+            // Marks one from the outside, without pretending it was clicked:
+            // the caller already knows the value it is setting.
+            select: function (value) {
+                buttons.forEach(function (button) {
+                    button.setAttribute("aria-checked", String(button.dataset.value === value));
+                });
+            }
+        };
+    }
+
+    var vehicleChoice = buildChoices(intakeVehicleEl, VEHICLE_CHOICES, function (value) {
+        intakeVehicle = value;
+    });
+
+    // The same three the website offers, from the same map the table reads.
+    var qualityChoice = buildChoices(
+        intakeQualityEl,
+        Object.keys(QUALITY_LABELS).map(function (value) {
+            return { value: value, label: QUALITY_LABELS[value] };
+        }),
+        function (value) { intakeQuality = value; }
+    );
+
+    // Brand and model, cascading, out of the same catalogue the website uses.
+    // Optional: without them the table's «Vehículo» column reads «—», which is
+    // recoverable, and the boss may be holding keys in the other hand.
+    function buildBrandOptions() {
+        var catalog = window.CAR_CATALOG;
+        if (!catalog) return;                 // carModels.js did not load
+        intakeBrandEl.appendChild(new Option("Sin especificar", ""));
+        catalog.brands.forEach(function (brand) {
+            intakeBrandEl.appendChild(new Option(brand.name, brand.id));
+        });
+        intakeBrandEl.addEventListener("change", function () {
+            buildModelOptions(intakeBrandEl.value);
+            syncVehicleToModel();
+        });
+        intakeModelEl.addEventListener("change", syncVehicleToModel);
+    }
+
+    function buildModelOptions(brandId) {
+        intakeModelEl.textContent = "";
+        var catalog = window.CAR_CATALOG;
+        var brand = brandId && catalog ? catalog.findBrand(brandId) : null;
+        intakeModelEl.appendChild(new Option("Sin especificar", ""));
+        intakeModelEl.disabled = !brand;
+        if (!brand) return;
+        brand.models.forEach(function (model) {
+            intakeModelEl.appendChild(new Option(model.name, model.id));
+        });
+    }
+
+    // Choosing a model settles which silhouette the workshop paints on: the
+    // catalogue has eight body types over four 3D models, and the mapping is the
+    // same one the website uses (BODY_TYPES in src/carModels.js). Without this
+    // the boss could file a Fiesta as a pickup by picking both halves, and the
+    // parts of one would not exist on the other. He can still tap another
+    // silhouette afterwards: this sets the obvious answer, it does not lock it.
+    function syncVehicleToModel() {
+        var catalog = window.CAR_CATALOG;
+        var car = chosenCar();
+        if (!catalog || !car.bodyType) return;
+        var body = catalog.bodyTypes[car.bodyType];
+        if (!body || !body.vehicle) return;
+        intakeVehicle = body.vehicle;
+        vehicleChoice.select(body.vehicle);
+    }
+
+    function setIntakeError(message) {
+        intakeErrorEl.textContent = message || "";
+        intakeErrorEl.hidden = !message;
+        if (message) intakeErrorEl.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+
+    // The names the catalogue shows, not its ids: the table and the emails put
+    // this in front of people, and 'yaris-sedan' says less than 'Yaris Sedán'
+    // (see the comment on `brand` in server/schema.sql).
+    function chosenCar() {
+        var catalog = window.CAR_CATALOG;
+        if (!catalog || !intakeBrandEl.value) return { brand: "", model: "", bodyType: "" };
+        var brand = catalog.findBrand(intakeBrandEl.value);
+        if (!brand) return { brand: "", model: "", bodyType: "" };
+        // findModel takes the brand's id and not the brand itself (see
+        // src/carModels.js); handed the object it returns null, and the model
+        // and the body type both went missing without a word.
+        var model = intakeModelEl.value ? catalog.findModel(brand.id, intakeModelEl.value) : null;
+        return {
+            brand: brand.name,
+            model: model ? model.name : "",
+            bodyType: model ? model.type : ""
+        };
+    }
+
+    function intakePayload() {
+        var car = chosenCar();
+        var plate = intakePlateEl.value.trim().toUpperCase();
+        return {
+            vehicle: intakeVehicle,
+            quality: intakeQuality,
+            firstName: intakeFirstNameEl.value.trim(),
+            lastName: intakeLastNameEl.value.trim(),
+            email: intakeEmailEl.value.trim(),
+            // El servidor lo exige con el prefijo, igual que en el asistente.
+            phone: "+51" + intakePhoneEl.value.replace(/\D/g, ""),
+            brand: car.brand,
+            model: car.model,
+            // La carrocería sale del modelo elegido, si se eligió uno. La
+            // silueta no: esa la eligió el jefe mirando el vehículo.
+            bodyType: car.bodyType,
+            plate: plate,
+            notes: intakeNotesEl.value.trim()
+        };
+    }
+
+    function firstIntakeProblem() {
+        if (!intakeFirstNameEl.value.trim()) return { message: "Falta el nombre.", field: intakeFirstNameEl };
+        if (!intakeLastNameEl.value.trim()) return { message: "Falta el apellido.", field: intakeLastNameEl };
+        var email = intakeEmailEl.value.trim();
+        if (!email) return { message: "Falta el email.", field: intakeEmailEl };
+        if (!EMAIL_RE.test(email)) return { message: "El email no es válido.", field: intakeEmailEl };
+        if (intakePhoneEl.value.replace(/\D/g, "").length !== 9) {
+            return { message: "El teléfono debe tener 9 dígitos.", field: intakePhoneEl };
+        }
+        if (!intakeVehicle) return { message: "Elige el tipo de vehículo.", field: null };
+        if (!intakeQuality) return { message: "Elige el nivel de acabado.", field: null };
+        // Optional, but wrong is not the same as missing.
+        var plate = intakePlateEl.value.trim().toUpperCase();
+        if (plate && !PLATE_RE.test(plate)) return { message: "La placa no es válida.", field: intakePlateEl };
+        return null;
+    }
+
+    function resetIntake() {
+        intakeFormEl.reset();
+        intakeVehicle = "";
+        intakeQuality = "";
+        vehicleChoice.clear();
+        qualityChoice.clear();
+        buildModelOptions("");
+        setIntakeError("");
+        show(intakeFormEl, true);
+        show(intakeDoneEl, false);
+    }
+
+    function showIntake() {
+        saveNotes();
+        readOnly = false;
+        view = "intake";
+        paintView();
+        resetIntake();
+        intakeFirstNameEl.focus();
+    }
+
+    intakeFormEl.addEventListener("submit", function (event) {
+        event.preventDefault();
+
+        var problem = firstIntakeProblem();
+        if (problem) {
+            setIntakeError(problem.message);
+            if (problem.field) problem.field.focus();
+            return;
+        }
+
+        intakeSubmitEl.disabled = true;
+        intakeSubmitEl.textContent = "Registrando…";
+        setIntakeError("");
+
+        var payload = intakePayload();
+        fetch(API_BASE + "/api/staff/requests", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify(payload)
+        })
+            .then(function (response) {
+                return response.json().catch(function () { return null; }).then(function (body) {
+                    if (response.status === 401) {
+                        showLogin();
+                        setError("Tu sesión venció. Vuelve a entrar.");
+                        return;
+                    }
+                    if (!response.ok) {
+                        throw new Error((body && body.error) || "No pudimos registrar el vehículo.");
+                    }
+                    intakeDoneNameEl.textContent = payload.firstName + " " + payload.lastName;
+                    intakeDoneCodeEl.textContent = body.id;
+                    intakeDoneHintEl.textContent = payload.email
+                        ? "Le mandamos el código a " + payload.email + "."
+                        : "";
+                    show(intakeFormEl, false);
+                    show(intakeDoneEl, true);
+                });
+            })
+            .catch(function (err) {
+                setIntakeError(err instanceof TypeError ? NETWORK_MESSAGE : err.message);
+            })
+            .then(function () {
+                intakeSubmitEl.disabled = false;
+                intakeSubmitEl.textContent = "Registrar";
+            });
+    });
+
+    intakeCancelEl.addEventListener("click", showProfile);
+    intakeBackEl.addEventListener("click", showProfile);
+    intakeAgainEl.addEventListener("click", function () {
+        resetIntake();
+        intakeFirstNameEl.focus();
+    });
+
+    buildBrandOptions();
+    buildModelOptions("");
+
     function loadRequests() {
         var query = statusFilter ? "?status=" + encodeURIComponent(statusFilter) : "";
         return fetch(API_BASE + "/api/staff/requests" + query, { credentials: "same-origin" })
@@ -1199,7 +1731,7 @@
                     // puesta— se pasa por la ficha, que es donde se elige cómo
                     // seguir. Si ya se estaba en la tabla —un filtro, un
                     // reintento— no se mueve de ahí.
-                    if (view !== "panel" && view !== "monitor") view = "profile";
+                    if (view === "login" || view === "profile") view = "profile";
                     paintView();
                     // Después de pintar: la ficha escondida no ocupa y la foto
                     // saldría de cero.
@@ -1279,7 +1811,7 @@
         // Desde la tabla no se sale de la sesión: se termina el turno y se
         // vuelve a la ficha. Los datos de los clientes dejan de verse, que es
         // lo que importa de un vistazo, y volver a la tabla no pide contraseña.
-        if (view === "panel" || view === "monitor") {
+        if (view !== "profile") {
             showProfile();
             return;
         }

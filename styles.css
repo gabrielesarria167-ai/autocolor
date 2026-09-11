@@ -3800,11 +3800,12 @@ body.staff {
     color: var(--text-faint);
 }
 
-/* Las dos maneras de seguir, del mismo tamaño y en la misma fila: ninguna es
-   un rincón de la otra. */
+/* Las maneras de seguir, del mismo tamaño y en la misma fila: ninguna es un
+   rincón de la otra. Son dos para un trabajador y tres para el jefe, así que la
+   fila se reparte sola en vez de llevar el número escrito. */
 .staff-profile__actions {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 16px;
     margin-top: 30px;
 }
@@ -3957,21 +3958,25 @@ body.staff {
     background: var(--surface-tint);
 }
 
-/* `auto-fill` and not `auto-fit`: with two workers, `auto-fit` stretches both
-   cards to the width of the screen and a row of two vehicles ends up lost in
-   the middle of an empty field. */
+/* One card per row, stacked. Tiled in columns, each worker's vehicle list was
+   squeezed into a third of the width while the eye had to zigzag to read the
+   roster; down a single column the names line up and the vehicles get the
+   width they need. */
 .staff-monitor__list {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 16px;
-    /* Each card is as tall as its own content. Stretching, the card of somebody
-       with no vehicles grew to the height of the busiest one in its row and left
-       an empty box the size of three cars. */
-    align-items: start;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
 }
 
+/* Who on the left, what they are holding on the right. The left column has a
+   fixed width so the names line up down the page — the whole point of one
+   column — and `minmax(0, 1fr)` on the right lets a long model name shrink
+   instead of pushing the card wider than the page. */
 .staff-monitor__card {
-    padding: 18px 20px 20px;
+    display: grid;
+    grid-template-columns: 220px minmax(0, 1fr) auto;
+    gap: 10px 24px;
+    padding: 16px 20px;
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     background: var(--surface);
@@ -3984,16 +3989,17 @@ body.staff {
 
 .staff-monitor__worker {
     display: flex;
-    align-items: baseline;
-    flex-wrap: wrap;
-    gap: 4px 10px;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
 }
 
 .staff-monitor__worker h2 {
     margin: 0;
-    font-size: 1.1rem;
+    font-size: 1.05rem;
     letter-spacing: -0.01em;
     color: var(--ink);
+    overflow-wrap: anywhere;
 }
 
 .staff-monitor__worker p {
@@ -4004,40 +4010,47 @@ body.staff {
     color: var(--text-faint);
 }
 
-/* At the end of the row and not next to the name: it is the count, not part of
-   who somebody is. `margin-left: auto` sends it to the card's right edge. */
+/* Under the code, not out at the card's right edge: in a wide row that edge is
+   a long way from the name it counts for. */
 .staff-monitor__count {
-    margin-left: auto;
+    margin-top: 4px;
     font-size: 0.8rem;
     font-weight: 600;
     color: var(--text-dim);
 }
 
 .staff-monitor__vehicles {
-    margin: 14px 0 0;
+    margin: 0;
     padding: 0;
     list-style: none;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 8px;
 }
 
+/* No rule above the first one: it would run alongside the name rather than
+   between two vehicles, and read as a divider that separates nothing. */
 .staff-monitor__vehicle {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 8px 10px;
-    padding-top: 10px;
+    gap: 8px 12px;
+}
+
+.staff-monitor__vehicle + .staff-monitor__vehicle {
+    padding-top: 8px;
     border-top: 1px solid var(--border);
 }
 
 .staff-monitor__model {
     font-size: 0.9rem;
     color: var(--ink);
+    overflow-wrap: anywhere;
 }
 
-/* The request's code, so it can be looked up in the table afterwards. Last in
-   the row and grey: useful when needed, not before. */
+/* The request's code, so it can be looked up in the table afterwards. Pushed to
+   the right so the status badges line up down the card's edge; grey because it
+   is useful when needed, not before. */
 .staff-monitor__code {
     margin-left: auto;
     font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
@@ -4058,13 +4071,440 @@ body.staff {
     font-size: 0.78rem;
     font-weight: 600;
     white-space: nowrap;
+    /* A fixed width so the badges make a column of their own down the card,
+       which is what lets the boss read the shop's stage at a glance instead of
+       hunting for each one at the end of a ragged line. */
+    width: 9.5rem;
 }
 
 .staff-monitor__idle {
-    margin: 12px 0 0;
+    margin: 0;
     font-size: 0.9rem;
     color: var(--text-faint);
 }
+
+/* What the boss wrote for this worker, on their own profile, above the notepad
+   that is theirs. Tinted and ruled down one side so the two are not mistaken
+   for each other: this one arrives from somebody else and cannot be edited. */
+.staff-boss-note {
+    margin-top: 18px;
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--brand);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+}
+
+.staff-boss-note__title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 8px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--brand);
+}
+
+.staff-boss-note__title svg {
+    width: 15px;
+    height: 15px;
+}
+
+.staff-boss-note__text {
+    margin: 0;
+    font-size: 0.98rem;
+    line-height: 1.5;
+    color: var(--ink);
+    /* The boss types line breaks and means them. */
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.staff-boss-note__date {
+    margin: 8px 0 0;
+    font-size: 0.78rem;
+    color: var(--text-faint);
+}
+
+/* The «…» on a monitor card, and the little menu it opens. Its own column in
+   the card's grid rather than a corner overlay, so it can never sit on top of a
+   status badge. */
+.staff-monitor__menu {
+    /* Placed rather than left to auto-placement: it comes last in the markup
+       (the card is built top-down) and would otherwise land on a row of its own
+       under the vehicles. */
+    grid-column: 3;
+    grid-row: 1;
+    justify-self: end;
+}
+
+.staff-monitor__more {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    padding: 0 0 6px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    background: none;
+    color: var(--text-dim);
+    font: inherit;
+    font-size: 1.2rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.15s var(--ease-out), border-color 0.15s var(--ease-out);
+}
+
+.staff-monitor__more:hover {
+    border-color: var(--border);
+    background: var(--surface-tint);
+}
+
+.staff-monitor__more:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+}
+
+/* `fixed`, like the status menu, and placed by the same placeMenu(). */
+.staff-cardmenu {
+    position: fixed;
+    z-index: 40;
+    min-width: 160px;
+    padding: 5px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    box-shadow: 0 10px 26px rgba(15, 23, 42, 0.16);
+}
+
+.staff-cardmenu__option {
+    display: block;
+    width: 100%;
+    padding: 8px 10px;
+    border: none;
+    border-radius: 6px;
+    background: none;
+    color: var(--ink);
+    font: inherit;
+    font-size: 0.88rem;
+    text-align: left;
+    cursor: pointer;
+}
+
+.staff-cardmenu__option:hover {
+    background: var(--surface-tint);
+}
+
+.staff-cardmenu__option:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: -2px;
+}
+
+/* The note across the foot of the card, spanning every column. */
+.staff-monitor__note {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    margin: 2px 0 0;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+    border-left: 3px solid var(--brand);
+    padding-left: 12px;
+    font-size: 0.88rem;
+    line-height: 1.45;
+    color: var(--text-dim);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.staff-monitor__note-date {
+    margin-left: auto;
+    font-size: 0.75rem;
+    color: var(--text-faint);
+    white-space: nowrap;
+}
+
+/* Writing one, inside the card it belongs to. */
+.staff-noteedit {
+    grid-column: 1 / -1;
+    margin-top: 4px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+}
+
+.staff-noteedit__title {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-dim);
+}
+
+.staff-noteedit__input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--ink);
+    font: inherit;
+    font-size: 0.92rem;
+    line-height: 1.5;
+    resize: vertical;
+}
+
+.staff-noteedit__input:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 1px;
+}
+
+.staff-noteedit__actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.staff-noteedit__save,
+.staff-noteedit__cancel {
+    padding: 8px 16px;
+    border-radius: var(--radius-sm);
+    font: inherit;
+    font-weight: 600;
+    font-size: 0.88rem;
+    cursor: pointer;
+}
+
+.staff-noteedit__save {
+    border: 1px solid transparent;
+    background: var(--brand);
+    color: #fff;
+}
+
+.staff-noteedit__save:hover {
+    background: var(--brand-dark);
+}
+
+.staff-noteedit__save:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+.staff-noteedit__cancel {
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+    color: var(--ink);
+}
+
+.staff-noteedit__cancel:hover {
+    background: var(--surface-tint);
+}
+
+
+/* -----------------------------------------------------------------------------
+   Registering a walk-in vehicle
+
+   One page, six answers above the fold, and an optional block underneath that
+   can be skipped entirely. The fields reuse the site's own `.field` system, so
+   this looks like the wizard the customers fill in rather than a second dialect
+   of the same form.
+   -------------------------------------------------------------------------- */
+
+.staff-intake {
+    max-width: 780px;
+}
+
+.staff-intake__head h1 {
+    margin: 0;
+}
+
+.staff-intake__head p {
+    margin: 6px 0 0;
+    color: var(--text-dim);
+}
+
+.staff-intake__form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-top: 22px;
+}
+
+.staff-intake__card {
+    padding: 22px 24px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+}
+
+.staff-intake__card .field-row + .field-row,
+.staff-intake__card .field-row + .staff-intake__group {
+    margin-top: 16px;
+}
+
+.staff-intake__group {
+    margin: 16px 0 0;
+    padding: 0;
+    border: none;
+}
+
+.staff-intake__group legend {
+    padding: 0;
+    margin-bottom: 10px;
+    font-weight: 600;
+    font-size: 0.92rem;
+    color: var(--ink);
+}
+
+.staff-intake__choices {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+/* Buttons and not a `<select>`: there are four of one and three of the other,
+   they never grow, and at a counter one tap beats open-scroll-pick. */
+.staff-intake__choice {
+    padding: 9px 16px;
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    background: var(--surface);
+    color: var(--ink);
+    font: inherit;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s var(--ease-out), border-color 0.15s var(--ease-out),
+        color 0.15s var(--ease-out);
+}
+
+.staff-intake__choice:hover {
+    border-color: var(--text-faint);
+    background: var(--surface-tint);
+}
+
+.staff-intake__choice[aria-checked="true"] {
+    border-color: var(--brand);
+    background: var(--brand);
+    color: #fff;
+    font-weight: 600;
+}
+
+.staff-intake__choice:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+}
+
+/* The second card says up front that none of it is needed, so nobody stops to
+   look up a plate with a customer waiting. */
+.staff-intake__optional-title {
+    margin: 0 0 16px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+}
+
+.staff-intake__optional-title span {
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--text-faint);
+}
+
+.staff-intake__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.staff-intake__submit,
+.staff-intake__cancel {
+    padding: 13px 26px;
+    border-radius: var(--radius-sm);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s var(--ease-out), border-color 0.2s var(--ease-out);
+}
+
+.staff-intake__submit {
+    border: 1px solid transparent;
+    background: var(--brand);
+    color: #fff;
+}
+
+.staff-intake__submit:hover {
+    background: var(--brand-dark);
+}
+
+.staff-intake__submit:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+.staff-intake__cancel {
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+    color: var(--ink);
+}
+
+.staff-intake__cancel:hover {
+    background: var(--surface-tint);
+}
+
+/* What is left on screen after saving. The code is read out loud to somebody
+   standing at the counter, so it is set large, spaced, and alone. */
+.staff-intake__done {
+    margin-top: 22px;
+    padding: 32px 28px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    text-align: center;
+}
+
+.staff-intake__done-title {
+    margin: 0;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--brand);
+}
+
+.staff-intake__done-name {
+    margin: 10px 0 0;
+    font-size: 1.15rem;
+    color: var(--ink);
+}
+
+.staff-intake__done-code {
+    margin: 14px 0 0;
+    font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+    font-size: 2.6rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: var(--ink);
+    /* Read off the screen digit by digit, so it has to survive a phone line. */
+    overflow-wrap: anywhere;
+}
+
+.staff-intake__done-hint {
+    margin: 10px 0 24px;
+    font-size: 0.9rem;
+    color: var(--text-dim);
+}
+
+.staff-intake__done .staff-intake__actions {
+    justify-content: center;
+}
+
 
 /* La foto encima del nombre en cuanto la fila de dos columnas deja de caber
    sin apretar el texto. */
@@ -4085,8 +4525,20 @@ body.staff {
         grid-template-columns: 1fr;
     }
 
-    .staff-monitor__list {
-        grid-template-columns: 1fr;
+    /* Narrow, the columns of a card stop being columns: the name sits above
+       the vehicles instead of beside them, and the «…» goes with the name
+       rather than dropping to a line of its own at the bottom. */
+    .staff-monitor__card {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .staff-monitor__vehicles,
+    .staff-monitor__idle {
+        grid-column: 1 / -1;
+    }
+
+    .staff-monitor__menu {
+        grid-column: 2;
     }
 }
 

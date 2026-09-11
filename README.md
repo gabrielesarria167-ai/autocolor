@@ -466,7 +466,9 @@ Las del panel del taller, todas detrás de la contraseña compartida:
 | `POST /api/staff/logout` | La cierra |
 | `GET /api/staff/whoami` | Qué ve el servidor: IP, proxies y la cuenta de correo configurada |
 | `GET /api/staff/requests?status=` | La cola de trabajo, opcionalmente por estado |
-| `GET /api/staff/workers` | Quién tiene qué vehículo. Solo contesta al jefe; a los demás, `403` |
+| `POST /api/staff/requests` | Registra un vehículo que llegó al local. Solo el jefe; a los demás, `403` |
+| `GET /api/staff/workers` | Quién tiene qué vehículo, con la nota del jefe de cada uno. Solo el jefe |
+| `PUT /api/staff/workers/:code/note` | Escribe, reemplaza o quita la nota del jefe sobre un trabajador |
 | `PATCH /api/staff/requests/:id` | Cambia el estado de una solicitud |
 | `PATCH /api/staff/requests/:id/occupancy` | Toma o suelta un vehículo |
 
@@ -813,10 +815,11 @@ without it there is no boss and the panel works as it always did — and, like
 the other two, it is read once at startup.
 
 His profile differs by one button: where everybody else has **«Iniciar
-sesión»**, he has **«Monitorear trabajadores»**. Behind it is one card per
-person with the vehicles they are holding right now — plate, brand, model,
-request code and status. Somebody holding nothing appears too, with the card
-dimmed: a worker being free is information as well. The screen repaints itself
+sesión»**, he has **«Monitorear trabajadores»**. Behind it is one full-width row
+per person — name and code on the left, the vehicles they are holding right now
+on the right, each with plate, brand, model, request code and status. Somebody
+holding nothing appears too, with the row dimmed: a worker being free is
+information as well. The screen repaints itself
 every half minute while it is open, and a button asks for it sooner.
 
 It is not a record of shifts; the workshop keeps none. It is the table's
@@ -824,11 +827,34 @@ It is not a record of shifts; the workshop keeps none. It is the table's
 it comes out of what the database already holds and not out of anything anybody
 has to start writing down.
 
+From each card's **«…»** he can leave that worker a note. There is one note per
+person, so writing another replaces it, and only he clears it. The worker reads
+it on their own profile, above their personal notepad, and cannot edit it — the
+notepad is theirs, the note is not. It lives in `worker_notes`
+(`server/schema.sql`), which is the only thing in that file that is not a
+request.
+
+His third button, **«Registrar vehículo»**, is for a car driven straight to the
+shop. It asks six things — nombres, apellidos, email, teléfono, la silueta 3D y
+el acabado — on one page, with marca, modelo, placa and notas below as optional.
+Everything else the row can hold is left null and can be filled in from the
+table later. Picking a model sets the matching silhouette on its own, since the
+catalogue already maps one to the other, and he can still change it. The row
+that comes out is an ordinary one: same ten-digit code, same `recibido`, and a
+worker takes it and moves it like any other.
+
+The customer gets an email written for a walk-in rather than the wizard's —
+«Recibimos tu vehículo en el taller» instead of a promise of a quote in 24
+hours — with the same tracking code, and the shop copy says it was registered at
+the counter. Choosing the same wording for both would have told somebody
+standing at the desk that they had filled in a form on the website.
+
 In exchange, the boss does not work: he takes no vehicles and changes no
 statuses. His profile does not offer him the controls, and the server refuses
 both with a `403` even when asked by hand. He does keep **«Ver solicitudes»**,
 which opens the whole table in read-only mode. The reverse holds too:
-`GET /api/staff/workers` answers him and nobody else.
+`GET /api/staff/workers`, the note route and the walk-in route answer him and
+nobody else.
 
 Todo esto también se puede hacer a mano desde psql:
 

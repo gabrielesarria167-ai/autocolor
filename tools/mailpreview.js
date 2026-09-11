@@ -70,6 +70,31 @@ const LEGACY = {
     email: null,
 };
 
+// Un vehículo que llegó al local y se registró desde el panel del taller
+// (POST /api/staff/requests). El jefe contesta seis cosas, así que casi todo lo
+// demás llega vacío: sin marca, sin modelo, sin placa, sin piezas y sin zona.
+// La silueta 3D y el acabado sí, que son de las seis. Es el caso que prueba que
+// el correo sigue nombrando el vehículo cuando no hay marca ni modelo.
+const WALK_IN = {
+    brand: null,
+    model: null,
+    bodyType: null,
+    year: null,
+    plate: null,
+    mileage: null,
+    colorCode: null,
+    vehicle: 'suv',
+    quality: 'standard',
+    parts: [],
+    firstName: 'Lucía',
+    lastName: 'Mendoza',
+    department: null,
+    province: null,
+    phone: '+51987333444',
+    email: 'lucia@ejemplo.com',
+    notes: 'Rayón en la puerta derecha.',
+};
+
 // El HTML se escribe a disco además de resumirse: mirarlo en un navegador es
 // la única forma de ver si la maqueta quedó bien, y `node tools/mailpreview.js`
 // no puede enseñar una tarjeta de 600 px en la terminal.
@@ -96,17 +121,25 @@ const customer = mail.customerMessage(CREATED, FULL);
 const shop = mail.shopMessage(CREATED, FULL);
 const shopMinimal = mail.shopMessage(CREATED, MINIMAL);
 const shopLegacy = mail.shopMessage(CREATED, LEGACY);
+// El tercer argumento es lo único que separa un vehículo del local de una
+// solicitud del sitio: los dos mensajes salen igual, con otra redacción.
+const walkInCustomer = mail.customerMessage(CREATED, WALK_IN, true);
+const walkInShop = mail.shopMessage(CREATED, WALK_IN, true);
 
 show('AL CLIENTE — solicitud completa', customer);
 show('AL TALLER — solicitud completa', shop);
 show('AL TALLER — sin los datos opcionales', shopMinimal);
 show('AL TALLER — fila antigua, sin correo ni zona', shopLegacy);
+show('AL CLIENTE — vehículo registrado en el local', walkInCustomer);
+show('AL TALLER — vehículo registrado en el local', walkInShop);
 
 const written = [
     ['cliente', writeHtml('autocolor-cliente.html', customer)],
     ['taller', writeHtml('autocolor-taller.html', shop)],
     ['taller (mínimo)', writeHtml('autocolor-taller-min.html', shopMinimal)],
     ['taller (antiguo)', writeHtml('autocolor-taller-legacy.html', shopLegacy)],
+    ['cliente (local)', writeHtml('autocolor-cliente-local.html', walkInCustomer)],
+    ['taller (local)', writeHtml('autocolor-taller-local.html', walkInShop)],
 ].filter(([, file]) => file);
 if (written.length) {
     console.log(`\n${'='.repeat(72)}\nHTML para mirar en el navegador\n${'='.repeat(72)}`);

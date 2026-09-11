@@ -4,6 +4,9 @@
    Acceso a la base `autocolor`: guardar una solicitud del asistente, buscar
    una por su código, y las que usa el panel del taller — listarlas, cambiarle
    el estado a una, ocuparla o soltarla, y ver cuáles tiene alguien tomadas.
+
+   Also the boss's note on each worker (worker_notes), which is the one thing
+   here that is not about a request.
    ========================================================================== */
 
 const crypto = require('node:crypto');
@@ -309,6 +312,69 @@ async function releaseRequest(id, workerId) {
     return { ok: false, reason: 'forbidden', occupiedBy: cur.rows[0].occupied_by };
 }
 
+/* -----------------------------------------------------------------------------
+   worker_notes — what the boss has told each worker
+
+   One row per worker (see server/schema.sql), so writing replaces rather than
+   piles up. Only the boss writes; the worker reads their own on their profile.
+-------------------------------------------------------------------------- */
+
+/** Every note, for the boss's monitor. A handful of rows: no LIMIT needed. */
+async function listWorkerNotes() {
+    const { rows } = await pool.query(
+        'SELECT worker_id, note, written_by, updated_at FROM worker_notes'
+    );
+    return rows.map(mapNote);
+}
+
+/** One worker's note, or null. This is what rides along to their own profile. */
+async function findWorkerNote(workerId) {
+    const { rows } = await pool.query(
+        `SELECT worker_id, note, written_by, updated_at
+           FROM worker_notes
+          WHERE worker_id = $1`,
+        [workerId]
+    );
+    return rows.length > 0 ? mapNote(rows[0]) : null;
+}
+
+/**
+ * Writes the note, replacing whatever was there. Writing and replacing are the
+ * same statement: with one row per worker there is no case where both a new
+ * note and an old one exist, so there is nothing to decide between.
+ *
+ * `updated_at` is set here and not defaulted, because the DEFAULT only applies
+ * to the INSERT half — an ON CONFLICT update would otherwise keep the date of
+ * the first note forever, and the profile shows that date.
+ */
+async function setWorkerNote(workerId, note, writtenBy) {
+    const { rows } = await pool.query(
+        `INSERT INTO worker_notes (worker_id, note, written_by)
+              VALUES ($1, $2, $3)
+         ON CONFLICT (worker_id) DO UPDATE
+                 SET note = EXCLUDED.note,
+                     written_by = EXCLUDED.written_by,
+                     updated_at = now()
+           RETURNING worker_id, note, written_by, updated_at`,
+        [workerId, note, writtenBy]
+    );
+    return mapNote(rows[0]);
+}
+
+/** Takes the note away. Deleting one that is not there is not an error. */
+async function clearWorkerNote(workerId) {
+    await pool.query('DELETE FROM worker_notes WHERE worker_id = $1', [workerId]);
+}
+
+function mapNote(row) {
+    return {
+        workerId: row.worker_id,
+        note: row.note,
+        writtenBy: row.written_by,
+        updatedAt: row.updated_at,
+    };
+}
+
 /**
  * Se llama al arrancar, para fallar con un mensaje claro si la base no está
  * levantada en vez de al primer cliente que envíe el formulario.
@@ -355,5 +421,6 @@ function describe() {
 module.exports = {
     createRequest, findRequest, listRequests, listOccupied, updateRequestStatus,
     occupyRequest, releaseRequest,
+    listWorkerNotes, findWorkerNote, setWorkerNote, clearWorkerNote,
     ping, describe, pool, DATABASE_URL,
 };
