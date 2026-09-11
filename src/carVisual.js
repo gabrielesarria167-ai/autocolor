@@ -815,8 +815,37 @@ export function mountCar3D(options) {
     info.hoverOverlay.visible = !nowSelected && mesh === hoveredMesh;
   }
 
+  // Forgets whatever the pointer was last over. On a mouse this is the cursor
+  // leaving the canvas; on a touchscreen it is the finger lifting, which is
+  // the case that needs it. A tap fires pointermove before click, so the
+  // panel under the finger becomes `hoveredMesh` — and then deselecting it
+  // runs the last line of onPointerClick, which re-lights the hover overlay
+  // because the mesh still matches. The finger is long gone, so the panel the
+  // customer just REMOVED stays highlighted on the car while the list beside
+  // it no longer names it. Touch has no pointer-leaving event of its own, so
+  // pointerup/pointercancel are where it gets cleared.
+  function clearHover() {
+    if (!hoveredMesh) return;
+    const info = overlayFor.get(hoveredMesh);
+    if (info && !isPartSelected(info.id)) info.hoverOverlay.visible = false;
+    hoveredMesh = null;
+    canvasEl.classList.remove('hoverable');
+  }
+
+  // pointerup lands BEFORE click, which is what makes this work: by the time
+  // onPointerClick reads `hoveredMesh` it is null, so its last line resolves
+  // to false and the overlay it would have re-lit never comes back. A mouse is
+  // left alone — the cursor really is still over the panel, and hovering is
+  // the whole point — and gets cleared by pointerleave instead.
+  function onPointerUp(event) {
+    if (event.pointerType !== 'mouse') clearHover();
+  }
+
   canvasEl.addEventListener('pointermove', onPointerMove);
   canvasEl.addEventListener('click', onPointerClick);
+  canvasEl.addEventListener('pointerup', onPointerUp);
+  canvasEl.addEventListener('pointercancel', clearHover);
+  canvasEl.addEventListener('pointerleave', clearHover);
 
   /* -----------------------------------------------------------------------
      Render loop
@@ -880,6 +909,9 @@ export function mountCar3D(options) {
       window.removeEventListener('resize', onWindowResize);
       canvasEl.removeEventListener('pointermove', onPointerMove);
       canvasEl.removeEventListener('click', onPointerClick);
+      canvasEl.removeEventListener('pointerup', onPointerUp);
+      canvasEl.removeEventListener('pointercancel', clearHover);
+      canvasEl.removeEventListener('pointerleave', clearHover);
       viewButtonBindings.forEach(({ btn, handler }) => btn.removeEventListener('click', handler));
 
       scene.traverse((obj) => {

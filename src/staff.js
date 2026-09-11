@@ -1599,7 +1599,9 @@
        like.
     --------------------------------------------------------------------- */
 
-    var PART_LABELS = window.AUTOCOLOR_PARTS ? window.AUTOCOLOR_PARTS.LABELS : {};
+    var partLabel = window.AUTOCOLOR_PARTS
+        ? window.AUTOCOLOR_PARTS.label
+        : function (id) { return id; };
 
     var intakeParts = [];
     var intake3d = null;         // the mounted viewer, if any
@@ -1625,7 +1627,7 @@
             intake3dListEl.appendChild(empty);
         } else {
             intakeParts.forEach(function (id) {
-                var label = PART_LABELS[id] || id;
+                var label = partLabel(id);
                 var item = document.createElement("li");
                 item.className = "car-view-3d__list-item";
 
@@ -1681,6 +1683,15 @@
     }
 
     function destroyIntake3d() {
+        // Bumped first, and not only when there is a viewer to tear down: a
+        // mount still waiting on its import has nothing for `destroy()` to
+        // reach, and without this its handler would pass the mountId check and
+        // build the viewer anyway — onto a screen nobody is looking at, where
+        // a WebGL context and a render loop would sit until the form is opened
+        // again. Leaving the screen mid-load is the ordinary way to hit it:
+        // the module, three.js and a GLB of tens of megabytes take a while on
+        // a phone, and «Cancelar» is right there.
+        intake3dMountId++;
         if (intake3d) {
             intake3d.destroy();
             intake3d = null;
@@ -1721,23 +1732,40 @@
         var mountId = ++intake3dMountId;
         var canvasEl = intake3dCanvasEl;
 
+        // Two handlers and not a trailing .catch(): the second argument to
+        // then() sees the import's own rejection and nothing else, which keeps
+        // a module that failed to DOWNLOAD apart from one that downloaded and
+        // then failed to MOUNT. They want opposite things — one needs the
+        // cached promise thrown away, the other needs it kept — and a trailing
+        // .catch() would catch both and treat them as the first.
         intake3dModule.then(function (mod) {
             // A later choice already claimed the canvas while this import was
             // in flight, so this mount has nothing left to draw into.
             if (mountId !== intake3dMountId) return;
-            intake3d = mod.mountCar3D({
-                vehicle: vehicle,
-                canvasEl: canvasEl,
-                canvasWrapEl: intake3dCanvasWrapEl,
-                overlayEl: intake3dOverlayEl,
-                progressBarEl: intake3dProgressBarEl,
-                loadingLabelEl: intake3dLoadingLabelEl,
-                errorEl: intake3dErrorEl,
-                buttonsEl: intake3dButtonsEl,
-                isPartSelected: function (id) { return intakeParts.indexOf(id) !== -1; },
-                onPartToggle: toggleIntakePart
-            });
-        }).catch(function (err) {
+            try {
+                intake3d = mod.mountCar3D({
+                    vehicle: vehicle,
+                    canvasEl: canvasEl,
+                    canvasWrapEl: intake3dCanvasWrapEl,
+                    overlayEl: intake3dOverlayEl,
+                    progressBarEl: intake3dProgressBarEl,
+                    loadingLabelEl: intake3dLoadingLabelEl,
+                    errorEl: intake3dErrorEl,
+                    buttonsEl: intake3dButtonsEl,
+                    isPartSelected: function (id) { return intakeParts.indexOf(id) !== -1; },
+                    onPartToggle: toggleIntakePart
+                });
+            } catch (err) {
+                // The file arrived; building the viewer is what failed —
+                // typically a phone that will not hand out another WebGL
+                // context. The cached module stays: refetching something that
+                // downloaded perfectly well costs a few hundred kilobytes and
+                // fixes nothing.
+                intake3dVehicle = null;
+                console.error("[taller] Could not build the 3D viewer:", err);
+                showIntake3dError("No se pudo abrir el visor 3D. Puedes registrar el vehículo sin elegir piezas.");
+            }
+        }, function (err) {
             if (mountId !== intake3dMountId) return;
             // All of it cleared so the next choice retries the mount. The
             // module promise too: holding a rejected one means the retry
@@ -1745,7 +1773,7 @@
             intake3dModule = null;
             intake3dRetries++;
             intake3dVehicle = null;
-            console.error("[taller] No se pudo cargar el visor 3D:", err);
+            console.error("[taller] Could not load the 3D viewer module:", err);
             showIntake3dError("No se pudo cargar el visor 3D. Puedes registrar el vehículo sin elegir piezas.");
         });
     }

@@ -8,25 +8,29 @@
    carVisual.js without renaming it here is a silent downgrade, not an error.
 
    It lives in its own file, and not inside the wizard that used to own it,
-   because two pages pick panels now: the customer's wizard (src/repair.js)
-   and the walk-in form in the workshop panel (src/staff.js). One copy each
-   would drift, and the one that drifted would be the one nobody reads.
+   because three places name these panels: the customer's wizard
+   (src/repair.js), the walk-in form in the workshop panel (src/staff.js) and
+   the two emails (server/mail.js). One copy each would drift, and the one
+   that drifted would be the one nobody reads — the email, which is the piece
+   the customer keeps.
 
-   Same shape as statuses.js, carModels.js and cities.js: a global on
-   `window`, loaded before whatever needs it. The project has no modules to
-   share this through.
-
-   ---------------------------------------------------------------------------
-   OJO: hay una tercera copia que no puede leer este archivo — la de
-   server/mail.js, que nombra las piezas en los dos correos. Las dos tienen
-   que decir lo mismo.
+   Reaching all three means this file has to load two ways, so it exports
+   twice: `window.AUTOCOLOR_PARTS` for the pages, which load it with a plain
+   <script> like statuses.js, carModels.js and cities.js, and `module.exports`
+   for the server, which requires it. Nothing else here depends on which of
+   the two it got.
    ========================================================================= */
 
-(function () {
+(function (root, factory) {
+    "use strict";
+    var api = factory();
+    if (typeof module === "object" && module && module.exports) module.exports = api;
+    else root.AUTOCOLOR_PARTS = api;
+})(typeof self !== "undefined" ? self : this, function () {
     "use strict";
 
     var LABELS = {
-        // Comunes a los cuatro modelos:
+        // Shared by all four models:
         "hood": "Capó",
         "roof": "Techo",
         // Only-on-the-pickup:
@@ -63,13 +67,22 @@
         "rear_hatch": "Portón trasero"
     };
 
-    window.AUTOCOLOR_PARTS = {
+    var has = Object.prototype.hasOwnProperty;
+
+    return {
         LABELS: LABELS,
 
-        // El id crudo antes que un hueco en blanco: si un modelo gana una
-        // pieza y este archivo todavía no, es mejor leer «rear_hatch» que nada.
+        // The raw id before a blank: if a model gains a panel and this file
+        // has not caught up, reading «rear_hatch» beats reading nothing.
+        //
+        // hasOwnProperty and not `LABELS[id] || id`: without it, an `id` of
+        // 'constructor' or 'toString' returns what the object inherits from
+        // Object.prototype, and the workshop's email asked for a quote on
+        // «function Object() { [native code] }». The ids travel through the
+        // request body, so whoever sends one picks the `id` (PART_RE in
+        // server/server.js accepts both of those words).
         label: function (id) {
-            return LABELS[id] || id;
+            return has.call(LABELS, id) ? LABELS[id] : id;
         }
     };
-})();
+});

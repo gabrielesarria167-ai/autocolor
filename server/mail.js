@@ -51,6 +51,10 @@
    ========================================================================== */
 
 const mailhtml = require('./mailhtml');
+// The same file the two pages load with a <script>, required here instead.
+// The panel names have to read the same in the email as they did on the
+// screen the customer picked them from, and one file is what guarantees it.
+const parts = require('../src/parts.js');
 
 // La llave de la API de Brevo (Brevo → SMTP & API → API keys). Es lo único
 // secreto que hace falta: no hay usuario ni contraseña que guardar.
@@ -149,39 +153,6 @@ const QUALITY_LABELS = {
     custom: 'Alta gama',
 };
 
-// Copia de src/repair.js, por lo mismo que la de arriba. El taller pide un
-// presupuesto por pieza, y «rear_door_left» no es lo que nadie va a escribir
-// en él. Una pieza que falte aquí sale con su identificador, como en el
-// asistente: se degrada, no se rompe.
-const PART_LABELS = {
-    hood: 'Capó',
-    roof: 'Techo',
-    front_bumper: 'Parachoques delantero',
-    tonneau: 'Platón y portón',
-    tailgate: 'Portón trasero',
-    rear_bumper: 'Parachoques trasero',
-    back_door_left: 'Puerta corrediza izquierda',
-    back_door_right: 'Puerta corrediza derecha',
-    left_fender: 'Guardabarros delantero izquierdo',
-    right_fender: 'Guardabarros delantero derecho',
-    rear_window_left: 'Panel lateral trasero izquierdo',
-    rear_window_right: 'Panel lateral trasero derecho',
-    back_bumper: 'Parachoques trasero',
-    Object_26: 'Moldura trasera del techo',
-    bumper: 'Parachoques delantero',
-    front_door_left: 'Puerta delantera izquierda',
-    front_door_right: 'Puerta delantera derecha',
-    rear_door_left: 'Puerta trasera izquierda',
-    rear_door_right: 'Puerta trasera derecha',
-    fender_left: 'Guardabarros delantero izquierdo',
-    fender_right: 'Guardabarros delantero derecho',
-    quarter_panel_left: 'Guardabarros trasero izquierdo',
-    quarter_panel_right: 'Guardabarros trasero derecho',
-    side_skirt_left: 'Faldón lateral izquierdo',
-    side_skirt_right: 'Faldón lateral derecho',
-    rear_hatch: 'Portón trasero',
-};
-
 // Copia de src/carModels.js (BODY_TYPES) y de src/lookup.js (VEHICLE_LABELS).
 // Sin ellas el correo del taller decía «sedan» y «wagon» —los identificadores
 // del catálogo— donde el resto del sitio dice «Sedán» y «Familiar».
@@ -206,13 +177,19 @@ const VEHICLE_LABELS = {
 // Object.hasOwn y no `MAPA[id] || id`: sin él, `id` valiendo 'constructor' o
 // 'toString' saca lo que hereda el objeto de Object.prototype, y el correo del
 // taller pedía presupuesto para «function Object() { [native code] }». Las
-// piezas vienen del formulario, así que el que las escribe elige el `id`.
+// piezas vienen del formulario, así que el que las escribe elige el `id`; los
+// mapas de aquí abajo son cerrados, pero se leen igual para no dejar la
+// trampa puesta para el próximo mapa que sí venga de fuera. La misma guarda
+// está en label() de src/parts.js, que es el que nombra las piezas.
 function label(map, id) {
     return Object.hasOwn(map, id) ? map[id] : id;
 }
 
+// From src/parts.js, which is where the panel names live for all three places
+// that name them. Its label() guards against the same thing label() above
+// does, and for the same reason.
 function partLabel(id) {
-    return label(PART_LABELS, id);
+    return parts.label(id);
 }
 
 function bodyTypeLabel(id) {

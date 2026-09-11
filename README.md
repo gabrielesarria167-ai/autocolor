@@ -74,7 +74,7 @@ lo abre a propósito, por ejemplo para probar el sitio desde el móvil.
 | `index.html`, `src/home.js` | Portada |
 | `pgs/repair.html`, `src/repair.js` | Asistente de cotización |
 | `src/carVisual.js` | Visor 3D de piezas (three.js, un modelo por silueta). Lo montan el asistente y el panel |
-| `src/parts.js` | El nombre de cada pieza de carrocería, compartido por los dos |
+| `src/parts.js` | El nombre de cada pieza de carrocería, compartido por los dos formularios y por los correos |
 | `src/lookup.js` | Consulta de una solicitud por su código |
 | `pgs/taller.html`, `src/staff.js` | Panel del taller: la cola de trabajo, el monitor del jefe y el registro de vehículos del local |
 | `src/cities.js` | Departamentos y provincias del Perú |
@@ -845,7 +845,8 @@ catalogue already maps one to the other, and he can still change it. Choosing a
 silhouette also brings up the same 3D picker the customer's wizard uses —
 literally the same viewer, `mountCar3D` in `src/carVisual.js` — so panels are
 picked by tapping the car rather than off a list. The panel names both pages
-show live in `src/parts.js`. The row
+show live in `src/parts.js`, which `server/mail.js` requires too, so the email
+names a panel exactly as the screen it was picked on did. The row
 that comes out is an ordinary one: same ten-digit code, same `recibido`, and a
 worker takes it and moves it like any other.
 

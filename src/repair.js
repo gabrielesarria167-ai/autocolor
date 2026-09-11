@@ -68,8 +68,17 @@
 
     // Part names — the label the client reads for each panel they pick. They
     // live in src/parts.js, loaded before this file, because the walk-in form
-    // in the workshop panel names the same panels (see src/staff.js).
-    var PART_LABELS = window.AUTOCOLOR_PARTS.LABELS;
+    // in the workshop panel and the two emails name the same panels (see
+    // src/staff.js and server/mail.js).
+    //
+    // Guarded, and not `window.AUTOCOLOR_PARTS.LABELS`: this file is one long
+    // IIFE, so a parts.js that never arrived would throw on this line and take
+    // every listener below it with it — a wizard that does nothing at all when
+    // touched. Without the names it still works; the list just reads
+    // «rear_hatch» instead of «Portón trasero».
+    var partLabel = window.AUTOCOLOR_PARTS
+        ? window.AUTOCOLOR_PARTS.label
+        : function (id) { return id; };
 
     function toggleCarPart(id) {
         var idx = state.parts.indexOf(id);
@@ -99,7 +108,7 @@
             carView3dList.appendChild(empty);
         } else {
             state.parts.forEach(function (id) {
-                var label = PART_LABELS[id] || id;
+                var label = partLabel(id);
                 var li = document.createElement("li");
                 li.className = "car-view-3d__list-item";
                 var span = document.createElement("span");
