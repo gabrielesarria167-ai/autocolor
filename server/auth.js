@@ -41,6 +41,21 @@ const WORKER_IDS = new Set(
         .filter(Boolean)
 );
 
+// The workshop boss's code, in AUTOCOLOR_BOSS_ID. One code, same shape as the
+// rest. It does not need to be repeated in AUTOCOLOR_WORKER_IDS — it is
+// accepted on its own (see verifyWorkerId): naming the boss and forgetting to
+// list him would lock out the very person just configured.
+//
+// What being the boss changes is the profile: instead of the start-session
+// button it carries the monitor, which shows the vehicle each worker is
+// holding (see GET /api/staff/workers in server/server.js). In exchange he
+// takes no vehicles and changes no statuses; if he did, he would show up as
+// one more row in his own monitor.
+//
+// Empty is the normal case: with no boss configured nobody sees the monitor
+// and the panel works as it always did.
+const BOSS_ID = (process.env.AUTOCOLOR_BOSS_ID || '').trim().toUpperCase();
+
 // Las sesiones viven en memoria y se pierden al reiniciar el servidor: el
 // panel es de una máquina y de un puñado de personas, y una tabla en la base
 // solo agregaría cosas que mantener para ahorrarles volver a entrar.
@@ -65,12 +80,34 @@ function verifyPassword(entered) {
     return crypto.timingSafeEqual(a, b);
 }
 
+// The boss counts: a workshop configured with him alone still has someone to
+// let in, and answering 503 there would switch off a panel that is set up.
 function hasWorkerIds() {
-    return WORKER_IDS.size > 0;
+    return WORKER_IDS.size > 0 || BOSS_ID.length > 0;
+}
+
+/** Whether a code is the boss's. Always false when no boss is configured. */
+function isBoss(entered) {
+    if (!BOSS_ID) return false;
+    return String(entered || '').trim().toUpperCase() === BOSS_ID;
+}
+
+/**
+ * The worker codes, sorted. The monitor needs them to show the people holding
+ * no vehicle at all: without this only the codes that appear in the database
+ * for holding one would show up, and "nobody is working" would look exactly
+ * like "there are no workers".
+ *
+ * The boss is not in the list: he is not a worker and does not appear in his
+ * own monitor.
+ */
+function listWorkerIds() {
+    return Array.from(WORKER_IDS).sort();
 }
 
 /**
  * Comprueba un código de trabajador contra la lista de AUTOCOLOR_WORKER_IDS.
+ * The boss's code (AUTOCOLOR_BOSS_ID) is accepted too, listed or not.
  *
  * Devuelve el código ya normalizado (mayúsculas, sin espacios) si es válido, o
  * cadena vacía si no. Se normaliza igual que al cargarlos para que no importe
@@ -81,6 +118,7 @@ function hasWorkerIds() {
 function verifyWorkerId(entered) {
     if (typeof entered !== 'string') return '';
     const code = entered.trim().toUpperCase();
+    if (BOSS_ID && code === BOSS_ID) return code;
     return WORKER_IDS.has(code) ? code : '';
 }
 
@@ -160,6 +198,8 @@ setInterval(() => {
 module.exports = {
     isConfigured,
     hasWorkerIds,
+    isBoss,
+    listWorkerIds,
     verifyPassword,
     verifyWorkerId,
     createSession,

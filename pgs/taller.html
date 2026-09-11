@@ -91,6 +91,10 @@
                 <div class="staff-profile__main" id="staffProfileMain">
                     <h1 class="staff-profile__name" id="staffProfileName">Trabajador</h1>
                     <p class="staff-profile__code" id="staffProfileCode"></p>
+                    <!-- Only the boss carries a written role: everybody else
+                         does the same job, and printing «Trabajador» under
+                         every name would say nothing. -->
+                    <p class="staff-profile__role" id="staffProfileRole" hidden>Jefe de taller</p>
 
                     <div class="staff-profile__notes">
                         <label class="staff-profile__notes-title" for="staffNotes">Notas personales</label>
@@ -104,6 +108,20 @@
             </div>
 
             <div class="staff-profile__actions">
+                <!-- The boss sees this button instead of the start-session one:
+                     he paints no vehicles, so starting a shift means nothing to
+                     him. What he needs is to know who is holding what.
+                     src/staff.js shows one or the other, never both. -->
+                <button type="button" class="staff-profile__action staff-profile__action--primary"
+                    id="staffProfileMonitor" hidden>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <circle cx="9" cy="8.5" r="3" />
+                        <path d="M3 19c0-2.9 2.69-4.75 6-4.75s6 1.85 6 4.75" />
+                        <path d="M16.5 7.5a3 3 0 0 1 0 5.4M18.5 19c0-2.1-.9-3.7-2.4-4.5" />
+                    </svg>
+                    Monitorear trabajadores
+                </button>
                 <button type="button" class="staff-profile__action staff-profile__action--primary"
                     id="staffProfileEnter">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
@@ -126,6 +144,38 @@
 
         </section>
 
+        <!-- The boss's monitor: one card per worker with the vehicles they are
+             holding right now. It comes from the same «Ocupado» column as
+             always, read the other way round — by person instead of by vehicle —
+             and not from any record of shifts: the workshop keeps none.
+
+             The data comes from GET /api/staff/workers, which answers the boss
+             and nobody else. This HTML is public like the rest of the page; what
+             closes the monitor is the API. -->
+        <section class="staff-monitor" id="staffMonitor" aria-labelledby="staffMonitorTitle" hidden>
+
+            <header class="staff-monitor__head">
+                <div>
+                    <h1 id="staffMonitorTitle">Trabajadores</h1>
+                    <p class="staff-page__count" id="staffMonitorCount"></p>
+                </div>
+                <button type="button" class="staff-monitor__refresh" id="staffMonitorRefresh">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M20 12a8 8 0 1 1-2.34-5.66" />
+                        <path d="M20 4v4.5h-4.5" />
+                    </svg>
+                    Actualizar
+                </button>
+            </header>
+
+            <div class="staff-monitor__list" id="staffMonitorList"></div>
+
+            <p class="staff-empty" id="staffMonitorEmpty" hidden>Todavía no hay trabajadores configurados.</p>
+
+            <p class="staff-note">Se actualiza solo cada medio minuto.</p>
+        </section>
+
         <section class="staff-panel" id="staffPanel" aria-labelledby="staffPanelTitle" hidden>
 
             <header>
@@ -138,7 +188,7 @@
                  inicia la sesión sin volver a pedir la contraseña —ya se
                  entró—, y la tabla se rehace con sus controles. -->
             <p class="staff-readonly" id="staffReadOnly" hidden>
-                <span>Estás viendo las solicitudes sin iniciar sesión: no puedes tomar vehículos ni cambiarles el estado.</span>
+                <span id="staffReadOnlyText">Estás viendo las solicitudes sin iniciar sesión: no puedes tomar vehículos ni cambiarles el estado.</span>
                 <button type="button" class="staff-readonly__enter" id="staffReadOnlyEnter">Iniciar sesión</button>
             </p>
 

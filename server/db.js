@@ -2,8 +2,8 @@
 
 /* =============================================================================
    Acceso a la base `autocolor`: guardar una solicitud del asistente, buscar
-   una por su código, y las dos que usa el panel del taller — listarlas y
-   cambiarle el estado a una.
+   una por su código, y las que usa el panel del taller — listarlas, cambiarle
+   el estado a una, ocuparla o soltarla, y ver cuáles tiene alguien tomadas.
    ========================================================================== */
 
 const crypto = require('node:crypto');
@@ -192,6 +192,38 @@ async function listRequests(options) {
 }
 
 /**
+ * The requests somebody is currently holding, for the boss's monitor (see
+ * GET /api/staff/workers in server/server.js).
+ *
+ * No phone and no customer name: the monitor answers "who is on what", and the
+ * usual listing covers the rest. Data that does not need showing does not need
+ * fetching either.
+ *
+ * Ordering by `occupied_by` keeps each worker's rows together, which is how the
+ * caller groups them. The LIMIT, as in listRequests, is a ceiling and not
+ * pagination: today the occupied ones are a handful, but a vehicle nobody
+ * releases stays occupied forever and the count only goes up.
+ */
+async function listOccupied() {
+    const { rows } = await pool.query(
+        `SELECT id, created_at, brand, model, plate, status, occupied_by
+           FROM requests
+          WHERE occupied_by IS NOT NULL
+          ORDER BY occupied_by, created_at DESC
+          LIMIT 500`
+    );
+    return rows.map((row) => ({
+        id: row.id.trim(),
+        createdAt: row.created_at,
+        brand: row.brand,
+        model: row.model,
+        plate: row.plate,
+        status: row.status,
+        occupiedBy: row.occupied_by,
+    }));
+}
+
+/**
  * Cambia el estado de una solicitud, pero solo si quien lo pide la tiene
  * ocupada: un trabajador únicamente mueve los vehículos en los que trabaja.
  * Uno disponible no se toca —hay que tomarlo primero—, y uno de otro, tampoco.
@@ -321,7 +353,7 @@ function describe() {
 }
 
 module.exports = {
-    createRequest, findRequest, listRequests, updateRequestStatus,
+    createRequest, findRequest, listRequests, listOccupied, updateRequestStatus,
     occupyRequest, releaseRequest,
     ping, describe, pool, DATABASE_URL,
 };

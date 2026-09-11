@@ -466,7 +466,9 @@ Las del panel del taller, todas detrás de la contraseña compartida:
 | `POST /api/staff/logout` | La cierra |
 | `GET /api/staff/whoami` | Qué ve el servidor: IP, proxies y la cuenta de correo configurada |
 | `GET /api/staff/requests?status=` | La cola de trabajo, opcionalmente por estado |
+| `GET /api/staff/workers` | Quién tiene qué vehículo. Solo contesta al jefe; a los demás, `403` |
 | `PATCH /api/staff/requests/:id` | Cambia el estado de una solicitud |
+| `PATCH /api/staff/requests/:id/occupancy` | Toma o suelta un vehículo |
 
 ## Los correos de cada solicitud
 
@@ -787,6 +789,38 @@ porque el despliegue es Render y ahí el mismo servidor sirve el sitio y la API.
 El `exclude` de `_config.yml` solo manda en GitHub Pages, que ya no es el
 alojamiento. No está enlazado desde ninguna página y lleva `noindex`, pero eso
 lo esconde, no lo cierra: lo que lo cierra es la contraseña de la API.
+
+### The workshop boss
+
+One of the codes can be the boss's. It goes in its own variable, not in the
+list above:
+
+```bash
+# .env
+AUTOCOLOR_BOSS_ID=PS23077
+```
+
+It does not have to be repeated in `AUTOCOLOR_WORKER_IDS`: it is accepted on
+its own. The line is optional — without it there is no boss and the panel works
+as it always did — and, like the other two, it is read once at startup.
+
+His profile differs by one button: where everybody else has **«Iniciar
+sesión»**, he has **«Monitorear trabajadores»**. Behind it is one card per
+person with the vehicles they are holding right now — plate, brand, model,
+request code and status. Somebody holding nothing appears too, with the card
+dimmed: a worker being free is information as well. The screen repaints itself
+every half minute while it is open, and a button asks for it sooner.
+
+It is not a record of shifts; the workshop keeps none. It is the table's
+«Ocupado» column read the other way round, by person instead of by vehicle, so
+it comes out of what the database already holds and not out of anything anybody
+has to start writing down.
+
+In exchange, the boss does not work: he takes no vehicles and changes no
+statuses. His profile does not offer him the controls, and the server refuses
+both with a `403` even when asked by hand. He does keep **«Ver solicitudes»**,
+which opens the whole table in read-only mode. The reverse holds too:
+`GET /api/staff/workers` answers him and nobody else.
 
 Todo esto también se puede hacer a mano desde psql:
 

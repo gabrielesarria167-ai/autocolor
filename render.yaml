@@ -96,6 +96,14 @@ services:
       - key: AUTOCOLOR_WORKER_IDS
         sync: false
 
+      # The workshop boss's code, one only. It is accepted without being in the
+      # list above, and his profile carries the worker monitor — who is holding
+      # which vehicle — instead of the start-session button; in exchange he
+      # takes no vehicles. Optional: without it there is no boss and the panel
+      # works the same. Like the other two it is read once at startup.
+      - key: AUTOCOLOR_BOSS_ID
+        sync: false
+
       # La llave de la API de Brevo, que es por donde salen los dos avisos de
       # cada solicitud (server/mail.js). Sin ella el asistente sigue guardando
       # solicitudes y nadie recibe aviso: el fallo se registra y ya, porque

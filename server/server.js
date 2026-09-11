@@ -14,6 +14,7 @@
      POST  /api/staff/login        abre sesión
      POST  /api/staff/logout       la cierra
      GET   /api/staff/requests             lista la cola de trabajo
+     GET   /api/staff/workers              who holds which vehicle (boss only)
      PATCH /api/staff/requests/:id           cambia el estado de una solicitud
      PATCH /api/staff/requests/:id/occupancy ocupa o libera un vehículo
 
@@ -39,7 +40,7 @@ const fsp = require('node:fs/promises');
 const net = require('node:net');
 const path = require('node:path');
 const {
-    createRequest, findRequest, listRequests, updateRequestStatus,
+    createRequest, findRequest, listRequests, listOccupied, updateRequestStatus,
     occupyRequest, releaseRequest,
     ping, describe, pool, DATABASE_URL,
 } = require('./db');
@@ -587,6 +588,27 @@ function requireStaff(req) {
     }
 }
 
+// The monitor is the boss's and nobody else's: it shows at a glance what each
+// worker is holding, which is for running the workshop, not for working in it.
+// A 403 and not a 404: whoever asks has a session and the route exists — what
+// they do not have is the boss's code.
+function requireBoss(req) {
+    requireStaff(req);
+    if (!auth.isBoss(auth.sessionWorkerId(req))) {
+        throw new HttpError(403, 'El monitor de trabajadores es solo para el jefe del taller.');
+    }
+}
+
+// The other way round: the boss takes no vehicles and changes no statuses. His
+// profile never offers him the controls, but the rule lives here like every
+// other one (see server/db.js) and not in the browser. If he took one, he would
+// show up as one more row in his own monitor.
+function refuseBoss(req) {
+    if (auth.isBoss(auth.sessionWorkerId(req))) {
+        throw new HttpError(403, 'El jefe del taller no toma vehículos ni les cambia el estado.');
+    }
+}
+
 // Qué dirección de cliente ve el servidor, y de qué cabecera la sacó.
 //
 // El límite por IP no se puede comprobar desde fuera: si falla, falla
@@ -609,6 +631,7 @@ function whoami(req, ip) {
         trustProxy: TRUST_PROXY,
         forwarding,                                    // de dónde podría salir
         workerId: auth.sessionWorkerId(req),           // quién tiene la sesión
+        isBoss: auth.isBoss(auth.sessionWorkerId(req)), // y si es el jefe del taller
         mail: mail.describe(),                         // a qué cuenta salen los avisos
     };
 }
@@ -666,14 +689,69 @@ async function handleStaff(req, res, pathname, ip) {
         // tocar —una ocupada solo la mueve quien la tiene— sin volver a
         // preguntar por cada una.
         const viewerId = auth.sessionWorkerId(req);
-        const viewer = { workerId: viewerId, name: names.nameFor(viewerId) };
+        // `isBoss` decides which profile gets painted — the monitor instead of
+        // the start-session button — and nothing else: it is the interface. Who
+        // may ask for the monitor and who may take a vehicle is decided by
+        // requireBoss and refuseBoss, here, without trusting the browser.
+        const viewer = {
+            workerId: viewerId,
+            name: names.nameFor(viewerId),
+            isBoss: auth.isBoss(viewerId),
+        };
         return sendJson(res, 200, { requests, viewer });
+    }
+
+    // The boss's monitor: every worker with the vehicles they are holding right
+    // now.
+    //
+    // The roster comes from the configured list of codes and not from the
+    // database, so somebody holding no vehicle shows up too, with an empty list.
+    // Were it built from the database alone, an idle workshop would look exactly
+    // like a workshop with no workers.
+    if (pathname === '/api/staff/workers' && req.method === 'GET') {
+        requireBoss(req);
+
+        // Code -> its vehicles. Start from the roster and deal the database rows
+        // on top of it.
+        const held = new Map();
+        for (const workerId of auth.listWorkerIds()) held.set(workerId, []);
+
+        for (const row of await listOccupied()) {
+            // A code that is no longer on the roster — somebody who left with a
+            // vehicle still taken — goes in anyway: leaving it out would hide a
+            // vehicle that really is in somebody's hands.
+            if (!held.has(row.occupiedBy)) held.set(row.occupiedBy, []);
+            held.get(row.occupiedBy).push({
+                id: row.id,
+                plate: row.plate,
+                brand: row.brand,
+                model: row.model,
+                status: row.status,
+                createdAt: row.createdAt,
+            });
+        }
+
+        const workers = Array.from(held, function ([workerId, requests]) {
+            return { workerId: workerId, name: names.nameFor(workerId), requests: requests };
+        });
+        // Whoever is working comes first, and within each group by name, which
+        // is how the screen reads. Without this the order would be the one of the
+        // code list, where somebody holding three vehicles can land at the end.
+        workers.sort(function (a, b) {
+            if ((a.requests.length > 0) !== (b.requests.length > 0)) {
+                return a.requests.length > 0 ? -1 : 1;
+            }
+            return (a.name || a.workerId).localeCompare(b.name || b.workerId, 'es');
+        });
+
+        return sendJson(res, 200, { workers });
     }
 
     if (req.method === 'PATCH') {
         const match = STAFF_PATH.exec(pathname);
         if (match) {
             requireStaff(req);
+            refuseBoss(req);
             const viewerId = auth.sessionWorkerId(req);
             const body = requireObject(await readJsonBody(req));
             if (!STATUSES.has(body.status)) throw new BadRequest('El estado no es válido.');
@@ -701,6 +779,7 @@ async function handleStaff(req, res, pathname, ip) {
         const occ = OCCUPANCY_PATH.exec(pathname);
         if (occ) {
             requireStaff(req);
+            refuseBoss(req);
             const viewerId = auth.sessionWorkerId(req);
             const body = requireObject(await readJsonBody(req));
             if (typeof body.occupied !== 'boolean') {

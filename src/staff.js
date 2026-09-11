@@ -38,9 +38,17 @@
     var profileCodeEl = document.getElementById("staffProfileCode");
     var notesEl = document.getElementById("staffNotes");
     var notesHintEl = document.getElementById("staffNotesHint");
+    var profileRoleEl = document.getElementById("staffProfileRole");
     var profileEnterBtn = document.getElementById("staffProfileEnter");
+    var profileMonitorBtn = document.getElementById("staffProfileMonitor");
     var profileBrowseBtn = document.getElementById("staffProfileBrowse");
+    var monitorEl = document.getElementById("staffMonitor");
+    var monitorListEl = document.getElementById("staffMonitorList");
+    var monitorCountEl = document.getElementById("staffMonitorCount");
+    var monitorEmptyEl = document.getElementById("staffMonitorEmpty");
+    var monitorRefreshBtn = document.getElementById("staffMonitorRefresh");
     var readOnlyEl = document.getElementById("staffReadOnly");
+    var readOnlyTextEl = document.getElementById("staffReadOnlyText");
     var readOnlyEnterBtn = document.getElementById("staffReadOnlyEnter");
     var noteEl = document.getElementById("staffNote");
 
@@ -80,10 +88,17 @@
     // Con esto se decide qué filas puede tocar —una ocupada solo la mueve quien
     // la tiene—, pero es solo para la interfaz: la regla de verdad la aplica el
     // servidor, que no se fía de lo que diga el navegador.
-    var viewer = { workerId: "", name: "" };
+    //
+    // `isBoss` arrives with the listing and only decides which profile gets
+    // painted: the boss gets the monitor where everybody else has «Iniciar
+    // sesión». Who may ask for the monitor — and who may take a vehicle — is
+    // decided by the server (see requireBoss and refuseBoss in
+    // server/server.js), which does not trust any of this.
+    var viewer = { workerId: "", name: "", isBoss: false };
 
-    // Qué se está enseñando: el acceso, la ficha del trabajador o la tabla.
-    // loadRequests trae los datos, pero no decide esto.
+    // What is on screen: the login, the worker's profile, the table, or — for
+    // the boss only — the monitor. loadRequests brings the data, but does not
+    // decide this.
     var view = "login";
 
     // Se entró a mirar —«Ver solicitudes» en la ficha— y no a trabajar: la
@@ -791,6 +806,7 @@
         show(loadingEl, false);
         show(loginEl, view === "login");
         show(profileEl, view === "profile");
+        show(monitorEl, view === "monitor");
         show(panelEl, view === "panel");
 
         // El botón de arriba a la derecha dice en cada pantalla lo que hace.
@@ -799,13 +815,30 @@
         // deja entrar otra vez sin la contraseña—. En modo consulta ni siquiera
         // se había empezado un turno: ahí lo único que cabe es volver.
         show(logoutBtn, view !== "login");
-        logoutBtn.textContent = view !== "panel"
+        logoutBtn.textContent = view === "login" || view === "profile"
             ? "Salir"
-            : readOnly ? "Volver al perfil" : "Terminar sesión";
+            : view === "monitor" || readOnly ? "Volver al perfil" : "Terminar sesión";
         if (view === "login") stopClock();
         else startClock();
 
+        // The monitor repaints itself only while on screen, and not outside it:
+        // somebody back on their profile does not need the occupancy asked of
+        // the server every half minute.
+        if (view === "monitor") startMonitorTimer();
+        else stopMonitorTimer();
+
         show(readOnlyEl, view === "panel" && readOnly);
+        // For the boss the table is for looking at and nothing else: there is no
+        // working mode to switch into, so the notice says so and loses its
+        // button. The server would refuse the change anyway (see refuseBoss in
+        // server/server.js); this is about not offering what cannot be done.
+        readOnlyTextEl.textContent = viewer.isBoss
+            ? "El jefe del taller ve las solicitudes, pero no toma vehículos ni les cambia el estado."
+            : "Estás viendo las solicitudes sin iniciar sesión: no puedes tomar vehículos ni cambiarles el estado.";
+        show(readOnlyEnterBtn, !viewer.isBoss);
+        // «Mis vehículos» goes too: the boss takes none, so that filter could
+        // only ever empty the table.
+        if (mineBtn) show(mineBtn, !viewer.isBoss);
         // Sin controles no hay nada que se guarde solo.
         show(noteEl, view === "panel" && !readOnly);
     }
@@ -828,6 +861,17 @@
         paintView();
         // Se mide con la ficha ya visible: escondida no ocupa y daría cero.
         sizePhoto();
+    }
+
+    // The monitor, where the boss's profile leads instead of to the table. It
+    // is painted empty and filled once the server answers: asking first and
+    // showing afterwards would leave the profile up for the length of the trip.
+    function showMonitor() {
+        saveNotes();
+        readOnly = false;
+        view = "monitor";
+        paintView();
+        loadWorkers();
     }
 
     // Se llega aquí desde la ficha, con las solicitudes ya cargadas: se elige
@@ -911,6 +955,13 @@
         profileNameEl.textContent = viewer.name || viewer.workerId || "Trabajador";
         profileCodeEl.textContent = viewer.workerId || "";
 
+        // The boss's profile differs by one button: where everybody else starts
+        // their shift, he opens the monitor. The rest — the photo, the code, the
+        // notepad — is the same, because it is his too.
+        show(profileRoleEl, !!viewer.isBoss);
+        show(profileMonitorBtn, !!viewer.isBoss);
+        show(profileEnterBtn, !viewer.isBoss);
+
         var key = notesKey();
         var saved = "";
         // El navegador puede tener el almacenamiento cerrado (ventana privada,
@@ -954,11 +1005,170 @@
     });
 
     profileEnterBtn.addEventListener("click", function () { showPanel(false); });
+    profileMonitorBtn.addEventListener("click", showMonitor);
     profileBrowseBtn.addEventListener("click", function () { showPanel(true); });
 
     // Desde el aviso del modo consulta se pasa a trabajar sin volver a pedir
     // nada: la sesión ya está abierta, lo que faltaba era decidirlo.
     readOnlyEnterBtn.addEventListener("click", function () { showPanel(false); });
+
+    /* ---------------------------------------------------------------------
+       The boss's monitor
+
+       One card per worker with the vehicles they are holding right now. It is
+       not a record of shifts — the workshop keeps none: it is the table's
+       «Ocupado» column read the other way round, by person instead of by
+       vehicle.
+
+       It is asked for separately rather than derived from the listing already
+       in memory because that listing brings at most 200 rows and may arrive
+       trimmed by a status filter: an occupied vehicle left out of it would make
+       its worker look free.
+    --------------------------------------------------------------------- */
+
+    // Half a minute. Occupancy changes while the boss watches — somebody takes a
+    // vehicle, somebody drops another — and a stale board is worse than none.
+    var MONITOR_MS = 30000;
+    var monitorTimer = null;
+
+    function startMonitorTimer() {
+        if (monitorTimer) return;
+        monitorTimer = window.setInterval(function () { loadWorkers(); }, MONITOR_MS);
+    }
+
+    function stopMonitorTimer() {
+        if (!monitorTimer) return;
+        window.clearInterval(monitorTimer);
+        monitorTimer = null;
+    }
+
+    // The monitor's status badge. Not the table's pill — nothing changes here —
+    // but it carries the same `data-status`, which is where the colours of the
+    // eleven statuses come from (see styles.css).
+    function statusBadge(status) {
+        var badge = document.createElement("span");
+        badge.className = "staff-monitor__status";
+        badge.dataset.status = status;
+
+        var dot = document.createElement("span");
+        dot.className = "staff-status__dot";
+        badge.appendChild(dot);
+        badge.appendChild(document.createTextNode(STATUS_LABELS[status] || status));
+        return badge;
+    }
+
+    function monitorVehicle(request) {
+        var item = document.createElement("li");
+        item.className = "staff-monitor__vehicle";
+
+        var plate = document.createElement("span");
+        plate.className = "staff-table__plate";
+        plate.textContent = request.plate || "Sin placa";
+        item.appendChild(plate);
+
+        var model = document.createElement("span");
+        model.className = "staff-monitor__model";
+        // textContent and not innerHTML: brand and model were typed by the
+        // customer in the wizard, same as in the table.
+        model.textContent = [request.brand, request.model].filter(Boolean).join(" ") || "—";
+        item.appendChild(model);
+
+        var code = document.createElement("span");
+        code.className = "staff-monitor__code";
+        code.textContent = request.id;
+        item.appendChild(code);
+
+        item.appendChild(statusBadge(request.status));
+        return item;
+    }
+
+    function monitorCard(worker) {
+        var card = document.createElement("article");
+        card.className = "staff-monitor__card";
+        // With no vehicles the card dims: at a glance you see who is on
+        // something and who is not, which is what this screen is for.
+        if (worker.requests.length === 0) card.classList.add("staff-monitor__card--idle");
+
+        var head = document.createElement("header");
+        head.className = "staff-monitor__worker";
+
+        var name = document.createElement("h2");
+        name.textContent = worker.name || worker.workerId;
+        head.appendChild(name);
+
+        var code = document.createElement("p");
+        code.textContent = worker.workerId;
+        head.appendChild(code);
+
+        var count = document.createElement("span");
+        count.className = "staff-monitor__count";
+        count.textContent = worker.requests.length === 1
+            ? "1 vehículo"
+            : worker.requests.length + " vehículos";
+        head.appendChild(count);
+
+        card.appendChild(head);
+
+        if (worker.requests.length === 0) {
+            var idle = document.createElement("p");
+            idle.className = "staff-monitor__idle";
+            idle.textContent = "Sin vehículos";
+            card.appendChild(idle);
+            return card;
+        }
+
+        var list = document.createElement("ul");
+        list.className = "staff-monitor__vehicles";
+        worker.requests.forEach(function (request) {
+            list.appendChild(monitorVehicle(request));
+        });
+        card.appendChild(list);
+        return card;
+    }
+
+    function renderWorkers(workers) {
+        monitorListEl.textContent = "";
+        workers.forEach(function (worker) {
+            monitorListEl.appendChild(monitorCard(worker));
+        });
+        show(monitorEmptyEl, workers.length === 0);
+
+        // How many people are on something, not how many there are: that is what
+        // the boss looks at.
+        var busy = workers.filter(function (worker) { return worker.requests.length > 0; }).length;
+        monitorCountEl.textContent = workers.length === 0
+            ? ""
+            : busy === 0
+                ? "Nadie tiene un vehículo ahora mismo"
+                : busy + " de " + workers.length + " con vehículo";
+    }
+
+    function loadWorkers() {
+        return fetch(API_BASE + "/api/staff/workers", { credentials: "same-origin" })
+            .then(function (response) {
+                return response.json().catch(function () { return null; }).then(function (body) {
+                    if (response.status === 401) {
+                        showLogin();
+                        setError("Tu sesión venció. Vuelve a entrar.");
+                        return null;
+                    }
+                    if (!body && API_MISSING_STATUS.indexOf(response.status) !== -1) {
+                        throw new Error(API_MISSING_MESSAGE);
+                    }
+                    if (!response.ok) {
+                        throw new Error((body && body.error) || "No pudimos cargar a los trabajadores.");
+                    }
+                    setError("");
+                    renderWorkers(body.workers || []);
+                    return body;
+                });
+            })
+            .catch(function (err) {
+                setError(err instanceof TypeError ? NETWORK_MESSAGE : err.message);
+            });
+    }
+
+    monitorRefreshBtn.addEventListener("click", function () { loadWorkers(); });
 
     function loadRequests() {
         var query = statusFilter ? "?status=" + encodeURIComponent(statusFilter) : "";
@@ -989,7 +1199,7 @@
                     // puesta— se pasa por la ficha, que es donde se elige cómo
                     // seguir. Si ya se estaba en la tabla —un filtro, un
                     // reintento— no se mueve de ahí.
-                    if (view !== "panel") view = "profile";
+                    if (view !== "panel" && view !== "monitor") view = "profile";
                     paintView();
                     // Después de pintar: la ficha escondida no ocupa y la foto
                     // saldría de cero.
@@ -1069,7 +1279,7 @@
         // Desde la tabla no se sale de la sesión: se termina el turno y se
         // vuelve a la ficha. Los datos de los clientes dejan de verse, que es
         // lo que importa de un vistazo, y volver a la tabla no pide contraseña.
-        if (view === "panel") {
+        if (view === "panel" || view === "monitor") {
             showProfile();
             return;
         }

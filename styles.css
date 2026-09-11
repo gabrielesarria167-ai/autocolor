@@ -3889,6 +3889,183 @@ body.staff {
     background: var(--brand-dark);
 }
 
+/* The role, under the code. Only the boss carries one: everybody else does the
+   same job, and repeating «Trabajador» on every profile would say nothing. */
+.staff-profile__role {
+    margin: 8px 0 0;
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: var(--surface-tint);
+    border: 1px solid var(--border);
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--text-dim);
+}
+
+/* -----------------------------------------------------------------------------
+   The boss's monitor
+
+   One card per worker with the vehicles they have taken. It is read from across
+   the room and at a glance — who is on something and who is not — so the name
+   carries weight, and the card of somebody holding nothing dims instead of
+   disappearing: a missing name would be information lost.
+   -------------------------------------------------------------------------- */
+
+.staff-monitor {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.staff-monitor__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.staff-monitor__head h1 {
+    margin: 0;
+}
+
+.staff-monitor__refresh {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--ink);
+    font: inherit;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background 0.2s var(--ease-out), border-color 0.2s var(--ease-out);
+}
+
+.staff-monitor__refresh svg {
+    width: 17px;
+    height: 17px;
+}
+
+.staff-monitor__refresh:hover {
+    border-color: var(--text-faint);
+    background: var(--surface-tint);
+}
+
+/* `auto-fill` and not `auto-fit`: with two workers, `auto-fit` stretches both
+   cards to the width of the screen and a row of two vehicles ends up lost in
+   the middle of an empty field. */
+.staff-monitor__list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 16px;
+    /* Each card is as tall as its own content. Stretching, the card of somebody
+       with no vehicles grew to the height of the busiest one in its row and left
+       an empty box the size of three cars. */
+    align-items: start;
+}
+
+.staff-monitor__card {
+    padding: 18px 20px 20px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+}
+
+.staff-monitor__card--idle {
+    background: var(--surface-tint);
+    border-style: dashed;
+}
+
+.staff-monitor__worker {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+}
+
+.staff-monitor__worker h2 {
+    margin: 0;
+    font-size: 1.1rem;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+}
+
+.staff-monitor__worker p {
+    margin: 0;
+    font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+    font-size: 0.78rem;
+    letter-spacing: 0.08em;
+    color: var(--text-faint);
+}
+
+/* At the end of the row and not next to the name: it is the count, not part of
+   who somebody is. `margin-left: auto` sends it to the card's right edge. */
+.staff-monitor__count {
+    margin-left: auto;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-dim);
+}
+
+.staff-monitor__vehicles {
+    margin: 14px 0 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.staff-monitor__vehicle {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+}
+
+.staff-monitor__model {
+    font-size: 0.9rem;
+    color: var(--ink);
+}
+
+/* The request's code, so it can be looked up in the table afterwards. Last in
+   the row and grey: useful when needed, not before. */
+.staff-monitor__code {
+    margin-left: auto;
+    font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+    font-size: 0.75rem;
+    color: var(--text-faint);
+}
+
+/* The same coloured badge as the table's pill, minus the pill behaviour:
+   nothing opens here. The colour comes from [data-status], further up. */
+.staff-monitor__status {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 10px;
+    border-radius: 999px;
+    background: var(--pill-bg, var(--surface-tint));
+    color: var(--pill-fg, var(--text-dim));
+    font-size: 0.78rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.staff-monitor__idle {
+    margin: 12px 0 0;
+    font-size: 0.9rem;
+    color: var(--text-faint);
+}
+
 /* La foto encima del nombre en cuanto la fila de dos columnas deja de caber
    sin apretar el texto. */
 @media (max-width: 700px) {
@@ -3905,6 +4082,10 @@ body.staff {
     }
 
     .staff-profile__actions {
+        grid-template-columns: 1fr;
+    }
+
+    .staff-monitor__list {
         grid-template-columns: 1fr;
     }
 }
