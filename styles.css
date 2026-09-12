@@ -4430,9 +4430,11 @@ body.staff {
     outline-offset: 2px;
 }
 
-/* The second card says up front that none of it is needed, so nobody stops to
-   look up a plate with a customer waiting. */
-.staff-intake__optional-title {
+/* The second card names what it is for, and says why it is asked at the
+   counter rather than left for the table: the customer and the car are both
+   standing there, which is the one moment any of it can be read off the
+   vehicle instead of chased down a week later. */
+.staff-intake__card-title {
     margin: 0 0 16px;
     font-size: 0.82rem;
     font-weight: 700;
@@ -4441,7 +4443,7 @@ body.staff {
     color: var(--text-dim);
 }
 
-.staff-intake__optional-title span {
+.staff-intake__card-title span {
     font-weight: 500;
     letter-spacing: 0;
     text-transform: none;

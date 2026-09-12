@@ -1594,9 +1594,12 @@
        silhouette is picked, so a panel that never registers a vehicle never
        fetches three.js at all.
 
-       Optional throughout: `parts` may come out empty, which is what the column
-       defaults to and what a vehicle that entered before anybody decided looks
-       like.
+       At least one panel is required to register, the same as on the website
+       (WALK_IN_REQUIRED in server/server.js). Picking a different silhouette
+       still empties the selection — an id from the pickup does not exist on
+       the van — so a boss who changes the model after choosing panels is
+       asked for them again rather than sent on with panels nobody can point
+       at.
     --------------------------------------------------------------------- */
 
     var partLabel = window.AUTOCOLOR_PARTS
@@ -1763,7 +1766,7 @@
                 // fixes nothing.
                 intake3dVehicle = null;
                 console.error("[taller] Could not build the 3D viewer:", err);
-                showIntake3dError("No se pudo abrir el visor 3D. Puedes registrar el vehículo sin elegir piezas.");
+                showIntake3dError("No se pudo abrir el visor 3D. Vuelve a elegir la silueta para reintentar.");
             }
         }, function (err) {
             if (mountId !== intake3dMountId) return;
@@ -1774,7 +1777,7 @@
             intake3dRetries++;
             intake3dVehicle = null;
             console.error("[taller] Could not load the 3D viewer module:", err);
-            showIntake3dError("No se pudo cargar el visor 3D. Puedes registrar el vehículo sin elegir piezas.");
+            showIntake3dError("No se pudo cargar el visor 3D. Vuelve a elegir la silueta para reintentar.");
         });
     }
 
@@ -1827,9 +1830,9 @@
             // silueta no: esa la eligió el jefe mirando el vehículo.
             bodyType: car.bodyType,
             plate: plate,
+            // The one thing the form does not insist on: a customer who said
+            // nothing leaves nothing to write down.
             notes: intakeNotesEl.value.trim(),
-            // May be empty, and that is a real answer: a vehicle can enter the
-            // shop before anybody decides what gets painted.
             parts: intakeParts.slice()
         };
     }
@@ -1845,9 +1848,20 @@
         }
         if (!intakeVehicle) return { message: "Elige el tipo de vehículo.", field: null };
         if (!intakeQuality) return { message: "Elige el nivel de acabado.", field: null };
-        // Optional, but wrong is not the same as missing.
+
+        // The second card, in the order it is read. Everything in it is asked
+        // for except the notes: the customer and the car are both at the
+        // counter, which is the one moment any of this can be checked against
+        // the vehicle itself instead of chased down a week later.
+        var car = chosenCar();
+        if (!car.brand) return { message: "Elige la marca.", field: intakeBrandEl };
+        if (!car.model) return { message: "Elige el modelo.", field: intakeModelEl };
+        if (intakeParts.length === 0) {
+            return { message: "Elige al menos una pieza a pintar: toca el vehículo.", field: null };
+        }
         var plate = intakePlateEl.value.trim().toUpperCase();
-        if (plate && !PLATE_RE.test(plate)) return { message: "La placa no es válida.", field: intakePlateEl };
+        if (!plate) return { message: "Falta la placa.", field: intakePlateEl };
+        if (!PLATE_RE.test(plate)) return { message: "La placa no es válida.", field: intakePlateEl };
         return null;
     }
 

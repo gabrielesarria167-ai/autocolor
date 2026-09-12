@@ -225,17 +225,28 @@ const WIZARD_REQUIRED = new Set([
     'brand', 'model', 'year', 'firstName', 'lastName', 'department', 'province',
 ]);
 
-// What the boss has to type for a vehicle driven straight to the shop. Far
-// less, on purpose: the customer is standing at the counter and the row can be
-// filled in from the panel afterwards. It is the floor the table itself
-// imposes — `vehicle`, `quality`, a name and a phone are NOT NULL in
-// server/schema.sql — plus the email, which is where the tracking code goes.
+// What the boss has to type for a vehicle driven straight to the shop. Less
+// than the website asks, but not much: the customer is standing at the
+// counter, which is the one moment the car itself can be looked at and the
+// plate read off it. Everything that describes the vehicle and the job is
+// wanted now — marca, modelo, placa and the panels to paint — because a row
+// that arrives without them is one somebody has to chase the customer for
+// later, and by then the car has been in the shop for a week.
+//
+// `notes` is the only thing left out, and it is the only one that can be:
+// there is nothing to write down when the customer had nothing to say.
+//
+// What the website still asks for and this does not — `year`, `department`,
+// `province`, `bodyType` — is not a judgement call, it is that the counter
+// has no reason to ask. The body type arrives anyway, derived from the model
+// (see intakePayload in src/staff.js).
 //
 // Anything outside the set is still checked when it arrives: a malformed plate
 // is refused here exactly as it is on the website. Optional means it may be
 // missing, not that it may be wrong.
 const WALK_IN_REQUIRED = new Set([
     'vehicle', 'quality', 'phone', 'email', 'firstName', 'lastName',
+    'brand', 'model', 'plate', 'parts',
 ]);
 
 /**
@@ -263,8 +274,11 @@ function validateRequest(body, required) {
     if (plate && !PLATE_RE.test(plate.toUpperCase())) throw new BadRequest('La placa no es válida.');
     if (!QUALITIES.has(body.quality)) throw new BadRequest('Nivel de acabado no válido.');
 
-    // Sin piezas es un arreglo vacío, que es lo que la columna trae por
-    // omisión: un vehículo que entra al taller antes de decidir qué se pinta.
+    // Los dos formularios piden piezas, así que en la práctica el arreglo
+    // vacío ya no llega de ninguno. Se sigue aceptando la ausencia como un
+    // arreglo vacío —que es lo que la columna trae por omisión— y es
+    // `required` quien lo rechaza abajo: así el error dice qué falta en vez
+    // de «cuerpo inválido».
     const parts = Array.isArray(body.parts) ? body.parts : (body.parts == null ? [] : null);
     if (!parts) throw new BadRequest('Selecciona al menos una pieza.');
     if (need('parts') && parts.length === 0) throw new BadRequest('Selecciona al menos una pieza.');

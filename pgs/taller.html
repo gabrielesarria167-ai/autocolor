@@ -256,18 +256,18 @@
                 </div>
 
                 <div class="staff-intake__card">
-                    <p class="staff-intake__optional-title">
-                        Opcional <span>— se puede completar después desde la tabla</span>
+                    <p class="staff-intake__card-title">
+                        El vehículo <span>— el cliente y el carro están en el mostrador</span>
                     </p>
 
                     <div class="field-row field-row--wide">
                         <div class="field">
                             <label for="intakeBrand">Marca</label>
-                            <select id="intakeBrand" class="is-placeholder"></select>
+                            <select id="intakeBrand" class="is-placeholder" required></select>
                         </div>
                         <div class="field">
                             <label for="intakeModel">Modelo</label>
-                            <select id="intakeModel" class="is-placeholder" disabled></select>
+                            <select id="intakeModel" class="is-placeholder" disabled required></select>
                         </div>
                     </div>
 
@@ -283,7 +283,7 @@
                          painted, and `parts` defaults to an empty array. -->
                     <div class="staff-intake__parts" id="intakeParts" hidden>
                         <p class="staff-intake__parts-title">
-                            Piezas a pintar <span>— opcional, toca el vehículo</span>
+                            Piezas a pintar <span>— toca el vehículo</span>
                         </p>
 
                         <div class="car-view-3d" id="intake3d">
@@ -327,10 +327,10 @@
                         <div class="field">
                             <label for="intakePlate">Placa</label>
                             <input type="text" id="intakePlate" maxlength="7" placeholder="Ej. ABC-123"
-                                spellcheck="false" autocapitalize="characters" autocomplete="off">
+                                spellcheck="false" autocapitalize="characters" autocomplete="off" required>
                         </div>
                         <div class="field">
-                            <label for="intakeNotes">Notas</label>
+                            <label for="intakeNotes">Notas <span class="field__optional">(opcional)</span></label>
                             <input type="text" id="intakeNotes" maxlength="200"
                                 placeholder="Lo que dijo el cliente" autocomplete="off">
                         </div>

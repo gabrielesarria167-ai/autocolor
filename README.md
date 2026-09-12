@@ -836,12 +836,19 @@ notepad is theirs, the note is not. It lives in `worker_notes`
 request.
 
 His third button, **«Registrar vehículo»**, is for a car driven straight to the
-shop. It asks six things — nombres, apellidos, email, teléfono, la silueta 3D y
-el acabado — on one page, with marca, modelo, placa, notas and the panels to
-paint below as optional.
-Everything else the row can hold is left null and can be filled in from the
-table later. Picking a model sets the matching silhouette on its own, since the
-catalogue already maps one to the other, and he can still change it. Choosing a
+shop. It asks for everything that describes the customer, the vehicle and the
+job, on one page: nombres, apellidos, email, teléfono, la silueta 3D and el
+acabado in the first card, then marca, modelo, las piezas a pintar and la placa
+in the second. Notas is the only optional field, because a customer who said
+nothing leaves nothing to write down. The counter is the one moment the car
+itself can be looked at and the plate read off it, and a row that arrives
+without them is one somebody has to chase the customer for after the vehicle
+has already been in the shop a week. What the website asks for and this does
+not — `year`, `department`, `province` — is left null and can be filled in from
+the table later; the body type arrives on its own, derived from the model.
+
+Picking a model sets the matching silhouette on its own, since the catalogue
+already maps one to the other, and he can still change it. Choosing a
 silhouette also brings up the same 3D picker the customer's wizard uses —
 literally the same viewer, `mountCar3D` in `src/carVisual.js` — so panels are
 picked by tapping the car rather than off a list. The panel names both pages
