@@ -1,0 +1,39 @@
+{
+  "artboards": [
+    { "file": "Audit.dc.html", "title": "Auditoría", "x": 0, "y": 0, "w": 900, "h": 1290 },
+    { "file": "Main.dc.html", "title": "A — Taller", "x": 1000, "y": 0, "w": 1280, "h": 1250 },
+    { "file": "DirectionB.dc.html", "title": "B — Ficha técnica", "x": 2360, "y": 0, "w": 1280, "h": 1250 },
+    { "file": "DirectionC.dc.html", "title": "C — Obra", "x": 3720, "y": 0, "w": 1280, "h": 1250 }
+  ],
+  "annotations": [
+    {
+      "id": "note-audit",
+      "x": 0,
+      "y": -250,
+      "w": 420,
+      "text": "Start here. Read from the live stylesheet, then measured against Germania Automotriz and Full Paint Perú in Lima plus premium paint shops abroad."
+    },
+    {
+      "id": "note-a",
+      "x": 1000,
+      "y": -250,
+      "w": 440,
+      "text": "A · Taller — dark industrial.\nNear-black ground, condensed uppercase Barlow, brand red, zero radius. Paintwork only reads when there is something for it to reflect, and dark gives it that.\nTradeoff: heavy over a long informational page, and the quote wizard has to be redrawn dark to match."
+    },
+    {
+      "id": "note-b",
+      "x": 2360,
+      "y": -250,
+      "w": 440,
+      "text": "B · Ficha técnica — light and measured.\nSteel neutrals, IBM Plex Sans and Mono, deep oxide red, every value a labelled field. Puts the online quote in the hero, which is the thing no competitor here offers.\nTradeoff: cooler and less emotional. It wins trust rather than desire, and the least work to retrofit."
+    },
+    {
+      "id": "note-c",
+      "x": 3720,
+      "y": -250,
+      "w": 440,
+      "text": "C · Obra — editorial, work-led.\nPaper ground, Bodoni Moda display, jobs numbered like case studies. Reads expensive in the way a restoration shop does.\nTradeoff: it lives or dies on photography that does not exist yet, and it reads costlier than a budget customer wants."
+    }
+  ],
+  "launch": { "view": "canvas" }
+}

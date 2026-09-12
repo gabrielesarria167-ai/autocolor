@@ -1,0 +1,158 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+  <style>
+    body { margin: 0; font-family: 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif; background: #f4f4f2; }
+    a { color: #b3121a; } a:hover { color: #8e0e14; }
+    .mono { font-family: 'IBM Plex Mono', 'SFMono-Regular', Menlo, monospace; font-size: 11px; font-weight: 500; letter-spacing: 0.13em; text-transform: uppercase; }
+  </style>
+</helmet>
+
+<div style="width: 1280px; min-height: 1240px; background: #f4f4f2; color: #14161a; display: flex; flex-direction: column">
+
+  <!-- header -->
+  <div style="display: flex; align-items: center; gap: 30px; padding: 0 44px; height: 74px; background: #ffffff; border-bottom: 1px solid #d9d9d4">
+    <img src="logoLight.png" alt="Autocolor" style="height: 28px; width: auto">
+    <div style="display: flex; gap: 24px; margin-left: 18px">
+      <span style="font-size: 14px; font-weight: 500; color: #55595f">Servicios</span>
+      <span style="font-size: 14px; font-weight: 500; color: #55595f">Proceso</span>
+      <span style="font-size: 14px; font-weight: 500; color: #55595f">Acabados</span>
+      <span style="font-size: 14px; font-weight: 500; color: #55595f">Trabajos</span>
+      <span style="font-size: 14px; font-weight: 500; color: #55595f">Contacto</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 16px; margin-left: auto">
+      <span class="mono" style="color: #6b7078">Lima · 935 646 304</span>
+      <span style="display: inline-flex; align-items: center; height: 44px; padding: 0 22px; background: #b3121a; color: #ffffff; font-size: 14px; font-weight: 600">Cotizar ahora</span>
+    </div>
+  </div>
+
+  <!-- hero -->
+  <div style="display: grid; grid-template-columns: 1.08fr 0.92fr; gap: 0; border-bottom: 1px solid #d9d9d4; background: #ffffff">
+
+    <div style="padding: 66px 46px 62px 44px; border-right: 1px solid #d9d9d4">
+      <p class="mono" style="margin: 0 0 20px; color: #b3121a">Planchado y pintura al horno</p>
+      <h1 style="margin: 0; font-size: 54px; line-height: 1.04; font-weight: 600; letter-spacing: -0.028em; color: #14161a; max-width: 16ch">El color de fábrica, medido y firmado.</h1>
+      <p style="margin: 22px 0 0; max-width: 50ch; font-size: 16.5px; line-height: 1.65; color: #55595f">Leemos el código de color de tu vehículo, lo igualamos con colorimetría y lo secamos en cabina de horno. Recibes el presupuesto por pieza, la fecha de entrega y la garantía por escrito antes de dejarnos el auto.</p>
+
+      <div style="display: flex; gap: 10px; margin-top: 30px">
+        <span style="display: inline-flex; align-items: center; gap: 10px; height: 52px; padding: 0 26px; background: #b3121a; color: #ffffff; font-size: 15.5px; font-weight: 600">
+          Cotizar mi vehículo
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 16px; height: 16px"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+        </span>
+        <span style="display: inline-flex; align-items: center; height: 52px; padding: 0 24px; border: 1px solid #14161a; color: #14161a; font-size: 15.5px; font-weight: 600">Escríbenos por WhatsApp</span>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; margin-top: 40px; background: #d9d9d4; border: 1px solid #d9d9d4">
+        <div style="background: #ffffff; padding: 16px 18px">
+          <p class="mono" style="margin: 0 0 6px; color: #8b9099">Garantía</p>
+          <p style="margin: 0; font-size: 15px; font-weight: 600">5 años por escrito</p>
+        </div>
+        <div style="background: #ffffff; padding: 16px 18px">
+          <p class="mono" style="margin: 0 0 6px; color: #8b9099">Secado</p>
+          <p style="margin: 0; font-size: 15px; font-weight: 600">Cabina de horno propia</p>
+        </div>
+        <div style="background: #ffffff; padding: 16px 18px">
+          <p class="mono" style="margin: 0 0 6px; color: #8b9099">Color</p>
+          <p style="margin: 0; font-size: 15px; font-weight: 600">Idéntico al original</p>
+        </div>
+        <div style="background: #ffffff; padding: 16px 18px">
+          <p class="mono" style="margin: 0 0 6px; color: #8b9099">Entrega</p>
+          <p style="margin: 0; font-size: 15px; font-weight: 600">Fecha cerrada</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- quote panel -->
+    <div style="padding: 40px 44px 44px 40px; background: #f4f4f2; display: flex; flex-direction: column; gap: 18px">
+      <div style="display: flex; align-items: baseline; justify-content: space-between">
+        <p class="mono" style="margin: 0; color: #14161a">Presupuesto en línea</p>
+        <p class="mono" style="margin: 0; color: #8b9099">Paso 1 / 4</p>
+      </div>
+
+      <div style="background: #ffffff; border: 1px solid #d9d9d4; padding: 24px 22px; display: flex; flex-direction: column; gap: 16px">
+        <div style="display: flex; flex-direction: column; gap: 7px">
+          <span class="mono" style="color: #8b9099">Marca y modelo</span>
+          <span style="display: block; padding: 13px 14px; border: 1px solid #c9c9c3; font-size: 15px; font-weight: 500">Toyota · Corolla Cross</span>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+          <div style="display: flex; flex-direction: column; gap: 7px">
+            <span class="mono" style="color: #8b9099">Año</span>
+            <span style="display: block; padding: 13px 14px; border: 1px solid #c9c9c3; font-size: 15px; font-weight: 500">2021</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 7px">
+            <span class="mono" style="color: #8b9099">Placa</span>
+            <span style="display: block; padding: 13px 14px; border: 1px solid #c9c9c3; font-size: 15px; font-weight: 500">ABC-142</span>
+          </div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 9px">
+          <span class="mono" style="color: #8b9099">Piezas a intervenir</span>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px">
+            <span style="padding: 9px 14px; border: 1px solid #b3121a; background: #b3121a; color: #ffffff; font-size: 13.5px; font-weight: 600">Capó</span>
+            <span style="padding: 9px 14px; border: 1px solid #b3121a; background: #b3121a; color: #ffffff; font-size: 13.5px; font-weight: 600">Puerta del.  izq.</span>
+            <span style="padding: 9px 14px; border: 1px solid #c9c9c3; color: #55595f; font-size: 13.5px; font-weight: 500">Guardafango</span>
+            <span style="padding: 9px 14px; border: 1px solid #c9c9c3; color: #55595f; font-size: 13.5px; font-weight: 500">Parachoques</span>
+            <span style="padding: 9px 14px; border: 1px solid #c9c9c3; color: #55595f; font-size: 13.5px; font-weight: 500">Techo</span>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: space-between; padding-top: 16px; border-top: 1px solid #e4e4df">
+          <span class="mono" style="color: #8b9099">Estimado</span>
+          <span style="font-size: 22px; font-weight: 600; letter-spacing: -0.02em">S/ 1 480 — 1 760</span>
+        </div>
+      </div>
+
+      <p class="mono" style="margin: 0; color: #8b9099; line-height: 1.7; text-transform: none; letter-spacing: 0.02em; font-size: 11.5px">Cifras de ejemplo. El rango final se confirma cuando el vehículo entra a taller.</p>
+    </div>
+  </div>
+
+  <!-- acabados -->
+  <div style="padding: 54px 44px 58px">
+    <p class="mono" style="margin: 0 0 14px; color: #b3121a">Niveles de acabado</p>
+    <h2 style="margin: 0 0 8px; font-size: 34px; line-height: 1.1; font-weight: 600; letter-spacing: -0.022em">Tres formas de hacerlo bien</h2>
+    <p style="margin: 0 0 28px; max-width: 60ch; font-size: 15.5px; line-height: 1.62; color: #55595f">La diferencia no es el color. Es cuántas manos de preparación lleva la pieza antes de entrar a cabina.</p>
+
+    <div style="border: 1px solid #d9d9d4; background: #ffffff">
+      <div style="display: grid; grid-template-columns: 1.3fr 1fr 1fr 1fr; border-bottom: 1px solid #d9d9d4">
+        <div style="padding: 14px 20px"><span class="mono" style="color: #8b9099">Detalle</span></div>
+        <div style="padding: 14px 20px; border-left: 1px solid #e4e4df"><span class="mono" style="color: #14161a">Económico</span></div>
+        <div style="padding: 14px 20px; border-left: 1px solid #e4e4df; background: #fbf3f3"><span class="mono" style="color: #b3121a">Profesional</span></div>
+        <div style="padding: 14px 20px; border-left: 1px solid #e4e4df"><span class="mono" style="color: #14161a">Alta gama</span></div>
+      </div>
+      <div style="display: grid; grid-template-columns: 1.3fr 1fr 1fr 1fr; border-bottom: 1px solid #e4e4df">
+        <div style="padding: 15px 20px; font-size: 14.5px; color: #55595f">Manos de preparación</div>
+        <div style="padding: 15px 20px; border-left: 1px solid #e4e4df; font-size: 14.5px; font-weight: 600">2</div>
+        <div style="padding: 15px 20px; border-left: 1px solid #e4e4df; background: #fbf3f3; font-size: 14.5px; font-weight: 600">4</div>
+        <div style="padding: 15px 20px; border-left: 1px solid #e4e4df; font-size: 14.5px; font-weight: 600">6</div>
+      </div>
+      <div style="display: grid; grid-template-columns: 1.3fr 1fr 1fr 1fr; border-bottom: 1px solid #e4e4df">
+        <div style="padding: 15px 20px; font-size: 14.5px; color: #55595f">Capas de barniz</div>
+        <div style="padding: 15px 20px; border-left: 1px solid #e4e4df; font-size: 14.5px; font-weight: 600">1</div>
+        <div style="padding: 15px 20px; border-left: 1px solid #e4e4df; background: #fbf3f3; font-size: 14.5px; font-weight: 600">2</div>
+        <div style="padding: 15px 20px; border-left: 1px solid #e4e4df; font-size: 14.5px; font-weight: 600">2 + pulido</div>
+      </div>
+      <div style="display: grid; grid-template-columns: 1.3fr 1fr 1fr 1fr; border-bottom: 1px solid #e4e4df">
+        <div style="padding: 15px 20px; font-size: 14.5px; color: #55595f">Difuminado con piezas vecinas</div>
+        <div style="padding: 15px 20px; border-left: 1px solid #e4e4df; font-size: 14.5px; color: #8b9099">No</div>
+        <div style="padding: 15px 20px; border-left: 1px solid #e4e4df; background: #fbf3f3; font-size: 14.5px; font-weight: 600">Sí</div>
+        <div style="padding: 15px 20px; border-left: 1px solid #e4e4df; font-size: 14.5px; font-weight: 600">Sí</div>
+      </div>
+      <div style="display: grid; grid-template-columns: 1.3fr 1fr 1fr 1fr">
+        <div style="padding: 15px 20px; font-size: 14.5px; color: #55595f">Garantía por escrito</div>
+        <div style="padding: 15px 20px; border-left: 1px solid #e4e4df; font-size: 14.5px; font-weight: 600">1 año</div>
+        <div style="padding: 15px 20px; border-left: 1px solid #e4e4df; background: #fbf3f3; font-size: 14.5px; font-weight: 600">3 años</div>
+        <div style="padding: 15px 20px; border-left: 1px solid #e4e4df; font-size: 14.5px; font-weight: 600">5 años</div>
+      </div>
+    </div>
+    <p class="mono" style="margin: 14px 0 0; color: #8b9099; text-transform: none; letter-spacing: 0.02em; font-size: 11.5px">Valores de ejemplo — reemplazar por las especificaciones reales del taller.</p>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>

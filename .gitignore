@@ -12,3 +12,7 @@ imgs/assets/3d-visuals/**/src/
 
 # Notas de trabajo, con datos del taller que no tienen por qué publicarse.
 LAUNCH-CHECKLIST.md
+
+# seeded design canvas (rebuild with the design skill)
+design/*.html
+!design/*.dc.html

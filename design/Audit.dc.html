@@ -1,0 +1,139 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+  <style>
+    body { margin: 0; font-family: 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif; background: #121315; }
+    a { color: #e1121b; } a:hover { color: #f7030d; }
+    .lbl { font-family: 'IBM Plex Mono', 'SFMono-Regular', Menlo, monospace; font-size: 11px; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase; }
+  </style>
+</helmet>
+
+<div style="width: 900px; min-height: 1280px; background: #121315; color: #e8e9ec; padding: 0 0 44px; display: flex; flex-direction: column; gap: 0">
+
+  <div style="padding: 44px 52px 30px; border-bottom: 1px solid rgba(255,255,255,0.14)">
+    <p class="lbl" style="margin: 0 0 14px; color: #e1121b">Autocolor / auditoría</p>
+    <h1 style="margin: 0; font-size: 38px; line-height: 1.08; font-weight: 600; letter-spacing: -0.02em; color: #ffffff; max-width: 22ch">Why the site reads unserious</h1>
+    <p style="margin: 16px 0 0; max-width: 62ch; font-size: 15px; line-height: 1.62; color: #9fa4ad">Read from the live source, then measured against body shops in Lima and premium paint shops abroad. The gap is not polish. It is that the palette, the type and the shapes belong to a consumer app, and the brand's own red never appears.</p>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0; border-bottom: 1px solid rgba(255,255,255,0.14)">
+
+    <div style="padding: 34px 30px 36px 52px; border-right: 1px solid rgba(255,255,255,0.14); display: flex; flex-direction: column; gap: 22px">
+      <p class="lbl" style="margin: 0; color: #6f7682">Today</p>
+
+      <div style="display: flex; flex-direction: column; gap: 20px">
+        <div style="display: flex; gap: 14px; align-items: flex-start">
+          <span style="width: 26px; height: 26px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: #e1121b; color: #fff; font-size: 12px; font-weight: 700">1</span>
+          <div>
+            <p style="margin: 0; font-size: 15px; font-weight: 600; color: #ffffff">A cream-to-white page</p>
+            <p style="margin: 5px 0 0; font-size: 13.5px; line-height: 1.55; color: #9fa4ad">The body is a gradient from #e1dcbf to white. That is a bakery palette. Nothing in a paint shop is beige.</p>
+            <div style="display: flex; gap: 6px; margin-top: 9px">
+              <span style="width: 44px; height: 18px; background: #e1dcbf"></span>
+              <span style="width: 44px; height: 18px; background: #f7f3e8"></span>
+              <span style="width: 44px; height: 18px; background: #ffffff"></span>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 14px; align-items: flex-start">
+          <span style="width: 26px; height: 26px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: #e1121b; color: #fff; font-size: 12px; font-weight: 700">2</span>
+          <div>
+            <p style="margin: 0; font-size: 15px; font-weight: 600; color: #ffffff">A sky-blue brand with a glow</p>
+            <p style="margin: 5px 0 0; font-size: 13.5px; line-height: 1.55; color: #9fa4ad">Every button, link and icon is #0f76bd, and the hero sits under a soft blue radial. This is the look of a scheduling app.</p>
+            <div style="display: flex; gap: 6px; margin-top: 9px">
+              <span style="width: 44px; height: 18px; background: #0f76bd"></span>
+              <span style="width: 44px; height: 18px; background: #6bc6ed"></span>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 14px; align-items: flex-start">
+          <span style="width: 26px; height: 26px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: #e1121b; color: #fff; font-size: 12px; font-weight: 700">3</span>
+          <div>
+            <p style="margin: 0; font-size: 15px; font-weight: 600; color: #ffffff">The logo is red and black. The site is not.</p>
+            <p style="margin: 5px 0 0; font-size: 13.5px; line-height: 1.55; color: #9fa4ad">The wordmark is a hard italic in #f7030d over black, with a car outline. None of that red appears anywhere in the stylesheet.</p>
+            <div style="margin-top: 10px; padding: 10px 14px; background: #ffffff; display: inline-block">
+              <img src="logoLight.png" alt="Autocolor" style="display: block; height: 30px; width: auto">
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 14px; align-items: flex-start">
+          <span style="width: 26px; height: 26px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: #e1121b; color: #fff; font-size: 12px; font-weight: 700">4</span>
+          <div>
+            <p style="margin: 0; font-size: 15px; font-weight: 600; color: #ffffff">Poppins, and pills</p>
+            <p style="margin: 5px 0 0; font-size: 13.5px; line-height: 1.55; color: #9fa4ad">Headlines are Poppins, the friendliest geometric face in the catalogue. Buttons are fully round at 999px and cards sit at 20px. Soft everywhere.</p>
+            <div style="display: flex; gap: 8px; align-items: center; margin-top: 10px">
+              <span style="padding: 8px 16px; border-radius: 999px; background: #0f76bd; color: #fff; font-size: 12px; font-weight: 600">Cotizar ahora</span>
+              <span style="padding: 5px 11px; border-radius: 999px; background: rgba(41,159,223,0.18); color: #6bc6ed; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase">Servicios</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 14px; align-items: flex-start">
+          <span style="width: 26px; height: 26px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: #e1121b; color: #fff; font-size: 12px; font-weight: 700">5</span>
+          <div>
+            <p style="margin: 0; font-size: 15px; font-weight: 600; color: #ffffff">No photograph of the work</p>
+            <p style="margin: 5px 0 0; font-size: 13.5px; line-height: 1.55; color: #9fa4ad">The hero is a tan stock SUV with a CSS tint over it, so the swatches read as a rental configurator rather than paintwork. The share image is still a TODO pointing at the logo.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="padding: 34px 52px 36px 30px; display: flex; flex-direction: column; gap: 22px">
+      <p class="lbl" style="margin: 0; color: #6f7682">What the reference shops do</p>
+
+      <div style="display: flex; flex-direction: column; gap: 18px">
+
+        <div style="border-left: 3px solid #e1121b; padding-left: 16px">
+          <p style="margin: 0; font-size: 15px; font-weight: 600; color: #ffffff">Germania Automotriz, Lima</p>
+          <p style="margin: 6px 0 0; font-size: 13.5px; line-height: 1.55; color: #9fa4ad">Uppercase Montserrat 600 at 50px, white over a photograph darkened to 52 percent. Square corners throughout, steel greys, no colour but the photograph. The process is spelled out in five technical stages: digital measurement, cold pull, computerised colour match, oven, quality control.</p>
+        </div>
+
+        <div style="border-left: 3px solid #e1121b; padding-left: 16px">
+          <p style="margin: 0; font-size: 15px; font-weight: 600; color: #ffffff">Full Paint Perú, Lima</p>
+          <p style="margin: 6px 0 0; font-size: 13.5px; line-height: 1.55; color: #9fa4ad">Near-black panels at #1c1c1c, one red accent, uppercase 700 headings, radii of two to four pixels. Opens on a before-and-after gallery of real cars and the list of brands it takes.</p>
+        </div>
+
+        <div style="border-left: 3px solid #e1121b; padding-left: 16px">
+          <p style="margin: 0; font-size: 15px; font-weight: 600; color: #ffffff">Premium paint and detail shops</p>
+          <p style="margin: 6px 0 0; font-size: 13.5px; line-height: 1.55; color: #9fa4ad">Dark, high-contrast grounds, because paintwork only reads when there is something for it to reflect. One repeated graphic motif carries the whole identity. Proof lands before any self-description: a rating, a written warranty, the insurers they bill. One action, repeated down the page.</p>
+        </div>
+
+        <div style="margin-top: 4px; padding: 18px; background: #1a1c20; border: 1px solid rgba(255,255,255,0.12)">
+          <p class="lbl" style="margin: 0 0 10px; color: #e1121b">The pattern</p>
+          <p style="margin: 0; font-size: 13.5px; line-height: 1.6; color: #c8ccd3">None of them are friendly. They are competent. The reassurance comes from specificity — ovens, colorimetry, written warranties, the insurer's name — not from soft shapes and pastel colour.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="padding: 32px 52px 0">
+    <p class="lbl" style="margin: 0 0 18px; color: #6f7682">What all three directions keep</p>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px">
+      <div style="padding: 18px; border: 1px solid rgba(255,255,255,0.14)">
+        <p style="margin: 0; font-size: 14px; font-weight: 600; color: #ffffff">Red and black</p>
+        <p style="margin: 6px 0 0; font-size: 13px; line-height: 1.55; color: #9fa4ad">Taken from the wordmark that already exists, tempered per direction. The blue and the cream go.</p>
+      </div>
+      <div style="padding: 18px; border: 1px solid rgba(255,255,255,0.14)">
+        <p style="margin: 0; font-size: 14px; font-weight: 600; color: #ffffff">Hard edges</p>
+        <p style="margin: 6px 0 0; font-size: 13px; line-height: 1.55; color: #9fa4ad">Zero to two pixels of radius. Panels, not cards. No pills anywhere.</p>
+      </div>
+      <div style="padding: 18px; border: 1px solid rgba(255,255,255,0.14)">
+        <p style="margin: 0; font-size: 14px; font-weight: 600; color: #ffffff">The work, photographed</p>
+        <p style="margin: 6px 0 0; font-size: 13px; line-height: 1.55; color: #9fa4ad">Marked slots below until real photographs of the shop, the oven and finished cars exist. They are the single biggest lift available.</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>
