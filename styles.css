@@ -2158,6 +2158,9 @@ body.home {
     line-height: 1;
     letter-spacing: 0.01em;
     color: #fff;
+    /* while the figure counts up the digits change every frame; equal-width
+       ones keep it from shivering */
+    font-variant-numeric: tabular-nums;
 }
 
 .stats span {
