@@ -10,7 +10,7 @@ body {
     margin: 0;
     min-height: 100dvh;
     width: 100%;
-    color: black;
+    color: var(--ink);
     scrollbar-color: auto;
     -webkit-font-smoothing: antialiased;
 }
@@ -257,7 +257,7 @@ svg {
 }
 
 .back-link:hover {
-    color: black;
+    color: var(--ink);
 }
 
 .back-link svg {
@@ -846,7 +846,7 @@ svg {
 
 .car-view-3d__list-item-remove:hover {
     background: var(--border);
-    color: black;
+    color: var(--ink);
 }
 
 .car-view-3d__empty {
@@ -928,7 +928,7 @@ svg {
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     padding: 11px 12px;
-    color: black;
+    color: var(--ink);
     font-family: inherit;
     transition: border-color 0.2s var(--ease-out), background 0.2s var(--ease-out);
 }
@@ -1107,7 +1107,7 @@ svg {
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-md);
     font-weight: 500;
-    color: black;
+    color: var(--ink);
     background: none;
     cursor: pointer;
     transition: background 0.2s var(--ease-out);
@@ -3945,7 +3945,7 @@ body.staff {
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     padding: 12px;
-    color: black;
+    color: var(--ink);
     font-family: inherit;
     font-size: 0.95rem;
     line-height: 1.6;
@@ -4676,7 +4676,19 @@ body.staff {
 .staff .car-view-3d__canvas-wrap {
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
-    background: linear-gradient(165deg, var(--shop-panel-2), var(--shop) 70%);
+    background: linear-gradient(165deg, #e6e8ec, #fafbfc 70%);
+}
+
+/* Lo que se dibuja encima de la platina vuelve a ser oscuro: el resto del
+   panel es claro sobre oscuro, pero dentro del recuadro el fondo es al revés.
+   Solo lo de dentro —la etiqueta de carga y su barra—; el pie de ayuda cuelga
+   del recuadro y se queda claro. */
+.staff .car-view-3d__loading-label {
+    color: #4a5058;
+}
+
+.staff .car-view-3d__progress-track {
+    background: rgba(17, 19, 23, 0.16);
 }
 
 .staff .car-view-3d__summary {
