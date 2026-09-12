@@ -2,6 +2,14 @@ html {
     background: var(--paper);
 }
 
+/* The rubber-band area above and below the page belongs to <html>, not to
+   <body>, so the dark pages have to say so here or they flash paper at the
+   edges of an overscroll. The wizard stays light. */
+html:has(body.home),
+html:has(body.staff) {
+    background: #0b0c0e;
+}
+
 body {
     /* The cream-to-white wash went with the old palette; a paint shop reads
        as steel, not as sand. */
@@ -2243,7 +2251,9 @@ body.home {
 
 .contact__details {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    /* 240 rather than 180: a second column is only worth having when the
+       cells are still wide enough for the mail address on one line */
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
     gap: 1px;
     padding: 0;
     background: var(--shop-line);
@@ -2274,6 +2284,9 @@ body.home {
     font-size: 0.96rem;
     line-height: 1.5;
     color: var(--shop-ink);
+    /* the address and the mail have no spaces to break at, and the cells are
+       narrow — without this they run out over the rule on the right */
+    overflow-wrap: anywhere;
 }
 
 a.contact__value:hover {
@@ -2286,6 +2299,9 @@ a.contact__value:hover {
     justify-content: center;
     margin-top: 36px;
     min-height: 260px;
+    /* the embed paints white before the tiles arrive; without a ground of its
+       own that first second is a slab of light in the middle of the page */
+    background: var(--shop-panel-2);
     border: 1px solid var(--shop-line);
     border-radius: 0;
     color: var(--shop-dim);
@@ -2297,6 +2313,10 @@ a.contact__value:hover {
 
 .map iframe {
     width: 100%;
+    /* the embed carries width="600"; as a flex item its intrinsic width
+       becomes its floor, so it has to be told it may shrink */
+    min-width: 0;
+    max-width: 100%;
     min-height: 380px;
     border: 0;
     /* the embed only ships a light tile set; knocking it back keeps it from
