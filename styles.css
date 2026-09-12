@@ -2393,7 +2393,7 @@ a.contact__value:hover {
     justify-content: center;
     width: 54px;
     height: 54px;
-    border-radius: 2px;
+    border-radius: 50%;
     background: #25d366;
     color: #0b0c0e;
     box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
@@ -3203,9 +3203,25 @@ body.wizard {
 
 /* El degradado crema del sitio es para vender; aquí estorba. Detrás de una
    tabla que se mira durante horas va un fondo plano y quieto, y que además no
-   cambia de color según cuánto se haya bajado. */
+   cambia de color según cuánto se haya bajado.
+
+   El panel pasa al mismo fondo de taller que el sitio público. Aquí el motivo
+   no es la estética: son nueve columnas miradas toda la jornada, y sobre
+   oscuro cansan menos y las píldoras de estado se separan mejor del fondo.
+   Los tokens del sitio se redefinen una sola vez, aquí, y el resto del bloque
+   sigue escrito contra ellos. */
 body.staff {
-    background: #f6f4ee;
+    background: var(--shop);
+    color: var(--shop-ink);
+
+    --ink: var(--shop-ink);
+    --surface: var(--shop-panel);
+    --surface-tint: var(--shop-panel-2);
+    --text-dim: var(--shop-body);
+    --text-faint: var(--shop-dim);
+    --border: var(--shop-line);
+    --border-strong: var(--shop-line-strong);
+    --focus: #ffffff;
 }
 
 /* .staff-panel es flex, y el `display` de una clase le gana al atributo
@@ -3222,8 +3238,9 @@ body.staff {
     align-items: center;
     gap: 14px;
     padding: 13px 24px;
-    background: var(--ink);
-    color: #f6f2e6;
+    background: var(--shop-panel-2);
+    border-bottom: 1px solid var(--shop-line);
+    color: var(--shop-ink);
 }
 
 .staff-topbar__logo {
@@ -3235,15 +3252,15 @@ body.staff {
 .staff-topbar__rule {
     width: 1px;
     height: 22px;
-    background: rgba(246, 242, 230, 0.22);
+    background: rgba(255, 255, 255, 0.22);
 }
 
 .staff-topbar__label {
     font-size: 0.72rem;
     font-weight: 600;
-    letter-spacing: 0.09em;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
-    color: rgba(246, 242, 230, 0.68);
+    color: var(--shop-body);
 }
 
 .staff-topbar__clock {
@@ -3252,16 +3269,16 @@ body.staff {
     font-size: 0.95rem;
     font-weight: 600;
     letter-spacing: 0.02em;
-    color: #f6f2e6;
+    color: var(--shop-ink);
     white-space: nowrap;
 }
 
 .staff-topbar__logout {
     padding: 6px 14px;
-    border: 1px solid rgba(246, 242, 230, 0.28);
+    border: 1px solid rgba(255, 255, 255, 0.28);
     border-radius: var(--radius-sm);
     background: transparent;
-    color: #f6f2e6;
+    color: var(--shop-ink);
     font: inherit;
     font-size: 0.85rem;
     font-weight: 600;
@@ -3270,8 +3287,8 @@ body.staff {
 }
 
 .staff-topbar__logout:hover {
-    background: rgba(246, 242, 230, 0.1);
-    border-color: rgba(246, 242, 230, 0.45);
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.45);
 }
 
 /* -----------------------------------------------------------------------------
@@ -3323,8 +3340,11 @@ body.staff {
 .staff-page h1 {
     margin: 0;
     font-family: var(--font-display);
-    font-size: clamp(1.6rem, 1.2rem + 1.6vw, 2.1rem);
-    line-height: 1.2;
+    font-size: clamp(1.9rem, 1.4rem + 1.8vw, 2.5rem);
+    font-weight: 700;
+    line-height: 1.05;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
     color: var(--ink);
 }
 
@@ -3367,7 +3387,7 @@ body.staff {
     padding: 9px 12px 9px 34px;
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
-    background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%237a7266' stroke-width='1.6'%3E%3Ccircle cx='7' cy='7' r='4.3'/%3E%3Cpath d='M10.4 10.4 14 14' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat 11px 50% / 14px 14px;
+    background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23a3aab3' stroke-width='1.6'%3E%3Ccircle cx='7' cy='7' r='4.3'/%3E%3Cpath d='M10.4 10.4 14 14' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat 11px 50% / 14px 14px;
     font: inherit;
     font-size: 0.9rem;
     color: var(--ink);
@@ -3413,9 +3433,9 @@ body.staff {
 }
 
 .staff-chip[aria-pressed="true"] {
-    background: var(--ink);
+    background: var(--shop-ink);
     border-color: transparent;
-    color: #f6f2e6;
+    color: var(--shop);
 }
 
 /* «Mis vehículos» no recorta por etapa sino por quién tiene el vehículo, así
@@ -3462,7 +3482,7 @@ body.staff {
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     overflow: hidden;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    box-shadow: none;
 }
 
 /* En pantalla angosta la tabla se desplaza dentro de su tarjeta en vez de
@@ -3498,7 +3518,7 @@ body.staff {
 .staff-table td {
     padding: 10px 14px;
     vertical-align: middle;
-    border-bottom: 1px solid rgba(28, 26, 23, 0.07);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
     color: var(--ink);
 }
 
@@ -3507,7 +3527,7 @@ body.staff {
 }
 
 .staff-table tbody tr:hover {
-    background: rgba(225, 220, 191, 0.16);
+    background: rgba(255, 255, 255, 0.05);
 }
 
 /* Solo lo que se lee de corrido —código, fecha, teléfono— se niega a partirse.
@@ -3530,7 +3550,7 @@ body.staff {
 .staff-table__plate {
     display: inline-block;
     padding: 3px 8px;
-    border-radius: 6px;
+    border-radius: 2px;
     background: var(--surface-tint);
     font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
     font-size: 0.82rem;
@@ -3625,7 +3645,7 @@ body.staff {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
-    box-shadow: 0 10px 26px rgba(15, 23, 42, 0.16);
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.5);
 }
 
 .staff-status__option {
@@ -3636,7 +3656,7 @@ body.staff {
     box-sizing: border-box;
     padding: 8px 11px;
     border: none;
-    border-radius: 6px;
+    border-radius: 2px;
     background: transparent;
     font: inherit;
     font-size: 0.82rem;
@@ -3665,17 +3685,17 @@ body.staff {
 
    Va sobre [data-status] a secas para que sirva igual a la píldora y a cada
    opción del menú, que es lo que les da su punto de color. */
-.staff [data-status="recibido"]           { --pill-bg: #eef0f2; --pill-fg: #46515c; --pill-dot: #7d8a97; }
-.staff [data-status="planchado"]          { --pill-bg: #fbf1dc; --pill-fg: #85610f; --pill-dot: #d19b1e; }
-.staff [data-status="desmontaje_montaje"] { --pill-bg: #ece7f7; --pill-fg: #55458a; --pill-dot: #8a76c8; }
-.staff [data-status="pintura"]            { --pill-bg: #e3f2fb; --pill-fg: #0a5b93; --pill-dot: #299fdf; }
-.staff [data-status="preparacion"]        { --pill-bg: #fdeee4; --pill-fg: #8f4a1e; --pill-dot: #dd7b38; }
-.staff [data-status="cuadrada"]           { --pill-bg: #f2eee6; --pill-fg: #6b5b3e; --pill-dot: #a8916a; }
-.staff [data-status="cristales"]          { --pill-bg: #e4f5f3; --pill-fg: #0f6a63; --pill-dot: #26a89c; }
-.staff [data-status="finitura"]           { --pill-bg: #fbe9f2; --pill-fg: #8e2a5b; --pill-dot: #d1508f; }
-.staff [data-status="listo"]              { --pill-bg: #e4f3e9; --pill-fg: #1a6d3c; --pill-dot: #2f9e5c; }
-.staff [data-status="entregado"]          { --pill-bg: #ecefe9; --pill-fg: #57604f; --pill-dot: #8d9682; }
-.staff [data-status="cancelado"]          { --pill-bg: #fbe9e8; --pill-fg: #a5241d; --pill-dot: #d94a41; }
+.staff [data-status="recibido"]           { --pill-bg: #262a30; --pill-fg: #c1c7cd; --pill-dot: #7d8a97; }
+.staff [data-status="planchado"]          { --pill-bg: #332d1c; --pill-fg: #ead5a4; --pill-dot: #d19b1e; }
+.staff [data-status="desmontaje_montaje"] { --pill-bg: #282738; --pill-fg: #bbafdf; --pill-dot: #8a76c8; }
+.staff [data-status="pintura"]            { --pill-bg: #182e3b; --pill-fg: #a4d1ea; --pill-dot: #299fdf; }
+.staff [data-status="preparacion"]        { --pill-bg: #352820; --pill-fg: #eac0a4; --pill-dot: #dd7b38; }
+.staff [data-status="cuadrada"]           { --pill-bg: #2d2b28; --pill-fg: #d6cbb8; --pill-dot: #a8916a; }
+.staff [data-status="cristales"]          { --pill-bg: #182f30; --pill-fg: #a4eae3; --pill-dot: #26a89c; }
+.staff [data-status="finitura"]           { --pill-bg: #33212e; --pill-fg: #e8a6c6; --pill-dot: #d1508f; }
+.staff [data-status="listo"]              { --pill-bg: #192d26; --pill-fg: #a9e5c1; --pill-dot: #2f9e5c; }
+.staff [data-status="entregado"]          { --pill-bg: #282c2c; --pill-fg: #c7ccc2; --pill-dot: #8d9682; }
+.staff [data-status="cancelado"]          { --pill-bg: #342022; --pill-fg: #eaa8a4; --pill-dot: #d94a41; }
 
 /* La píldora de estado de un vehículo que tiene otro: inerte y sin el caret que
    invita a desplegarla. El servidor rechaza el cambio igual (403); esto solo
@@ -3725,7 +3745,7 @@ body.staff {
 }
 
 .staff-occupied__claim:hover {
-    border-color: #299fdf;
+    border-color: var(--brand);
     border-style: solid;
     color: var(--ink);
     background: var(--surface-tint);
@@ -3738,8 +3758,8 @@ body.staff {
     padding: 6px 12px;
     border: none;
     border-radius: 999px;
-    background: #e4f3e9;
-    color: #1a6d3c;
+    background: #192d26;
+    color: #a9e5c1;
     font: inherit;
     font-size: 0.82rem;
     font-weight: 600;
@@ -3749,7 +3769,7 @@ body.staff {
 }
 
 .staff-occupied__mine:hover {
-    background: #d5ecdc;
+    background: #22402f;
 }
 
 /* «Liberar» sale al pasar por encima o al enfocar, y la píldora se estira para
@@ -3765,7 +3785,7 @@ body.staff {
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: #2f9e5c;
+    color: #7fd9a3;
     opacity: 0;
     transition: max-width 0.18s var(--ease-out), margin-left 0.18s var(--ease-out), opacity 0.14s var(--ease-out);
 }
@@ -4348,7 +4368,7 @@ body.staff {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
-    box-shadow: 0 10px 26px rgba(15, 23, 42, 0.16);
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.5);
 }
 
 .staff-cardmenu__option {
@@ -4356,7 +4376,7 @@ body.staff {
     width: 100%;
     padding: 8px 10px;
     border: none;
-    border-radius: 6px;
+    border-radius: 2px;
     background: none;
     color: var(--ink);
     font: inherit;
@@ -4656,7 +4676,7 @@ body.staff {
 .staff .car-view-3d__canvas-wrap {
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
-    background: linear-gradient(165deg, var(--surface-tint), #ffffff 70%);
+    background: linear-gradient(165deg, var(--shop-panel-2), var(--shop) 70%);
 }
 
 .staff .car-view-3d__summary {
