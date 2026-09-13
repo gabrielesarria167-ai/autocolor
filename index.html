@@ -61,6 +61,14 @@
 
     <main id="contenido">
 
+        <!--
+            Las secciones se alternan: fondo base y fondo panel, una y otra, para
+            que cada una se despegue de la anterior. El héroe es fondo base, así
+            que la primera lleva section--tint, y la última tiene que quedar sin
+            él o se funde con el pie de página, que ya es panel. Si se añade o se
+            quita una sección, hay que repasar la cadena entera.
+        -->
+
         <!-- ===== Hero ===== -->
         <section class="hero">
             <div class="hero__inner">
@@ -174,7 +182,7 @@
         </section>
 
         <!-- ===== Servicios ===== -->
-        <section class="section" id="servicios">
+        <section class="section section--tint" id="servicios">
             <div class="section__inner">
                 <header class="section__head reveal">
                     <p class="eyebrow">Servicios</p>
@@ -272,7 +280,7 @@
         </section>
 
         <!-- ===== Proceso ===== -->
-        <section class="section section--tint" id="proceso">
+        <section class="section" id="proceso">
             <div class="section__inner">
                 <header class="section__head reveal">
                     <p class="eyebrow">Cómo funciona</p>
@@ -315,7 +323,7 @@
         </section>
 
         <!-- ===== Acabados ===== -->
-        <section class="section" id="acabados">
+        <section class="section section--tint" id="acabados">
             <div class="section__inner">
                 <header class="section__head reveal">
                     <p class="eyebrow">Niveles de acabado</p>
