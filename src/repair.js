@@ -704,18 +704,32 @@
     }
 
     // ---------- Paso 2: selección de acabado ----------
-    qualityCards.forEach(function (card) {
-        card.addEventListener("click", function () {
-            qualityCards.forEach(function (c) {
-                c.classList.remove("is-selected");
-                c.setAttribute("aria-checked", "false");
-            });
-            card.classList.add("is-selected");
-            card.setAttribute("aria-checked", "true");
-            state.quality = card.dataset.value;
-            refreshConfirm();
+    function selectQuality(card) {
+        qualityCards.forEach(function (c) {
+            c.classList.remove("is-selected");
+            c.setAttribute("aria-checked", "false");
         });
+        card.classList.add("is-selected");
+        card.setAttribute("aria-checked", "true");
+        state.quality = card.dataset.value;
+        refreshConfirm();
+    }
+
+    qualityCards.forEach(function (card) {
+        card.addEventListener("click", function () { selectQuality(card); });
     });
+
+    // Quien llega desde una tarjeta de acabado de la portada trae su elección
+    // en ?acabado=; el token es el mismo data-value de la tarjeta, así que no
+    // hay tabla que mantener. Llega elegido, pero se puede cambiar: el paso 2
+    // sigue siendo un paso del asistente, no una decisión ya tomada.
+    var wantedQuality = new URLSearchParams(window.location.search).get("acabado");
+
+    if (wantedQuality) {
+        qualityCards.forEach(function (card) {
+            if (card.dataset.value === wantedQuality) selectQuality(card);
+        });
+    }
 
     // ---------- Paso 4: formulario de contacto ----------
 
