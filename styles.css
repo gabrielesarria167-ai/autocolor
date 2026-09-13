@@ -1972,6 +1972,13 @@ body.home {
     padding-left: 24px;
     color: var(--shop-body);
     font-size: 0.92rem;
+    line-height: 1.5;
+}
+
+/* The lead of each line names what it is; the sentence after it explains. */
+.tier__list strong {
+    font-weight: 600;
+    color: var(--shop-ink);
 }
 
 .tier__list li::before {

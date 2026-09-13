@@ -122,9 +122,9 @@
     var figures = document.querySelectorAll(".stats strong");
 
     if (figures.length && "IntersectionObserver" in window && !reduceMotion) {
-        var DECAY = 4;          // cuanto más alto, más brusca la frenada
-        var DURATION = 1300;    // ms
-        var STAGGER = 100;       // ms entre una cifra y la siguiente
+        var DECAY = 3;          // cuanto más alto, más brusca la frenada
+        var DURATION = 2600;    // ms
+        var STAGGER = 170;      // ms entre una cifra y la siguiente
         var SETTLE = 1 - Math.exp(-DECAY);
 
         var countables = [];
