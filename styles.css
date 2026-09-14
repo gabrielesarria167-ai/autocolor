@@ -1575,7 +1575,9 @@ body.home {
    competing with the label. */
 .hero__trust {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    /* Fixed columns, not auto-fit: auto-fit gave three or four across at
+       tablet widths and left holes in the ruled frame. */
+    grid-template-columns: 1fr;
     gap: 0;
     margin-top: 40px;
     border-top: 1px solid var(--shop-line);
@@ -1600,6 +1602,18 @@ body.home {
     height: 18px;
     flex-shrink: 0;
     color: var(--brand-text);
+}
+
+@media (min-width: 480px) {
+    .hero__trust {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    /* An odd count leaves the last cell alone on its row, and the empty half
+       beside it has no rules to close the frame; stretch it across instead. */
+    .hero__trust li:last-child:nth-child(odd) {
+        grid-column: 1 / -1;
+    }
 }
 
 /* --- hero vehicle + live colour preview --- */
@@ -1755,9 +1769,6 @@ body.home {
 
     /* Four proofs in the copy column: two by two, so the cluster stays square
        instead of leaving a lone cell on a second row. */
-    .hero__trust {
-        grid-template-columns: repeat(2, 1fr);
-    }
 }
 
 /* ===== Home: service cards ===== */
@@ -2051,6 +2062,19 @@ body.home {
     color: var(--shop-body);
     font-size: 0.92rem;
     line-height: 1.6;
+}
+
+/* Links reset to plain text site-wide, so one inside running copy needs its
+   underline back or it reads as an ordinary sentence. */
+.fact dd a {
+    color: var(--shop-ink);
+    text-decoration: underline;
+    text-decoration-color: var(--brand-line);
+    text-underline-offset: 3px;
+}
+
+.fact dd a:hover {
+    text-decoration-color: var(--brand-text);
 }
 
 .split__panel {
