@@ -2645,17 +2645,17 @@ body.wizard {
     border-width: 1.5px;
 }
 
-/* The standard and top tiers were drawn in near-black and slate, which vanish
-   on the dark ground; they become the ground's own greys and white. The
-   recommended tier keeps the red, with its price set in the readable cut. */
+/* The standard and top tiers get their green and gold back: in grey and white
+   the three levels read as one card printed three times. The recommended tier
+   keeps the red, with its price set in the readable cut. */
 .wizard .quality-card--standard {
-    --tier: #7d848d;
-    --tier-soft: rgba(125, 132, 141, 0.12);
+    --tier: #2ecc71;
+    --tier-soft: rgba(46, 204, 113, 0.12);
 }
 
 .wizard .quality-card--alta-gama {
-    --tier: #ffffff;
-    --tier-soft: rgba(255, 255, 255, 0.07);
+    --tier: #f4b400;
+    --tier-soft: rgba(244, 180, 0, 0.12);
 }
 
 .wizard .quality-card--premium .quality-card__sub {
