@@ -1910,9 +1910,10 @@ body.home {
     }
 }
 
-/* The three tiers used to be green, blue and gold, which read as a pricing
-   table on a SaaS site. They are one material now; only the recommended one
-   carries the red. */
+/* Each tier carries its own colour, the same as in the wizard: green for the
+   economy level, the brand red for the recommended one, gold for the top. The
+   colour marks the price, the ticks and a rule down the card's left edge; the
+   ground and the buttons stay the same for all three. */
 .tier {
     position: relative;
     display: flex;
@@ -1927,6 +1928,16 @@ body.home {
 
 .section--tint .tier {
     background: var(--shop-panel);
+}
+
+.tier--standard {
+    --tier-color: #2ecc71;
+    box-shadow: inset 3px 0 0 #2ecc71;
+}
+
+.tier--alta {
+    --tier-color: #f4b400;
+    box-shadow: inset 3px 0 0 #f4b400;
 }
 
 .tier--premium {
