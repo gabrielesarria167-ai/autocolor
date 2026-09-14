@@ -4,9 +4,10 @@ html {
 
 /* The rubber-band area above and below the page belongs to <html>, not to
    <body>, so the dark pages have to say so here or they flash paper at the
-   edges of an overscroll. The wizard stays light. */
+   edges of an overscroll. */
 html:has(body.home),
-html:has(body.staff) {
+html:has(body.staff),
+html:has(body.wizard) {
     background: #0b0c0e;
 }
 
@@ -1196,7 +1197,9 @@ body.home {
        all derive from this. */
     --header-h: 72px;
 
-    /* The workshop ground. Only the home page paints with these. */
+    /* The workshop ground. Every page paints with these now: the home page
+       directly, the wizard and the workshop panel by pointing the shared
+       tokens at them. */
     --shop: #0b0c0e;
     --shop-panel: #101215;
     --shop-panel-2: #15181c;
@@ -2415,11 +2418,44 @@ a.contact__value:hover {
    the JS depends on are untouched — this is presentation only.
    ========================================================================== */
 
+/* The wizard moves onto the workshop ground with the rest of the site. As on
+   the workshop panel, the shared tokens are redefined once here and the rules
+   below, already written against them, follow. What cannot follow — colours
+   that were hardcoded for a light page, and the red where it has to be read as
+   type — is overridden further down, next to the rule it belongs to. */
 body.wizard {
-    background: var(--paper);
-    background-attachment: fixed;
-    color: var(--ink);
+    background: var(--shop);
+    color: var(--shop-ink);
+    color-scheme: dark;
     min-height: 100dvh;
+
+    --ink: var(--shop-ink);
+    --surface: var(--shop-panel);
+    --surface-tint: var(--shop-panel-2);
+    --text-dim: var(--shop-body);
+    --text-faint: var(--shop-dim);
+    --border: var(--shop-line);
+    --border-strong: var(--shop-line-strong);
+    --focus: #ffffff;
+}
+
+/* The parts step is the exception. The seams between one body panel and the
+   next only read against a light ground, so the step's whole body turns white
+   and takes the light tokens back; the progress bar above it and the footer
+   below stay in the workshop. */
+.wizard-body:has(.step[data-step="3"].active) {
+    background: #ffffff;
+    color: #17150f;
+    color-scheme: light;
+
+    --ink: #17150f;
+    --surface: #ffffff;
+    --surface-tint: #ececea;
+    --text-dim: #5c616a;
+    --text-faint: #878d97;
+    --border: rgba(17, 19, 23, 0.14);
+    --border-strong: rgba(17, 19, 23, 0.26);
+    --focus: #1f6feb;
 }
 
 .wizard .site-header__tag {
@@ -2474,7 +2510,7 @@ body.wizard {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 2px;
-    box-shadow: 0 1px 2px rgba(28, 26, 23, 0.04), 0 18px 44px rgba(28, 26, 23, 0.09);
+    box-shadow: 0 18px 44px rgba(0, 0, 0, 0.45);
     overflow: clip;
 }
 
@@ -2560,7 +2596,7 @@ body.wizard {
 .wizard .progress-dot.is-done {
     background: var(--brand-soft);
     border-color: var(--brand-line);
-    color: var(--brand-dark);
+    color: var(--brand-text);
 }
 
 .wizard .progress-dot.is-done::before {
@@ -2597,11 +2633,14 @@ body.wizard {
 }
 
 /* ===== Wizard: step headings ===== */
+/* Condensed uppercase, as on the home page and the workshop panel. */
 .wizard .step h1 {
-    font-size: clamp(1.5rem, 1.2rem + 1.4vw, 2.05rem);
-    line-height: 1.18;
-    letter-spacing: -0.02em;
-    margin: 0 0 8px;
+    font-size: clamp(1.75rem, 1.35rem + 1.6vw, 2.4rem);
+    font-weight: 700;
+    line-height: 1.05;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    margin: 0 0 10px;
 }
 
 .wizard .step__subtitle {
@@ -2620,8 +2659,29 @@ body.wizard {
     border-width: 1.5px;
 }
 
+/* The standard and top tiers were drawn in near-black and slate, which vanish
+   on the dark ground; they become the ground's own greys and white. The
+   recommended tier keeps the red, with its price set in the readable cut. */
+.wizard .quality-card--standard {
+    --tier: #7d848d;
+    --tier-soft: rgba(125, 132, 141, 0.12);
+}
+
+.wizard .quality-card--alta-gama {
+    --tier: #ffffff;
+    --tier-soft: rgba(255, 255, 255, 0.07);
+}
+
+.wizard .quality-card--premium .quality-card__sub {
+    color: var(--brand-text);
+}
+
+.wizard .quality-card--alta-gama .quality-card__badge {
+    color: var(--shop);
+}
+
 .wizard .quality-card:hover {
-    box-shadow: 0 12px 26px rgba(28, 26, 23, 0.09);
+    box-shadow: 0 12px 26px rgba(0, 0, 0, 0.4);
 }
 
 .wizard .quality-card__badge {
@@ -2688,6 +2748,20 @@ body.wizard {
 }
 
 /* ===== Wizard: form fields ===== */
+/* ===== Wizard: vehicle data ===== */
+.wizard .data-card__icon,
+.wizard .car-preview__type {
+    color: var(--brand-text);
+}
+
+.wizard .car-preview {
+    box-shadow: none;
+}
+
+.wizard .field select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a3aab3' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+}
+
 .wizard .contact-form {
     column-gap: 18px;
 }
@@ -2765,7 +2839,7 @@ body.wizard {
     justify-content: space-between;
     gap: 14px;
     padding: 14px 20px;
-    background: rgba(255, 255, 255, 0.9);
+    background: rgba(16, 18, 21, 0.9);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border-top: 1px solid var(--border);
@@ -2821,7 +2895,7 @@ body.wizard {
 .wizard .step-confirm:disabled {
     background: var(--border-strong);
     color: #fff;
-    opacity: 0.55;
+    opacity: 0.45;
     box-shadow: none;
 }
 
@@ -2834,11 +2908,15 @@ body.wizard {
     width: 72px;
     height: 72px;
     background: var(--brand-soft);
-    box-shadow: 0 0 0 8px rgba(41, 159, 223, 0.07);
+    box-shadow: 0 0 0 8px rgba(212, 15, 24, 0.06);
 }
 
 .wizard .success h1 {
-    font-size: clamp(1.5rem, 1.2rem + 1.4vw, 2.05rem);
+    font-size: clamp(1.75rem, 1.35rem + 1.6vw, 2.4rem);
+    font-weight: 700;
+    line-height: 1.05;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
 }
 
 .wizard .success__reset {
@@ -2850,7 +2928,7 @@ body.wizard {
 
 .wizard .success__reset:hover {
     border-color: var(--brand);
-    color: var(--brand-dark);
+    color: var(--brand-text);
     background: var(--brand-soft);
 }
 
@@ -2873,7 +2951,7 @@ body.wizard {
 }
 
 .wizard-note a:hover {
-    color: var(--brand-dark);
+    color: var(--brand-text);
 }
 
 /* ==========================================================================
@@ -3153,6 +3231,51 @@ body.wizard {
     color: #a5241d;
 }
 
+/* On the wizard's dark ground the red cut that carries white text is too dim
+   to read as type, and the pill and error tints were mixed for white paper.
+   The type moves to --brand-text and the tints to the workshop panel's. */
+.wizard .form-error {
+    border-color: rgba(242, 67, 74, 0.4);
+    background: #342022;
+    color: #eaa8a4;
+}
+
+.wizard .tracking-code__label,
+.wizard .tracking-code__copy,
+.wizard .tracking-code__hint a {
+    color: var(--brand-text);
+}
+
+.wizard .tracking-code__copy:hover,
+.wizard .tracking-code__copy.is-copied {
+    color: #fff;
+}
+
+.wizard .lookup {
+    box-shadow: none;
+}
+
+.wizard .status-pill[data-status="recibido"],
+.wizard .status-pill[data-status="planchado"],
+.wizard .status-pill[data-status="desmontaje_montaje"],
+.wizard .status-pill[data-status="pintura"],
+.wizard .status-pill[data-status="preparacion"],
+.wizard .status-pill[data-status="cuadrada"],
+.wizard .status-pill[data-status="cristales"],
+.wizard .status-pill[data-status="finitura"] {
+    color: var(--brand-text);
+}
+
+.wizard .status-pill[data-status="listo"],
+.wizard .status-pill[data-status="entregado"] {
+    background: #192d26;
+    color: #a9e5c1;
+}
+
+.wizard .status-pill[data-status="cancelado"] {
+    background: #342022;
+    color: #eaa8a4;
+}
 
 /* =============================================================================
    Panel del taller (pgs/taller.html)
