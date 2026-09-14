@@ -1334,10 +1334,15 @@ body.home {
 }
 
 /* ===== Home: header ===== */
+/* Pinned to --header-h rather than left to its contents: the nav links, the
+   call-to-action and the menu toggle each give it a different natural height,
+   and the wizard's sticky progress bar and the anchor offsets are placed at
+   the token, so any difference shows up as a gap under the header. */
 .site-header {
     position: sticky;
     top: 0;
     z-index: 40;
+    height: var(--header-h);
     display: flex;
     align-items: center;
     gap: 20px;
@@ -2439,25 +2444,6 @@ body.wizard {
     --focus: #ffffff;
 }
 
-/* The parts step is the exception. The seams between one body panel and the
-   next only read against a light ground, so the step's whole body turns white
-   and takes the light tokens back; the progress bar above it and the footer
-   below stay in the workshop. */
-.wizard-body:has(.step[data-step="3"].active) {
-    background: #ffffff;
-    color: #17150f;
-    color-scheme: light;
-
-    --ink: #17150f;
-    --surface: #ffffff;
-    --surface-tint: #ececea;
-    --text-dim: #5c616a;
-    --text-faint: #878d97;
-    --border: rgba(17, 19, 23, 0.14);
-    --border-strong: rgba(17, 19, 23, 0.26);
-    --focus: #1f6feb;
-}
-
 .wizard .site-header__tag {
     display: none;
     padding: 8px 14px;
@@ -2726,10 +2712,23 @@ body.wizard {
     box-shadow: 0 4px 12px rgba(212, 15, 24, 0.22);
 }
 
+/* The 3D stage is the one light thing in the wizard. The seams between one
+   body panel and the next only read against a light ground, so the canvas
+   keeps a white platen; what is drawn on top of it — the loading label and
+   its bar — turns dark to match. The hint hangs below the frame and stays
+   light, as on the workshop panel. */
 .wizard .car-view-3d__canvas-wrap {
     border-radius: 2px;
-    background: linear-gradient(165deg, var(--surface-tint), #ffffff 70%);
+    background: #ffffff;
     border: 1px solid var(--border);
+}
+
+.wizard .car-view-3d__loading-label {
+    color: #4a5058;
+}
+
+.wizard .car-view-3d__progress-track {
+    background: rgba(17, 19, 23, 0.16);
 }
 
 .wizard .car-view-3d__summary {
