@@ -358,7 +358,23 @@
                     <ul class="car-view-3d__list" id="carView3dList">
                         <li class="car-view-3d__empty">Ninguna pieza seleccionada. Toca el vehículo para elegir.</li>
                     </ul>
+                    <p class="car-view-3d__nudge" id="carView3dNudge" hidden>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z" />
+                            <circle cx="8" cy="8" r="1.6" />
+                        </svg>
+                        <span id="carView3dNudgeText"></span>
+                    </p>
                     <div class="car-view-3d__estimate" id="carView3dEstimate" hidden>
+                        <p class="car-view-3d__estimate-row" id="carView3dSubtotalRow" hidden>
+                            <span>Subtotal</span>
+                            <span class="car-view-3d__estimate-amount" id="carView3dSubtotal"></span>
+                        </p>
+                        <p class="car-view-3d__estimate-row car-view-3d__estimate-row--discount" id="carView3dDiscountRow" hidden>
+                            <span id="carView3dDiscountLabel"></span>
+                            <span class="car-view-3d__estimate-amount" id="carView3dDiscount"></span>
+                        </p>
                         <p class="car-view-3d__estimate-total" aria-live="polite">
                             <span>Total estimado</span>
                             <strong id="carView3dTotal"></strong>

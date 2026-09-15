@@ -169,6 +169,17 @@
         side_skirt_right: "sill"
     };
 
+    // The multi-part discount, in percent, indexed by how many priced panels
+    // the request has: none for one, then 5, 7 and 9, and 10 from five panels
+    // up (the last step is the cap). It comes off the subtotal, not off each
+    // panel, so the list keeps showing list prices.
+    var DISCOUNT_STEPS = [0, 0, 5, 7, 9, 10];
+
+    function discountRate(count) {
+        if (!(count > 0)) return 0;
+        return DISCOUNT_STEPS[Math.min(count, DISCOUNT_STEPS.length - 1)];
+    }
+
     var has = Object.prototype.hasOwnProperty;
 
     // The price of one panel at one finish, or null when either is unknown.
@@ -186,18 +197,32 @@
         PRICES: PRICES,
         PRICE_GROUP_OF: PRICE_GROUP_OF,
         price: price,
+        DISCOUNT_STEPS: DISCOUNT_STEPS,
+        discountRate: discountRate,
 
-        // The sum of the priced panels, and how many had no price: a total
-        // that silently skipped a panel would read as the whole bill.
+        // The sum of the priced panels, the discount their count earns (in
+        // whole soles), and how many had no price: a total that silently
+        // skipped a panel would read as the whole bill. Unpriced panels do not
+        // count towards the discount either, since it comes off what they add.
         estimate: function (ids, quality) {
-            var total = 0;
+            var subtotal = 0;
+            var priced = 0;
             var unpriced = 0;
             (ids || []).forEach(function (id) {
                 var value = price(id, quality);
                 if (value === null) unpriced++;
-                else total += value;
+                else { subtotal += value; priced++; }
             });
-            return { total: total, unpriced: unpriced };
+            var rate = discountRate(priced);
+            var discount = Math.round(subtotal * rate / 100);
+            return {
+                subtotal: subtotal,
+                priced: priced,
+                rate: rate,
+                discount: discount,
+                total: subtotal - discount,
+                unpriced: unpriced
+            };
         },
 
         // The raw id before a blank: if a model gains a panel and this file

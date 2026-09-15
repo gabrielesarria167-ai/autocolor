@@ -893,9 +893,59 @@ svg {
 .car-view-3d__estimate {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
     padding-top: 12px;
     border-top: 1px solid var(--border-strong);
+}
+
+.car-view-3d__estimate-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--text-dim);
+}
+
+.car-view-3d__estimate-amount {
+    white-space: nowrap;
+}
+
+/* Savings read in the site's green: the Económico tier's text colour, which
+   holds 4.5:1 on the summary's tint. */
+.car-view-3d__estimate-row--discount {
+    color: var(--tier-standard-text);
+}
+
+.car-view-3d__estimate-row--discount .car-view-3d__estimate-amount {
+    font-weight: 500;
+}
+
+/* What one more part would earn. Dashed while there is a next step, solid
+   green once the cap is reached. */
+.car-view-3d__nudge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    padding: 9px 10px;
+    border: 1px dashed var(--border-strong);
+    font-size: 0.8rem;
+    line-height: 1.35;
+    color: var(--text-dim);
+}
+
+.car-view-3d__nudge svg {
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+}
+
+.car-view-3d__nudge.is-maxed {
+    border-style: solid;
+    border-color: var(--tier-standard-text);
+    color: var(--tier-standard-text);
 }
 
 .car-view-3d__estimate-total {

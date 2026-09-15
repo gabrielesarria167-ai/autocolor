@@ -61,6 +61,13 @@
     var carView3dEstimate = document.getElementById("carView3dEstimate");
     var carView3dTotal = document.getElementById("carView3dTotal");
     var carView3dEstimateNote = document.getElementById("carView3dEstimateNote");
+    var carView3dSubtotalRow = document.getElementById("carView3dSubtotalRow");
+    var carView3dSubtotal = document.getElementById("carView3dSubtotal");
+    var carView3dDiscountRow = document.getElementById("carView3dDiscountRow");
+    var carView3dDiscountLabel = document.getElementById("carView3dDiscountLabel");
+    var carView3dDiscount = document.getElementById("carView3dDiscount");
+    var carView3dNudge = document.getElementById("carView3dNudge");
+    var carView3dNudgeText = document.getElementById("carView3dNudgeText");
     var partsPicker = document.getElementById("partsPicker");
     var partsPickerList = document.getElementById("partsPickerList");
     var pickerVehicle = null; // vehicle the checklist is currently built for
@@ -204,19 +211,47 @@
 
     // The running total under the list, shown once something in the
     // selection has a price. estimate() leaves a part the price list does not
-    // know out of the sum and counts it, and the note says so.
+    // know out of the sum and counts it, and the note says so. With two parts
+    // or more the multi-part discount shows as its own line under a subtotal,
+    // and the line above says what one more part would earn.
     function renderEstimate() {
         if (!carView3dEstimate) return;
-        var result = window.AUTOCOLOR_PARTS && window.AUTOCOLOR_PARTS.estimate
-            ? window.AUTOCOLOR_PARTS.estimate(state.parts, state.quality)
-            : { total: 0, unpriced: state.parts.length };
+        var parts = window.AUTOCOLOR_PARTS;
+        var result = parts && parts.estimate
+            ? parts.estimate(state.parts, state.quality)
+            : { priced: 0, unpriced: state.parts.length };
         var missing = result.unpriced;
-        carView3dEstimate.hidden = missing === state.parts.length;
-        if (carView3dEstimate.hidden) return;
+        var shown = result.priced > 0;
+        carView3dEstimate.hidden = !shown;
+        if (carView3dNudge) carView3dNudge.hidden = !shown;
+        if (!shown) return;
+
+        var discounted = result.rate > 0;
+        carView3dSubtotalRow.hidden = !discounted;
+        carView3dDiscountRow.hidden = !discounted;
+        if (discounted) {
+            carView3dSubtotal.textContent = formatSoles(result.subtotal);
+            carView3dDiscountLabel.textContent = "Descuento por " + result.priced + " piezas (" + result.rate + "%)";
+            carView3dDiscount.textContent = "−" + formatSoles(result.discount);
+        }
+        renderNudge(result.priced);
         carView3dTotal.textContent = formatSoles(result.total);
         carView3dEstimateNote.textContent = "Acabado " + QUALITY_NAMES[state.quality] + ". " +
             (missing ? "No incluye " + missing + (missing === 1 ? " pieza" : " piezas") + " sin precio de lista. " : "") +
             "Precio referencial: el taller confirma el presupuesto al revisar el vehículo.";
+    }
+
+    function renderNudge(count) {
+        if (!carView3dNudge || !carView3dNudgeText) return;
+        var parts = window.AUTOCOLOR_PARTS;
+        var next = parts.discountRate(count + 1);
+        var maxed = next === parts.discountRate(count);
+        carView3dNudge.classList.toggle("is-maxed", maxed);
+        carView3dNudgeText.textContent = maxed
+            ? "Tienes el descuento máximo por varias piezas: " + next + "%."
+            : count === 1
+                ? "Pinta 2 piezas o más y te descontamos " + next + "%."
+                : "Agrega 1 pieza más y el descuento sube a " + next + "%.";
     }
 
     if (carView3dClear) {
