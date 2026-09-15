@@ -1,0 +1,48 @@
+{
+  "artboards": [
+    {
+      "file": "OnePart.dc.html",
+      "title": "1 pieza · sin descuento",
+      "x": 0,
+      "y": 0,
+      "w": 378,
+      "h": 640
+    },
+    {
+      "file": "Main.dc.html",
+      "title": "2 piezas · 5%",
+      "x": 458,
+      "y": 0,
+      "w": 378,
+      "h": 640
+    },
+    {
+      "file": "ThreeParts.dc.html",
+      "title": "3 piezas · 7%",
+      "x": 916,
+      "y": 0,
+      "w": 378,
+      "h": 640
+    },
+    {
+      "file": "FiveParts.dc.html",
+      "title": "5 piezas · 10% (máximo)",
+      "x": 1374,
+      "y": 0,
+      "w": 378,
+      "h": 640
+    }
+  ],
+  "annotations": [
+    {
+      "id": "discount-rule",
+      "x": 0,
+      "y": -170,
+      "w": 520,
+      "text": "Descuento por varias piezas, sobre el subtotal de lista:\n1 pieza 0% · 2 piezas 5% · 3 piezas 7% · 4 piezas 9% · 5 o más 10%\nEjemplos con acabado Profesional."
+    }
+  ],
+  "launch": {
+    "view": "canvas"
+  }
+}
