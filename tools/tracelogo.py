@@ -10,7 +10,7 @@ Writes the SVGs under imgs/brand/, plus the raster copies that can't be SVG:
 the favicon set and the two email logos (mail clients don't render SVG).
 """
 import os
-from PIL import Image, ImageChops, ImageDraw
+from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
 SRC = 'design/rebrand/logo-source.jpeg'
 OUT = 'imgs/brand'
@@ -177,6 +177,21 @@ def raster(shapes, size, box, colour, ground=None, pad=0.0, ss=4):
     return img
 
 
+def with_halo(im, radius=3):
+    """Put a white outline under a dark logo on a transparent ground.
+
+    Gmail's apps and Outlook.com's dark mode invert the email's colours but
+    leave images alone, and they ignore the prefers-color-scheme swap to the
+    white logo. The ink logo then sits dark on a near-black card and vanishes.
+    On a light card the white outline is invisible; on an inverted one it is
+    what keeps the logo readable.
+    """
+    alpha = im.getchannel('A').filter(ImageFilter.MaxFilter(radius * 2 + 1))
+    halo = Image.new('RGBA', im.size, (255, 255, 255, 0))
+    halo.putalpha(alpha)
+    return Image.alpha_composite(halo, im)
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     word_loops, tag_loops = [], []
@@ -241,7 +256,7 @@ def main():
                       (word_loops, WORD_BOX[0] - sx, WORD_BOX[1] - sy),
                       (tag_loops, TAG_BOX[0] - sx, TAG_BOX[1] - sy)]
     size = (480, round(480 * sh / sw))
-    raster(stacked_shapes, size, (sw, sh), INK).save(os.path.join(OUT, 'logo-email.png'))
+    with_halo(raster(stacked_shapes, size, (sw, sh), INK)).save(os.path.join(OUT, 'logo-email.png'))
     raster(stacked_shapes, size, (sw, sh), '#FFFFFF').save(os.path.join(OUT, 'logo-email-white.png'))
 
     # Social preview: the stacked lockup centred on paper at 1200x630.

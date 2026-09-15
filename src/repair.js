@@ -15,6 +15,7 @@
     var confirmBtn = document.getElementById("stepConfirm");
     var successPanel = document.getElementById("success");
     var progressNav = document.querySelector(".progress");
+    var wizardFoot = document.querySelector(".wizard-foot");
     var contactForm = document.getElementById("contactForm");
     var phoneInput = document.getElementById("phone");
     var phoneFullInput = document.getElementById("phoneFull");
@@ -549,6 +550,9 @@
         progressNav.hidden = true;
         backLink.hidden = true;
         confirmBtn.hidden = true;
+        // The footer too: with both of its buttons hidden it was left as an
+        // empty sticky strip with a border across the success screen.
+        if (wizardFoot) wizardFoot.hidden = true;
         setStepHint("");
         steps.forEach(function (s) { s.hidden = true; s.classList.remove("active"); });
         successPanel.hidden = false;
@@ -612,6 +616,7 @@
 
         progressNav.hidden = false;
         confirmBtn.hidden = false;
+        if (wizardFoot) wizardFoot.hidden = false;
         successPanel.hidden = true;
         goTo(1);
     });

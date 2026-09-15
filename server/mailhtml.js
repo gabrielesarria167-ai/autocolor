@@ -35,12 +35,13 @@ const LINE = '#dadde5';     // borders and hairlines
 const ACCENT = '#262d40';   // the logo's ink: labels, links, the plate, the button
 const INK = '#262d40';      // headings and data
 const BODY = '#5a6275';     // running text
-const MUTED = '#737b8d';    // labels and small print
+const MUTED = '#666e81';    // labels and small print, 4.5:1 on CARD and on GROUND
 
 // The same palette for readers with a dark system theme. The ink is too dark
 // to read as type on the dark card, so text that was ink turns to a light
-// steel (#c3c8d4, 10.2:1 on the card); the button keeps its ink fill, since
-// there the ink is the ground and the white label is what has to read.
+// steel (#c3c8d4, 10.2:1 on the card). So does the button: its ink fill is
+// 1.2:1 against the dark card, which left a white label floating with no
+// visible edge, so in dark mode it turns light steel with an ink label.
 const GROUND_DARK = '#141824';
 const CARD_DARK = '#1b2130';
 const LINE_DARK = '#2f374b';
@@ -141,8 +142,8 @@ function codePanel(label, code) {
 function button(href, text) {
     return `<table role="presentation" cellpadding="0" cellspacing="0" border="0">
               <tr>
-                <td align="center" bgcolor="${ACCENT}" style="border-radius:0;">
-                  <a href="${escapeHtml(href)}" target="_blank" style="display:block; font-family:${FONT}; font-size:15px; line-height:20px; font-weight:bold; letter-spacing:1px; color:#ffffff; text-decoration:none; padding:16px 40px; border-radius:0;">${escapeHtml(text)}</a>
+                <td class="c-button" align="center" bgcolor="${ACCENT}" style="border-radius:0;">
+                  <a class="c-button-label" href="${escapeHtml(href)}" target="_blank" style="display:block; font-family:${FONT}; font-size:15px; line-height:20px; font-weight:bold; letter-spacing:1px; color:#ffffff; text-decoration:none; padding:16px 40px; border-radius:0;">${escapeHtml(text)}</a>
                 </td>
               </tr>
             </table>`;
@@ -215,8 +216,7 @@ function shell({ title, preheader, kicker, body, footerNote, logoUrl, logoDarkUr
      cada etiqueta —así tiene que ser en correo (ver la cabecera)— y una regla
      de hoja normal no le gana a un estilo en línea. Con !important sí.
      La regla de los enlaces es la excepción: va SIN !important a propósito,
-     porque el texto del botón es blanco en línea y con !important se lo
-     llevaría por delante, dejando acero claro sobre tinta. */
+     para no pisar el texto del botón, que tiene su propia regla (.c-button). */
   @media (prefers-color-scheme: dark) {
     body, .c-ground { background-color:${GROUND_DARK} !important; }
     .c-card { background-color:${CARD_DARK} !important; border-color:${LINE_DARK} !important; }
@@ -229,6 +229,8 @@ function shell({ title, preheader, kicker, body, footerNote, logoUrl, logoDarkUr
     a { color:${ACCENT_DARK}; }
     .c-panel { background-color:${PANEL_DARK} !important; border-color:${LINE_DARK} !important; }
     .c-note { background-color:${NOTE_DARK} !important; }
+    .c-button { background-color:${ACCENT_DARK} !important; }
+    .c-button-label { color:${CARD_DARK} !important; }
     .c-logo-light { display:none !important; }
     .c-logo-dark { display:block !important; }
   }

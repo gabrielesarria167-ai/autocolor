@@ -16,6 +16,9 @@
             toggle.classList.toggle("is-open", open);
             panel.classList.toggle("is-open", open);
             toggle.setAttribute("aria-expanded", String(open));
+            // The label says what a press will do; left at «Abre el menú» a
+            // screen reader announced «Abre el menú, expandido» while open.
+            toggle.setAttribute("aria-label", open ? "Cierra el menú" : "Abre el menú");
         };
 
         toggle.addEventListener("click", function () {
