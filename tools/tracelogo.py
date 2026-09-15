@@ -189,7 +189,6 @@ def main():
 
     mark = f'<path d="{MARK}"/>'
     write('mark.svg', f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {MARK_W} {MARK_H}" fill="{INK}"><title>Autocolor</title>{mark}</svg>\n')
-    write('wordmark.svg', f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {ww} {wh}" fill="{INK}"><title>autocolor</title><path fill-rule="evenodd" d="{word}"/></svg>\n')
 
     # Stacked lockup, as supplied: mark over wordmark over tagline, all in
     # source coordinates so the proportions are the original ones.

@@ -88,12 +88,11 @@ lo abre a propósito, por ejemplo para probar el sitio desde el móvil.
 | `server/netcheck.js` | A dónde llega el alojamiento, cuando el correo falla |
 | `NEXT-STEPS.md` | Lo que queda por hacer del correo y los hallazgos de la revisión |
 | `server/env.js` | Lee el `.env` de la raíz al arrancar |
-| `_config.yml` | Qué no se publica en GitHub Pages |
 | `render.yaml`, `.nvmrc` | El despliegue en Render |
 | `server/pgserver.sh` | Crea y controla el servidor Postgres propio |
 | `server/schema.sql` | Tabla `requests` + consultas útiles para el taller |
 | `server/migrate.js` | Aplica `schema.sql` a la base local o a la alojada |
-| `imgs/assets/3d-visuals/` | Modelos `.glb` servidos y las páginas donde se prepararon |
+| `imgs/assets/3d-visuals/` | Modelos `.glb` servidos |
 
 ## Publicar el sitio
 
@@ -123,20 +122,11 @@ Mientras no haya API detrás, el sitio publicado lo dice con todas sus
 letras en vez de pedir que se reintente: el formulario avisa que el envío no
 está disponible en esa versión del sitio, y la consulta por código, lo mismo.
 
-Ojo: GitHub Pages publica **todo** el repositorio salvo lo que liste
-`_config.yml`. Ahí no debe haber contraseñas ni claves; las que haga falta van
-en variables de entorno del servicio que corra la API, o en el `.env` local,
-que no se versiona.
-
-Lo que queda fuera de la publicación:
-
-| Excluido | Por qué |
-|---|---|
-| `pgs/taller.html`, `src/staff.js` | Es la herramienta interna del taller; no tiene por qué existir en la web pública |
-| `server/` | El servidor y el esquema de la base, que no se sirven como sitio |
-
-Excluir la página la **esconde, no la cierra**: lo que protege los datos sigue
-siendo la contraseña de la API (`server/auth.js`).
+The site isn't published on GitHub Pages any more, so there is no
+`_config.yml`. What Render's server refuses to serve (`.env`, `server/`,
+`tools/` and the like) is the `DENY_PREFIXES` list in `server/server.js`. No
+passwords or keys go in the repository either way: they live in the service's
+environment variables or in the local `.env`, which isn't versioned.
 
 ## Desplegar en Render
 
@@ -823,8 +813,7 @@ obliga a entrar de nuevo. Detrás de https hay que añadir
 
 El panel **sí se sirve en el sitio público** —`https://…/pgs/taller.html`—,
 porque el despliegue es Render y ahí el mismo servidor sirve el sitio y la API.
-El `exclude` de `_config.yml` solo manda en GitHub Pages, que ya no es el
-alojamiento. No está enlazado desde ninguna página y lleva `noindex`, pero eso
+No está enlazado desde ninguna página y lleva `noindex`, pero eso
 lo esconde, no lo cierra: lo que lo cierra es la contraseña de la API.
 
 ### The workshop boss

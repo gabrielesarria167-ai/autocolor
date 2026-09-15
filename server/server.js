@@ -75,9 +75,6 @@ const MAX_BODY_BYTES = 32 * 1024;
 // `/.git/config` se leen igual de fácil. Que hoy no se note es solo porque se
 // escucha en 127.0.0.1 (ver HOST arriba) — y el README recomienda 0.0.0.0 para
 // probar desde el móvil, que es justo cuando dejaría de no notarse.
-//
-// Es el equivalente para este servidor de lo que _config.yml hace para GitHub
-// Pages; ninguno de los dos sustituye al otro.
 const DENY_PREFIXES = [
     '/.env',
     // Entrada aparte: isDenied compara por igualdad las que no acaban en '/',
@@ -92,7 +89,6 @@ const DENY_PREFIXES = [
     '/node_modules/',
     '/package.json',
     '/package-lock.json',
-    '/_config.yml',
     '/render.yaml',
     '/tools/',
 ];
