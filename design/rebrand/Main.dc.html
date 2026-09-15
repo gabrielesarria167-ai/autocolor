@@ -1,0 +1,408 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600&family=Schibsted+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <style>
+    body { margin: 0; background: #ffffff; color: #262d40; font-family: 'Schibsted Grotesk', 'Helvetica Neue', Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+    a { color: #262d40; text-decoration: underline; text-underline-offset: 3px; } a:hover { color: #181d2a; }
+    h1, h2, h3, p, ul, ol, dl, dd { margin: 0; padding: 0; }
+    ul, ol { list-style: none; }
+    .display { font-family: 'Jost', 'Futura', 'Century Gothic', 'Avenir Next', sans-serif; font-weight: 500; letter-spacing: -0.02em; text-wrap: balance; }
+    .label { font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: #5a6275; }
+    .lede { font-size: 18px; line-height: 1.6; color: #5a6275; text-wrap: pretty; }
+    .body { font-size: 15px; line-height: 1.6; color: #5a6275; text-wrap: pretty; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; height: 52px; padding: 0 26px; font-size: 16px; font-weight: 600; letter-spacing: 0; white-space: nowrap; border: 1px solid #262d40; }
+    .btn-primary { background: #262d40; color: #ffffff; }
+    .btn-ghost { background: transparent; color: #262d40; border-color: #c4c9d4; }
+    .split { display: inline-flex; gap: 3px; align-items: stretch; height: 12px; }
+    .split span { width: 3px; background: #262d40; }
+  </style>
+</helmet>
+
+<div style="width: 1440px; background: #ffffff; display: flex; flex-direction: column">
+
+  <!-- header -->
+  <div style="height: 76px; display: flex; align-items: center; gap: 48px; padding: 0 130px; border-bottom: 1px solid #e3e6ec; background: #ffffff">
+    <img src="lockup-horizontal.svg" alt="Autocolor" style="height: 30px; width: auto; display: block">
+    <div style="display: flex; gap: 32px; margin-left: 12px">
+      <span style="font-size: 15px; font-weight: 500; color: #3b4356">Servicios</span>
+      <span style="font-size: 15px; font-weight: 500; color: #3b4356">Cómo funciona</span>
+      <span style="font-size: 15px; font-weight: 500; color: #3b4356">Acabados</span>
+      <span style="font-size: 15px; font-weight: 500; color: #3b4356">Contacto</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 24px; margin-left: auto">
+      <span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 14px; color: #3b4356">935 646 304</span>
+      <span class="btn btn-primary" style="height: 44px; padding: 0 20px; font-size: 15px">Cotizar ahora</span>
+    </div>
+  </div>
+
+  <!-- hero -->
+  <div style="padding: 72px 130px 88px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 64px; align-items: start">
+    <div style="display: flex; flex-direction: column; gap: 28px; padding-top: 20px">
+      <div style="display: flex; align-items: center; gap: 12px">
+        <img src="mark.svg" alt="" style="height: 16px; width: auto; display: block">
+        <span class="label" style="color: #262d40">Laboratorio de matizado y pintado al horno</span>
+      </div>
+      <h1 class="display" style="font-size: 72px; line-height: 1.02; color: #262d40">Tu vehículo, con el color de fábrica.</h1>
+      <p class="lede" style="max-width: 500px">Igualamos el color original con colorimetría y secamos en cabina de horno, pieza por pieza. Arma tu presupuesto en línea en 2 minutos — sin llamadas ni visitas previas.</p>
+      <div style="display: flex; gap: 12px; flex-wrap: wrap">
+        <span class="btn btn-primary">Cotizar mi vehículo
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+        </span>
+        <span class="btn btn-ghost">Escríbenos por WhatsApp</span>
+      </div>
+      <ul style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 28px; padding-top: 28px; border-top: 1px solid #e3e6ec; margin-top: 8px">
+        <li style="display: flex; gap: 10px; align-items: flex-start; font-size: 14px; line-height: 1.45; color: #3b4356">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#262d40" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 1px"><path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6l7-3Z"></path><path d="M9 12l2 2 4-4"></path></svg>
+          Garantía por escrito de 5 años</li>
+        <li style="display: flex; gap: 10px; align-items: flex-start; font-size: 14px; line-height: 1.45; color: #3b4356">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#262d40" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 1px"><path d="M4 20V9l8-5 8 5v11"></path><path d="M9 20v-6h6v6"></path></svg>
+          Pintado en cabina de horno</li>
+        <li style="display: flex; gap: 10px; align-items: flex-start; font-size: 14px; line-height: 1.45; color: #3b4356">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#262d40" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 1px"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
+          Fecha de entrega garantizada</li>
+        <li style="display: flex; gap: 10px; align-items: flex-start; font-size: 14px; line-height: 1.45; color: #3b4356">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#262d40" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 1px"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"></path><circle cx="12" cy="12" r="3.5"></circle></svg>
+          Espectrofotómetro para tomar el color exacto</li>
+      </ul>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 0; border: 1px solid #e3e6ec">
+      <div style="position: relative; height: 420px; background: #f3f4f7; display: flex; align-items: center; justify-content: center; overflow: hidden">
+        <div style="position: absolute; left: 50%; top: 0; bottom: 0; width: 12px; transform: translateX(-50%); background: #ffffff"></div>
+        <div style="position: absolute; left: 0; right: 0; bottom: 92px; height: 1px; background: #dadde5"></div>
+        <img src="suv.webp" alt="Vehículo pintado en Autocolor" style="position: relative; width: 500px; height: auto; display: block">
+        <span class="label" style="position: absolute; left: 20px; top: 18px">Vista previa</span>
+        <span class="label" style="position: absolute; right: 20px; top: 18px; color: #262d40">Color original</span>
+      </div>
+      <div style="padding: 20px 20px 22px; display: flex; flex-direction: column; gap: 14px; background: #ffffff; border-top: 1px solid #e3e6ec">
+        <span class="label">Previsualiza el color</span>
+        <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px">
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <div style="height: 56px; background: #cbbda4; outline: 2px solid #262d40; outline-offset: 3px"></div>
+            <span style="font-size: 13px; font-weight: 600; color: #262d40">Original</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <div style="height: 56px; background: #d61f14"></div>
+            <span style="font-size: 13px; color: #5a6275">Rojo Fuego</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <div style="height: 56px; background: #1f6feb"></div>
+            <span style="font-size: 13px; color: #5a6275">Azul Océano</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <div style="height: 56px; background: #245b12"></div>
+            <span style="font-size: 13px; color: #5a6275">Verde Bosque</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <div style="height: 56px; background: #e8e8e6; box-shadow: inset 0 0 0 1px #dadde5"></div>
+            <span style="font-size: 13px; color: #5a6275">Blanco Perla</span>
+          </div>
+        </div>
+        <p style="font-size: 12px; line-height: 1.5; color: #7a8193">Referencia visual. El tono final se define por el código de color de tu vehículo.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- servicios -->
+  <div style="background: #f3f4f7; padding: 96px 130px; display: flex; flex-direction: column; gap: 48px; border-top: 1px solid #e3e6ec">
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 64px; align-items: end">
+      <div style="display: flex; flex-direction: column; gap: 18px">
+        <span class="label">Servicios</span>
+        <h2 class="display" style="font-size: 48px; line-height: 1.06">Todo lo que le devuelve la cara a tu vehículo</h2>
+      </div>
+      <p class="lede" style="max-width: 480px">Desde un raspón en una puerta hasta un cambio de color completo. Trabajamos por pieza, así pagas solo lo que necesitas.</p>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: #dadde5; border: 1px solid #dadde5">
+      <div style="background: #ffffff; padding: 32px 30px 34px; display: flex; flex-direction: column; gap: 14px">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#262d40" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 3 3 4-4 5 5"></path><path d="M3 21h18"></path><circle cx="7.5" cy="6.5" r="2.5"></circle></svg>
+        <h3 class="display" style="font-size: 23px; margin-top: 10px">Pintura completa</h3>
+        <p class="body">Repintado integral de la carrocería con preparación, fondo, color y barniz con secado y sellado al horno.</p>
+      </div>
+      <div style="background: #ffffff; padding: 32px 30px 34px; display: flex; flex-direction: column; gap: 14px">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#262d40" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="8" height="7"></rect><rect x="13" y="4" width="8" height="7"></rect><rect x="3" y="13" width="8" height="7"></rect><rect x="13" y="13" width="8" height="7"></rect></svg>
+        <h3 class="display" style="font-size: 23px; margin-top: 10px">Pintura por piezas</h3>
+        <p class="body">Capó, puertas, guardafangos o parachoques por separado, con difuminado para que el color calce con el resto.</p>
+      </div>
+      <div style="background: #ffffff; padding: 32px 30px 34px; display: flex; flex-direction: column; gap: 14px">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#262d40" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4l6 6-9 9-6-6 9-9Z"></path><path d="M8 10l6 6"></path><path d="M3 21h6"></path></svg>
+        <h3 class="display" style="font-size: 23px; margin-top: 10px">Planchado y desabolladura</h3>
+        <p class="body">Enderezado de golpes y abolladuras antes de pintar, para que la superficie quede recta y no se marque bajo la luz.</p>
+      </div>
+      <div style="background: #ffffff; padding: 32px 30px 34px; display: flex; flex-direction: column; gap: 14px">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#262d40" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s3-8 8-8 8 8 8 8"></path><path d="M9 19l2-4M15 19l-2-4"></path></svg>
+        <h3 class="display" style="font-size: 23px; margin-top: 10px">Fast Repair</h3>
+        <p class="body">Reparación puntual de rayones profundos y roces de estacionamiento sin repintar todo el vehículo. Si el daño es pequeño, te devolvemos el auto en el día.</p>
+      </div>
+      <div style="background: #ffffff; padding: 32px 30px 34px; display: flex; flex-direction: column; gap: 14px">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#262d40" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"></circle><path d="M8.5 13.5c1.5 1.5 5.5 1.5 7-1.5"></path><circle cx="9.5" cy="9.5" r="1"></circle></svg>
+        <h3 class="display" style="font-size: 23px; margin-top: 10px">Pulido y abrillantado</h3>
+        <p class="body">Recuperación del brillo en pintura opacada por el sol, con corrección de micro rayas y sellado.</p>
+      </div>
+      <div style="background: #ffffff; padding: 32px 30px 34px; display: flex; flex-direction: column; gap: 14px">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#262d40" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"></path><path d="M12 3a9 9 0 0 1 0 18" fill="#262d40" stroke="none" opacity="0.2"></path><circle cx="12" cy="12" r="9"></circle></svg>
+        <h3 class="display" style="font-size: 23px; margin-top: 10px">Cambio de color</h3>
+        <p class="body">Personalización completa de tonalidad, incluyendo acabados perlados y mate, con registro fotográfico del proceso.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- proceso -->
+  <div style="padding: 96px 130px; display: flex; flex-direction: column; gap: 56px; border-top: 1px solid #e3e6ec">
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 64px; align-items: end">
+      <div style="display: flex; flex-direction: column; gap: 18px">
+        <span class="label">Cómo funciona</span>
+        <h2 class="display" style="font-size: 48px; line-height: 1.06">Del presupuesto a la entrega, en cuatro pasos</h2>
+      </div>
+      <p class="lede" style="max-width: 480px">El presupuesto se arma en línea. Recién cuando lo apruebas coordinamos la entrega del vehículo.</p>
+    </div>
+    <div style="position: relative; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 32px">
+      <div style="position: absolute; left: 0; right: 0; top: 19px; height: 1px; background: #dadde5"></div>
+      <div style="position: relative; display: flex; flex-direction: column; gap: 14px">
+        <span style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: #262d40; color: #ffffff; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 15px">1</span>
+        <h3 class="display" style="font-size: 22px; margin-top: 12px">Registra tu vehículo</h3>
+        <p class="body">Marca, modelo, año y placa. Con eso reconocemos la carrocería y su cálculo de superficie.</p>
+      </div>
+      <div style="position: relative; display: flex; flex-direction: column; gap: 14px">
+        <span style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: #ffffff; border: 1px solid #262d40; color: #262d40; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 15px; box-sizing: border-box">2</span>
+        <h3 class="display" style="font-size: 22px; margin-top: 12px">Elige el acabado</h3>
+        <p class="body">Económico, profesional o alta gama, según el nivel de preparación y los materiales.</p>
+      </div>
+      <div style="position: relative; display: flex; flex-direction: column; gap: 14px">
+        <span style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: #ffffff; border: 1px solid #262d40; color: #262d40; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 15px; box-sizing: border-box">3</span>
+        <h3 class="display" style="font-size: 22px; margin-top: 12px">Marca las piezas</h3>
+        <p class="body">Sobre un modelo 3D de la carrocería de tu vehículo, tocas exactamente lo que quieres pintar o reparar.</p>
+      </div>
+      <div style="position: relative; display: flex; flex-direction: column; gap: 14px">
+        <span style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: #ffffff; border: 1px solid #262d40; color: #262d40; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 15px; box-sizing: border-box">4</span>
+        <h3 class="display" style="font-size: 22px; margin-top: 12px">Recibe tu presupuesto</h3>
+        <p class="body">Te contactamos en 24 horas con el precio cerrado y la fecha de entrega.</p>
+      </div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 20px">
+      <span class="btn btn-primary">Empezar mi cotización</span>
+      <span style="font-size: 14px; color: #7a8193">Toma unos 2 minutos · Sin compromiso</span>
+    </div>
+  </div>
+
+  <!-- acabados -->
+  <div style="background: #f3f4f7; padding: 96px 130px; display: flex; flex-direction: column; gap: 48px; border-top: 1px solid #e3e6ec">
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 64px; align-items: end">
+      <div style="display: flex; flex-direction: column; gap: 18px">
+        <span class="label">Niveles de acabado</span>
+        <h2 class="display" style="font-size: 48px; line-height: 1.06">Tres formas de hacerlo bien</h2>
+      </div>
+      <p class="lede" style="max-width: 480px">Todos incluyen preparación y pintura profesional. La diferencia está en el nivel de detalle y en los materiales.</p>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; align-items: stretch">
+
+      <div style="background: #ffffff; border: 1px solid #dadde5; padding: 32px 30px 30px; display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; align-items: center; gap: 10px">
+          <span style="width: 12px; height: 12px; background: #1e8a55"></span>
+          <h3 class="display" style="font-size: 26px">Económico</h3>
+        </div>
+        <p style="display: flex; align-items: baseline; gap: 8px"><span class="display" style="font-size: 34px; color: #1e8a55; font-weight: 500">S/ 250</span><span class="label">desde · por pieza</span></p>
+        <p class="body">Para devolverle el aspecto al auto rápido y sin gastar de más.</p>
+        <ul style="display: flex; flex-direction: column; gap: 12px; padding: 18px 0 24px; border-top: 1px solid #e3e6ec; margin-top: 4px">
+          <li class="body" style="font-size: 14px"><strong style="color: #262d40; font-weight: 600">Preparación esencial:</strong> lijado e imprimación de base para que la pintura agarre como debe.</li>
+          <li class="body" style="font-size: 14px"><strong style="color: #262d40; font-weight: 600">Solo uretano:</strong> nada de acrílicos ni barnices de baja calidad.</li>
+          <li class="body" style="font-size: 14px"><strong style="color: #262d40; font-weight: 600">Acabado estándar:</strong> pintura y barniz que dan buen brillo a un precio accesible.</li>
+        </ul>
+        <span class="btn btn-ghost" style="margin-top: auto; width: 100%; box-sizing: border-box">Cotizar</span>
+      </div>
+
+      <div style="position: relative; background: #262d40; border: 1px solid #262d40; padding: 32px 30px 30px; display: flex; flex-direction: column; gap: 14px; color: #ffffff">
+        <span class="label" style="position: absolute; top: -1px; right: -1px; background: #ffffff; color: #262d40; padding: 7px 12px; border: 1px solid #262d40">Más elegido</span>
+        <div style="display: flex; align-items: center; gap: 10px">
+          <span style="width: 12px; height: 12px; background: #ffffff"></span>
+          <h3 class="display" style="font-size: 26px; color: #ffffff">Profesional</h3>
+        </div>
+        <p style="display: flex; align-items: baseline; gap: 8px"><span class="display" style="font-size: 34px; color: #ffffff; font-weight: 500">S/ 350</span><span class="label" style="color: #a9b0c0">desde · por pieza</span></p>
+        <p class="body" style="color: #c3c8d4">Acabado superior y color exacto, por un precio justo.</p>
+        <ul style="display: flex; flex-direction: column; gap: 12px; padding: 18px 0 24px; border-top: 1px solid rgba(255,255,255,0.16); margin-top: 4px">
+          <li class="body" style="font-size: 14px; color: #c3c8d4"><strong style="color: #ffffff; font-weight: 600">Preparación completa:</strong> ciclo de lijado profundo hasta dejar la superficie lisa.</li>
+          <li class="body" style="font-size: 14px; color: #c3c8d4"><strong style="color: #ffffff; font-weight: 600">Color medido:</strong> espectrofotómetro y prueba de tono en plancha antes de tocar el auto.</li>
+          <li class="body" style="font-size: 14px; color: #c3c8d4"><strong style="color: #ffffff; font-weight: 600">Fórmula avanzada:</strong> uretano profesional de alta resistencia.</li>
+          <li class="body" style="font-size: 14px; color: #c3c8d4"><strong style="color: #ffffff; font-weight: 600">Garantía firmada:</strong> 5 años en pintura y matizado.</li>
+        </ul>
+        <span class="btn" style="margin-top: auto; width: 100%; box-sizing: border-box; background: #ffffff; color: #262d40; border-color: #ffffff">Cotizar</span>
+      </div>
+
+      <div style="background: #ffffff; border: 1px solid #dadde5; padding: 32px 30px 30px; display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; align-items: center; gap: 10px">
+          <span style="width: 12px; height: 12px; background: #b07d0a"></span>
+          <h3 class="display" style="font-size: 26px">Alta gama</h3>
+        </div>
+        <p style="display: flex; align-items: baseline; gap: 8px"><span class="display" style="font-size: 34px; color: #9a6c06; font-weight: 500">S/ 450</span><span class="label">desde · por pieza</span></p>
+        <p class="body">El estándar de fábrica, para el auto que no admite un tono aproximado.</p>
+        <ul style="display: flex; flex-direction: column; gap: 12px; padding: 18px 0 24px; border-top: 1px solid #e3e6ec; margin-top: 4px">
+          <li class="body" style="font-size: 14px"><strong style="color: #262d40; font-weight: 600">Preparación de laboratorio:</strong> lijado técnico con extracción de polvo al vacío.</li>
+          <li class="body" style="font-size: 14px"><strong style="color: #262d40; font-weight: 600">Colorimetría:</strong> escaneo con espectrofotómetro y homologación en plancha de prueba.</li>
+          <li class="body" style="font-size: 14px"><strong style="color: #262d40; font-weight: 600">Insumos premium:</strong> pintura y barniz de alta gama con filtro UV.</li>
+          <li class="body" style="font-size: 14px"><strong style="color: #262d40; font-weight: 600">Horno de aire seco:</strong> pintado y curado sin polvo, para un brillo parejo de extremo a extremo.</li>
+          <li class="body" style="font-size: 14px"><strong style="color: #262d40; font-weight: 600">Garantía premium:</strong> 5 años.</li>
+        </ul>
+        <span class="btn btn-ghost" style="margin-top: auto; width: 100%; box-sizing: border-box">Cotizar</span>
+      </div>
+    </div>
+    <p style="font-size: 13px; color: #7a8193">Los precios mostrados son referenciales por pieza. El presupuesto final depende del estado de la pieza, el tipo de vehículo y el color.</p>
+  </div>
+
+  <!-- por qué autocolor -->
+  <div style="padding: 96px 130px; display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 80px; border-top: 1px solid #e3e6ec">
+    <div style="display: flex; flex-direction: column; gap: 18px">
+      <span class="label">Por qué Autocolor</span>
+      <h2 class="display" style="font-size: 48px; line-height: 1.06">Pintar bien es, sobre todo, preparar bien</h2>
+      <p class="lede">El brillo que se ve al recoger el vehículo lo define lo que pasó antes: el enderezado, el lijado, el fondo y el control del polvo dentro de la cabina. Ahí es donde ponemos el tiempo. Más de 15 años en el sector automotriz en Europa nos enseñaron lo que vale la movilidad de cada cliente: por eso respetamos el precio que acordamos y la fecha de entrega que te damos.</p>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px 40px; margin-top: 22px; padding-top: 30px; border-top: 1px solid #e3e6ec">
+        <div style="display: flex; flex-direction: column; gap: 8px">
+          <h3 class="display" style="font-size: 20px">Colorimetría</h3>
+          <p class="body">Identificamos el color exacto con espectrofotómetro y con acceso a las bases de datos de las marcas, y ajustamos la mezcla hasta que calce con la pieza contigua.</p>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px">
+          <h3 class="display" style="font-size: 20px">Cabina de horno</h3>
+          <p class="body">Secado a temperatura controlada y aire filtrado: menos polvo atrapado y un barniz más duro. Para un acabado espejo, recién salido de fábrica.</p>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px">
+          <h3 class="display" style="font-size: 20px">Presupuesto cerrado</h3>
+          <p class="body">El precio que apruebas es el que pagas. Si aparece algo extra, te consultamos antes de tocarlo.</p>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px">
+          <h3 class="display" style="font-size: 20px">Seguimiento</h3>
+          <p class="body">Te avisamos por WhatsApp en cada etapa, con fotos del avance. O consúltalo en la web con tu <a href="#">código de seguimiento</a>.</p>
+        </div>
+      </div>
+    </div>
+    <div style="align-self: start; border-top: 2px solid #262d40; display: flex; flex-direction: column">
+      <div style="display: flex; align-items: baseline; gap: 20px; padding: 26px 0; border-bottom: 1px solid #dadde5">
+        <span class="display" style="font-size: 60px; line-height: 1; width: 170px; flex-shrink: 0">+15</span>
+        <span class="body" style="font-size: 15px">años de experiencia en el sector automotriz</span>
+      </div>
+      <div style="display: flex; align-items: baseline; gap: 20px; padding: 26px 0; border-bottom: 1px solid #dadde5">
+        <span class="display" style="font-size: 60px; line-height: 1; width: 170px; flex-shrink: 0">+200</span>
+        <span class="body" style="font-size: 15px">vehículos matizados desde julio de 2026</span>
+      </div>
+      <div style="display: flex; align-items: baseline; gap: 20px; padding: 26px 0; border-bottom: 1px solid #dadde5">
+        <span class="display" style="font-size: 60px; line-height: 1; width: 170px; flex-shrink: 0">24 h</span>
+        <span class="body" style="font-size: 15px">para recibir tu presupuesto</span>
+      </div>
+      <div style="display: flex; align-items: baseline; gap: 20px; padding: 26px 0; border-bottom: 1px solid #dadde5">
+        <span class="display" style="font-size: 60px; line-height: 1; width: 170px; flex-shrink: 0">5 años</span>
+        <span class="body" style="font-size: 15px">de garantía por escrito en el color</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- faq -->
+  <div style="background: #f3f4f7; padding: 96px 130px; display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 80px; border-top: 1px solid #e3e6ec">
+    <div style="display: flex; flex-direction: column; gap: 18px">
+      <span class="label">Preguntas frecuentes</span>
+      <h2 class="display" style="font-size: 48px; line-height: 1.06">Antes de dejarnos tu vehículo</h2>
+    </div>
+    <div style="display: flex; flex-direction: column; border-top: 1px solid #c9ced8">
+      <div style="padding: 24px 0; border-bottom: 1px solid #c9ced8; display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 24px">
+          <span class="display" style="font-size: 21px">¿Cuánto demora un trabajo de pintura?</span>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#262d40" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"></path></svg>
+        </div>
+        <p class="body" style="max-width: 620px">El pintado en sí es rápido porque se hace al horno: un pintado general con acabado de fábrica toma <strong style="color: #262d40">4 horas</strong> de cabina, y una pieza suelta —una puerta, un capó— <strong style="color: #262d40">2 horas</strong>. Con <strong style="color: #262d40">Fast Repair</strong> entregamos el vehículo el mismo día cuando el daño es pequeño.</p>
+      </div>
+      <div style="padding: 24px 0; border-bottom: 1px solid #c9ced8; display: flex; justify-content: space-between; align-items: center; gap: 24px">
+        <span class="display" style="font-size: 21px">¿El color va a quedar igual al original?</span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#262d40" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+      </div>
+      <div style="padding: 24px 0; border-bottom: 1px solid #c9ced8; display: flex; justify-content: space-between; align-items: center; gap: 24px">
+        <span class="display" style="font-size: 21px">¿Qué es el espectrofotómetro y para qué lo usan?</span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#262d40" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+      </div>
+      <div style="padding: 24px 0; border-bottom: 1px solid #c9ced8; display: flex; justify-content: space-between; align-items: center; gap: 24px">
+        <span class="display" style="font-size: 21px">¿Necesito llevar el vehículo para que me coticen?</span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#262d40" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+      </div>
+      <div style="padding: 24px 0; border-bottom: 1px solid #c9ced8; display: flex; justify-content: space-between; align-items: center; gap: 24px">
+        <span class="display" style="font-size: 21px">¿Qué diferencia hay entre el uretano y la pintura acrílica?</span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#262d40" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+      </div>
+      <div style="padding: 24px 0; border-bottom: 1px solid #c9ced8; display: flex; justify-content: space-between; align-items: center; gap: 24px">
+        <span class="display" style="font-size: 21px">¿Qué garantía tiene el trabajo?</span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#262d40" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+      </div>
+      <div style="padding: 24px 0; border-bottom: 1px solid #c9ced8; display: flex; justify-content: space-between; align-items: center; gap: 24px">
+        <span class="display" style="font-size: 21px">¿Qué formas de pago aceptan?</span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#262d40" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- contacto: a page section like the others, so it doesn't read as footer -->
+  <div style="padding: 96px 130px 104px; display: flex; flex-direction: column; gap: 48px; border-top: 1px solid #e3e6ec; background: #ffffff">
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 64px; align-items: start">
+      <div style="display: flex; flex-direction: column; gap: 18px">
+        <span class="label">Contacto</span>
+        <h2 class="display" style="font-size: 48px; line-height: 1.06">Cotiza hoy y agenda tu ingreso</h2>
+        <p class="lede" style="max-width: 460px">Arma tu presupuesto en línea o escríbenos directamente. Te respondemos dentro del horario de taller.</p>
+        <div style="display: flex; gap: 12px; margin-top: 10px">
+          <span class="btn btn-primary">Cotizar mi vehículo</span>
+          <span class="btn btn-ghost">WhatsApp</span>
+        </div>
+      </div>
+      <dl style="display: flex; flex-direction: column; border-top: 2px solid #262d40">
+        <div style="display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 20px; padding: 20px 0; border-bottom: 1px solid #dadde5">
+          <dt class="label" style="padding-top: 3px">Dirección</dt>
+          <dd style="font-size: 17px; color: #262d40">Jr. San Juan Masías, Ayacucho 05002</dd>
+        </div>
+        <div style="display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 20px; padding: 20px 0; border-bottom: 1px solid #dadde5">
+          <dt class="label" style="padding-top: 3px">Teléfono</dt>
+          <dd style="font-size: 17px; color: #262d40">+51 935 646 304</dd>
+        </div>
+        <div style="display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 20px; padding: 20px 0; border-bottom: 1px solid #dadde5">
+          <dt class="label" style="padding-top: 3px">Correo</dt>
+          <dd style="font-size: 17px; color: #262d40">info@autocolorayacucho.com</dd>
+        </div>
+        <div style="display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 20px; padding: 20px 0; border-bottom: 1px solid #dadde5">
+          <dt class="label" style="padding-top: 3px">Horario</dt>
+          <dd style="font-size: 17px; color: #262d40">Lun - Sab 07:30 - 20:00</dd>
+        </div>
+      </dl>
+    </div>
+    <div style="height: 380px; background: #f3f4f7; border: 1px solid #dadde5; display: flex; align-items: center; justify-content: center">
+      <span class="label">[Mapa de Google — sin cambios]</span>
+    </div>
+  </div>
+
+  <!-- footer -->
+  <div style="background: #1b2130; color: #ffffff; padding: 72px 130px 36px; display: flex; flex-direction: column; gap: 56px">
+    <div style="display: grid; grid-template-columns: minmax(0, 6fr) minmax(0, 3fr) minmax(0, 3fr); gap: 48px">
+      <div style="display: flex; flex-direction: column; gap: 22px">
+        <img src="lockup-stacked-white.svg" alt="Autocolor — Laboratorio de Matizado y Pintado al Horno" style="width: 250px; height: auto; display: block">
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px">
+        <span class="label" style="color: #8e96a8; margin-bottom: 6px">Servicios</span>
+        <span style="font-size: 15px; color: #c3c8d4">Pintura completa</span>
+        <span style="font-size: 15px; color: #c3c8d4">Pintura por piezas</span>
+        <span style="font-size: 15px; color: #c3c8d4">Planchado</span>
+        <span style="font-size: 15px; color: #c3c8d4">Pulido</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px">
+        <span class="label" style="color: #8e96a8; margin-bottom: 6px">Autocolor</span>
+        <span style="font-size: 15px; color: #c3c8d4">Cómo funciona</span>
+        <span style="font-size: 15px; color: #c3c8d4">Acabados</span>
+        <span style="font-size: 15px; color: #c3c8d4">Preguntas frecuentes</span>
+        <span style="font-size: 15px; color: #c3c8d4">Cotizar</span>
+      </div>
+    </div>
+    <div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.12)">
+      <span style="font-size: 13px; color: #8e96a8">© 2026 Autocolor. Todos los derechos reservados.</span>
+      <span style="font-size: 13px; color: #8e96a8; text-align: right; line-height: 1.5">Laboratorio de matizado y pintado al horno Autocolor<br>RUC 10283944063</span>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

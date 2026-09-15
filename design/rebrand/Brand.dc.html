@@ -1,0 +1,93 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600&family=Schibsted+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <style>
+    body { margin: 0; background: #ffffff; color: #262d40; font-family: 'Schibsted Grotesk', 'Helvetica Neue', Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+    a { color: #262d40; } a:hover { color: #181d2a; }
+    h1, h2, p { margin: 0; }
+    .display { font-family: 'Jost', 'Futura', 'Century Gothic', 'Avenir Next', sans-serif; font-weight: 500; letter-spacing: -0.02em; }
+    .label { font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: #5a6275; }
+    .mono { font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 13px; color: #5a6275; }
+  </style>
+</helmet>
+
+<div style="width: 1280px; background: #ffffff; padding: 56px; box-sizing: border-box; display: flex; flex-direction: column; gap: 48px">
+  <div style="display: flex; justify-content: space-between; align-items: baseline">
+    <h1 class="display" style="font-size: 36px">Sistema visual</h1>
+    <span class="label">Autocolor · 2026</span>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px">
+    <div style="height: 300px; background: #ffffff; border: 1px solid #dadde5; display: flex; align-items: center; justify-content: center">
+      <img src="lockup-stacked.svg" alt="Autocolor" style="width: 250px; height: auto">
+    </div>
+    <div style="height: 300px; background: #262d40; display: flex; align-items: center; justify-content: center">
+      <img src="lockup-stacked-white.svg" alt="Autocolor" style="width: 250px; height: auto">
+    </div>
+    <div style="height: 300px; background: #f3f4f7; border: 1px solid #dadde5; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 36px">
+      <img src="lockup-horizontal.svg" alt="Autocolor" style="height: 34px; width: auto">
+      <div style="display: flex; align-items: center; gap: 28px">
+        <img src="mark.svg" alt="" style="height: 56px; width: auto">
+        <img src="mark.svg" alt="" style="height: 28px; width: auto">
+        <img src="mark.svg" alt="" style="height: 16px; width: auto">
+      </div>
+    </div>
+  </div>
+  <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; margin-top: -32px">
+    <span class="mono">Vertical · pie de página, correo, documentos</span>
+    <span class="mono">Sobre tinta · banda de contacto, taller</span>
+    <span class="mono">Horizontal · cabecera. Símbolo desde 16 px</span>
+  </div>
+
+  <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 56px">
+    <div style="display: flex; flex-direction: column; gap: 18px">
+      <span class="label">Color</span>
+      <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px">
+        <div style="display: flex; flex-direction: column; gap: 8px"><div style="height: 96px; background: #262d40"></div><strong style="font-size: 14px">Tinta</strong><span class="mono">#262D40 · del logo</span></div>
+        <div style="display: flex; flex-direction: column; gap: 8px"><div style="height: 96px; background: #1b2130"></div><strong style="font-size: 14px">Tinta profunda</strong><span class="mono">#1B2130 · hover, pie</span></div>
+        <div style="display: flex; flex-direction: column; gap: 8px"><div style="height: 96px; background: #5a6275"></div><strong style="font-size: 14px">Grafito</strong><span class="mono">#5A6275 · texto</span></div>
+        <div style="display: flex; flex-direction: column; gap: 8px"><div style="height: 96px; background: #ffffff; box-shadow: inset 0 0 0 1px #dadde5"></div><strong style="font-size: 14px">Papel</strong><span class="mono">#FFFFFF</span></div>
+        <div style="display: flex; flex-direction: column; gap: 8px"><div style="height: 96px; background: #f3f4f7; box-shadow: inset 0 0 0 1px #dadde5"></div><strong style="font-size: 14px">Lámina</strong><span class="mono">#F3F4F7 · secciones</span></div>
+        <div style="display: flex; flex-direction: column; gap: 8px"><div style="height: 96px; background: #dadde5"></div><strong style="font-size: 14px">Línea</strong><span class="mono">#DADDE5 · filetes</span></div>
+      </div>
+      <div style="display: flex; gap: 12px; align-items: center; padding-top: 10px">
+        <span style="width: 14px; height: 14px; background: #1e8a55"></span><span class="mono" style="margin-right: 14px">Económico #1E8A55</span>
+        <span style="width: 14px; height: 14px; background: #262d40"></span><span class="mono" style="margin-right: 14px">Profesional #262D40</span>
+        <span style="width: 14px; height: 14px; background: #b07d0a"></span><span class="mono">Alta gama #B07D0A</span>
+      </div>
+      <p style="font-size: 14px; line-height: 1.55; color: #5a6275; max-width: 520px">La marca es de un solo color. El color de verdad lo ponen la pintura, las muestras y el vehículo: la interfaz no compite con ellos.</p>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 18px">
+      <span class="label">Tipografía</span>
+      <div style="display: flex; flex-direction: column; gap: 4px; padding-bottom: 18px; border-bottom: 1px solid #e3e6ec">
+        <span class="display" style="font-size: 54px; line-height: 1.05">Color de fábrica</span>
+        <span class="mono">Jost 500 · títulos · geométrica, pariente del logotipo</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 6px; padding-bottom: 18px; border-bottom: 1px solid #e3e6ec">
+        <span style="font-size: 18px; line-height: 1.55; color: #3b4356">Igualamos el color original con colorimetría y secamos en cabina de horno, pieza por pieza.</span>
+        <span class="mono">Schibsted Grotesk 400–600 · texto y botones</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 15px; letter-spacing: 0.08em; text-transform: uppercase">Código de color 1F7 · placa ABC-123</span>
+        <span class="mono">IBM Plex Mono 500 · etiquetas, códigos, cifras</span>
+      </div>
+      <div style="display: flex; gap: 12px; align-items: center; padding-top: 16px">
+        <span style="display: inline-flex; align-items: center; height: 48px; padding: 0 22px; background: #262d40; color: #fff; font-size: 15px; font-weight: 600">Cotizar mi vehículo</span>
+        <span style="display: inline-flex; align-items: center; height: 48px; padding: 0 22px; border: 1px solid #c4c9d4; font-size: 15px; font-weight: 600">WhatsApp</span>
+        <span style="display: inline-flex; align-items: center; height: 48px; padding: 0 22px; background: #1b2130; color: #fff; font-size: 15px; font-weight: 600">Hover</span>
+      </div>
+      <span class="mono">Esquinas rectas, como el símbolo. Botones 44–56 px.</span>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

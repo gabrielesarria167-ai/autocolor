@@ -1,0 +1,123 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600&family=Schibsted+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <style>
+    body { margin: 0; background: #f3f4f7; color: #262d40; font-family: 'Schibsted Grotesk', 'Helvetica Neue', Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+    a { color: #262d40; text-underline-offset: 3px; } a:hover { color: #181d2a; }
+    h1, h2, p { margin: 0; }
+    .display { font-family: 'Jost', 'Futura', 'Century Gothic', 'Avenir Next', sans-serif; font-weight: 500; letter-spacing: -0.02em; }
+    .label { font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: #5a6275; }
+    .field { display: flex; flex-direction: column; gap: 8px; }
+    .field span.name { font-size: 14px; font-weight: 600; color: #262d40; }
+    .input { height: 48px; box-sizing: border-box; border: 1px solid #c9ced8; background: #ffffff; padding: 0 14px; display: flex; align-items: center; justify-content: space-between; font-size: 15px; color: #8a91a2; }
+  </style>
+</helmet>
+
+<div style="width: 1440px; background: #f3f4f7; display: flex; flex-direction: column">
+  <div style="height: 76px; display: flex; align-items: center; gap: 48px; padding: 0 130px; border-bottom: 1px solid #e3e6ec; background: #ffffff">
+    <img src="lockup-horizontal.svg" alt="Autocolor" style="height: 30px; width: auto; display: block">
+    <div style="display: flex; gap: 32px; margin-left: 12px">
+      <span style="font-size: 15px; font-weight: 500; color: #3b4356">Inicio</span>
+      <span style="font-size: 15px; font-weight: 500; color: #3b4356">Servicios</span>
+      <span style="font-size: 15px; font-weight: 500; color: #3b4356">Acabados</span>
+      <span style="font-size: 15px; font-weight: 500; color: #3b4356">Preguntas</span>
+      <span style="font-size: 15px; font-weight: 500; color: #3b4356">Contacto</span>
+    </div>
+    <span style="margin-left: auto; display: inline-flex; align-items: center; height: 44px; padding: 0 18px; border: 1px solid #262d40; font-size: 15px; font-weight: 600">Consulta tu solicitud</span>
+  </div>
+
+  <div style="width: 720px; margin: 48px auto 0; display: flex; flex-direction: column; gap: 20px">
+    <div style="background: #ffffff; border: 1px solid #dadde5">
+      <!-- progress -->
+      <div style="padding: 22px 36px 20px; border-bottom: 1px solid #e3e6ec; display: flex; align-items: flex-start">
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; width: 72px">
+          <span style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: #262d40; color: #fff; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 13px">1</span>
+          <span style="font-size: 13px; font-weight: 600; color: #262d40">Vehículo</span>
+        </div>
+        <div style="flex: 1; height: 1px; background: #c9ced8; margin-top: 16px"></div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; width: 72px">
+          <span style="width: 32px; height: 32px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border: 1px solid #c9ced8; color: #8a91a2; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 13px">2</span>
+          <span style="font-size: 13px; color: #8a91a2">Acabado</span>
+        </div>
+        <div style="flex: 1; height: 1px; background: #c9ced8; margin-top: 16px"></div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; width: 72px">
+          <span style="width: 32px; height: 32px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border: 1px solid #c9ced8; color: #8a91a2; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 13px">3</span>
+          <span style="font-size: 13px; color: #8a91a2">Piezas</span>
+        </div>
+        <div style="flex: 1; height: 1px; background: #c9ced8; margin-top: 16px"></div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; width: 72px">
+          <span style="width: 32px; height: 32px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border: 1px solid #c9ced8; color: #8a91a2; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 13px">4</span>
+          <span style="font-size: 13px; color: #8a91a2">Contacto</span>
+        </div>
+      </div>
+
+      <div style="padding: 40px 48px 36px; display: flex; flex-direction: column; gap: 28px">
+        <div style="display: flex; flex-direction: column; gap: 10px">
+          <span class="label">Paso 1 de 4</span>
+          <h1 class="display" style="font-size: 38px; line-height: 1.08">Datos del vehículo</h1>
+          <p style="font-size: 16px; color: #5a6275">Completa la información para identificar tu vehículo.</p>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 20px; padding-top: 24px; border-top: 1px solid #e3e6ec">
+          <div style="display: flex; align-items: center; gap: 10px">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#262d40" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17H3.5v-5L5.5 7h13l2 5v5H19"></path><path d="M9.5 17h5"></path><circle cx="7" cy="17" r="2"></circle><circle cx="17" cy="17" r="2"></circle><path d="M4 12h16"></path></svg>
+            <h2 class="display" style="font-size: 21px">Vehículo</h2>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 20px">
+            <div class="field"><span class="name">Marca</span>
+              <div class="input" style="color: #262d40; border-color: #262d40; box-shadow: 0 0 0 3px rgba(38,45,64,0.12)">Toyota
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#262d40" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg></div></div>
+            <div class="field"><span class="name">Modelo</span>
+              <div class="input">Seleccionar modelo
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8a91a2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg></div></div>
+            <div class="field"><span class="name">Año</span><div class="input">Ej. 2020</div></div>
+            <div class="field"><span class="name">Placa</span><div class="input" style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 14px">Ej. ABC-123</div></div>
+            <div class="field"><span class="name">Kilometraje <span style="font-weight: 400; color: #8a91a2">(opcional)</span></span><div class="input">Ej. 85000</div></div>
+            <div class="field"><span class="name">Código de color <span style="font-weight: 400; color: #8a91a2">(opcional)</span></span><div class="input" style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 14px">Ej. 1F7</div>
+              <span style="font-size: 13px; color: #7a8193">Generalmente está en una etiqueta del vehículo.</span></div>
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 20px; padding-top: 24px; border-top: 1px solid #e3e6ec">
+          <div style="display: flex; align-items: center; gap: 10px">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#262d40" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"></path></svg>
+            <h2 class="display" style="font-size: 21px">Propietario</h2>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 20px">
+            <div class="field"><span class="name">Nombres</span><div class="input">Ingresa tus nombres</div></div>
+            <div class="field"><span class="name">Apellidos</span><div class="input">Ingresa tus apellidos</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="padding: 20px 48px; border-top: 1px solid #e3e6ec; display: flex; justify-content: flex-end">
+        <span style="display: inline-flex; align-items: center; height: 50px; padding: 0 26px; background: #262d40; color: #ffffff; font-size: 16px; font-weight: 600">Guardar y continuar</span>
+      </div>
+    </div>
+
+    <div style="background: #ffffff; border: 1px solid #dadde5; padding: 28px 48px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 32px; align-items: end">
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <h2 class="display" style="font-size: 22px">Consulta tu solicitud</h2>
+        <p style="font-size: 14px; line-height: 1.55; color: #5a6275">¿Ya enviaste una? Ingresa el código de 10 dígitos que recibiste para ver en qué estado está.</p>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <span style="font-size: 14px; font-weight: 600">Código de seguimiento</span>
+        <div style="display: flex">
+          <div class="input" style="flex: 1; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; letter-spacing: 0.12em; font-size: 14px">1234567890</div>
+          <span style="display: inline-flex; align-items: center; height: 48px; padding: 0 18px; background: #262d40; color: #fff; font-size: 15px; font-weight: 600">Consultar</span>
+        </div>
+      </div>
+    </div>
+    <p style="text-align: center; font-size: 13px; color: #7a8193; padding-bottom: 48px">Sin compromiso · Te respondemos con el presupuesto en 24 horas · <a href="#">Preguntas frecuentes</a></p>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

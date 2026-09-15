@@ -1,0 +1,47 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700&family=Schibsted+Grotesk:wght@400;500;600&display=swap">
+  <style>
+    body { margin: 0; background: #fbfbfc; color: #262d40; font-family: 'Schibsted Grotesk', 'Helvetica Neue', Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+    a { color: #262d40; } a:hover { color: #181d2a; }
+    h1, p { margin: 0; }
+    .display { font-family: 'Jost', 'Futura', 'Century Gothic', 'Avenir Next', sans-serif; font-weight: 700; letter-spacing: -0.035em; }
+  </style>
+</helmet>
+
+<div style="width: 1440px; height: 900px; background: #fbfbfc; display: flex; flex-direction: column; overflow: hidden">
+  <div style="height: 76px; display: flex; align-items: center; padding: 0 64px; gap: 40px">
+    <img src="lockup-horizontal.svg" alt="Autocolor" style="height: 30px; width: auto">
+    <div style="display: flex; gap: 30px; margin-left: auto; font-size: 15px; font-weight: 500">
+      <span>servicios</span><span>cómo funciona</span><span>acabados</span><span>contacto</span>
+    </div>
+    <span style="display: inline-flex; align-items: center; height: 44px; padding: 0 20px; background: #262d40; color: #fff; font-size: 15px; font-weight: 600; border-radius: 22px">cotizar ahora</span>
+  </div>
+
+  <div style="flex: 1; padding: 40px 64px 0; display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 4fr); gap: 40px; align-items: end">
+    <h1 class="display" style="font-size: 138px; line-height: 0.9">tu vehículo, con el color de fábrica.</h1>
+    <div style="display: flex; flex-direction: column; gap: 22px; padding-bottom: 12px">
+      <img src="suv.webp" alt="" style="width: 100%; height: auto">
+      <p style="font-size: 18px; line-height: 1.55; color: #5a6275">Laboratorio de matizado y pintado al horno en Ayacucho. Arma tu presupuesto en línea en 2 minutos.</p>
+      <span style="display: inline-flex; align-self: flex-start; align-items: center; height: 54px; padding: 0 28px; background: #262d40; color: #fff; font-size: 16px; font-weight: 600; border-radius: 27px">cotizar mi vehículo</span>
+    </div>
+  </div>
+
+  <div style="margin-top: 40px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); height: 170px">
+    <div style="background: #cbbda4; padding: 20px 24px; display: flex; flex-direction: column; justify-content: space-between"><span style="font-size: 13px; font-weight: 600">original</span><span class="display" style="font-size: 22px; letter-spacing: -0.01em">pintura completa</span></div>
+    <div style="background: #d61f14; color: #fff; padding: 20px 24px; display: flex; flex-direction: column; justify-content: space-between"><span style="font-size: 13px; font-weight: 600">rojo fuego</span><span class="display" style="font-size: 22px; letter-spacing: -0.01em">por piezas</span></div>
+    <div style="background: #1f6feb; color: #fff; padding: 20px 24px; display: flex; flex-direction: column; justify-content: space-between"><span style="font-size: 13px; font-weight: 600">azul océano</span><span class="display" style="font-size: 22px; letter-spacing: -0.01em">planchado</span></div>
+    <div style="background: #245b12; color: #fff; padding: 20px 24px; display: flex; flex-direction: column; justify-content: space-between"><span style="font-size: 13px; font-weight: 600">verde bosque</span><span class="display" style="font-size: 22px; letter-spacing: -0.01em">pulido</span></div>
+    <div style="background: #e8e8e6; padding: 20px 24px; display: flex; flex-direction: column; justify-content: space-between"><span style="font-size: 13px; font-weight: 600">blanco perla</span><span class="display" style="font-size: 22px; letter-spacing: -0.01em">cambio de color</span></div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

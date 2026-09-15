@@ -1,0 +1,48 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600&family=Schibsted+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <style>
+    body { margin: 0; background: #f3f4f7; color: #262d40; font-family: 'Schibsted Grotesk', 'Helvetica Neue', Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+    a { color: #262d40; } a:hover { color: #181d2a; }
+    h1, p { margin: 0; }
+    .display { font-family: 'Jost', 'Futura', 'Century Gothic', 'Avenir Next', sans-serif; font-weight: 500; letter-spacing: -0.02em; }
+    .label { font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; }
+    .input { height: 48px; box-sizing: border-box; border: 1px solid #c9ced8; background: #ffffff; }
+  </style>
+</helmet>
+
+<div style="width: 1440px; height: 820px; background: #f3f4f7; display: flex; flex-direction: column">
+  <div style="height: 64px; display: flex; align-items: center; gap: 18px; padding: 0 32px; background: #262d40">
+    <img src="lockup-horizontal-white.svg" alt="Autocolor" style="height: 24px; width: auto; display: block">
+    <span style="width: 1px; height: 22px; background: rgba(255,255,255,0.24)"></span>
+    <span class="label" style="color: #c3c8d4">Taller</span>
+  </div>
+  <div style="flex: 1; display: flex; align-items: center; justify-content: center">
+    <div style="width: 420px; background: #ffffff; border: 1px solid #dadde5; padding: 36px; display: flex; flex-direction: column; gap: 22px; margin-top: -60px">
+      <img src="mark.svg" alt="" style="height: 36px; width: auto; align-self: flex-start">
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <h1 class="display" style="font-size: 28px">Acceso del taller</h1>
+        <p style="font-size: 15px; line-height: 1.55; color: #5a6275">Ingresa tu código de trabajador y la contraseña del taller para ver las solicitudes.</p>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <span style="font-size: 14px; font-weight: 600">Código de trabajador</span>
+        <div class="input"></div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <span style="font-size: 14px; font-weight: 600">Contraseña</span>
+        <div class="input"></div>
+      </div>
+      <span style="display: flex; align-items: center; justify-content: center; height: 50px; background: #262d40; color: #ffffff; font-size: 16px; font-weight: 600; margin-top: 4px">Entrar</span>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>
