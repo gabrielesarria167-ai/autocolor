@@ -1,5 +1,5 @@
 /* =========================================================================
-   parts.js — the name each body panel goes by
+   parts.js — the name each body panel goes by, and what painting it costs
 
    The keys are the GLB node names, exactly as they come out of the four
    models (see VEHICLE_MODELS in src/carVisual.js). One flat map serves all
@@ -114,11 +114,91 @@
         ]
     };
 
+    // What painting one panel costs, in soles, per finish (the `quality` ids
+    // the wizard and server/server.js use: standard = Económico, premium =
+    // Profesional, custom = Alta gama). The workshop prices by kind of panel,
+    // not by model, so each row is a kind and PRICE_GROUP_OF files every node
+    // name under one.
+    var PRICES = {
+        bumper_front: { label: "Parachoque delantero", standard: 250, premium: 300, custom: 400 },
+        bumper_rear:  { label: "Parachoque posterior", standard: 250, premium: 300, custom: 400 },
+        fender_front: { label: "Guardafango delantero", standard: 250, premium: 300, custom: 400 },
+        fender_rear:  { label: "Guardafango posterior", standard: 250, premium: 300, custom: 400 },
+        door:         { label: "Puerta", standard: 250, premium: 300, custom: 400 },
+        hood:         { label: "Capó", standard: 350, premium: 400, custom: 550 },
+        roof:         { label: "Techo", standard: 350, premium: 400, custom: 550 },
+        trunk:        { label: "Maletera", standard: 300, premium: 350, custom: 450 },
+        sill:         { label: "Estribo", standard: 250, premium: 300, custom: 400 }
+    };
+
+    // The workshop's price list names nine kinds of panel; the models name
+    // twenty-six nodes. The ones that needed a call:
+    //   - the van's rear_window_* are the body panels behind its sliding
+    //     doors, which is where a car has its rear quarter panel;
+    //   - the pickup's tonneau (bed and tailgate) and the SUV's tailgate are
+    //     priced as the trunk, the rear opening of the other bodies;
+    //   - the wagon's Object_26, the trim at the back of the roof, is not on
+    //     the list; it takes the lowest row, like every other small panel.
+    // tools/verify-3d.mjs fails when a part in BY_VEHICLE has no group here.
+    var PRICE_GROUP_OF = {
+        hood: "hood",
+        roof: "roof",
+        Object_26: "sill",
+        bumper: "bumper_front",
+        front_bumper: "bumper_front",
+        back_bumper: "bumper_rear",
+        rear_bumper: "bumper_rear",
+        fender_left: "fender_front",
+        fender_right: "fender_front",
+        left_fender: "fender_front",
+        right_fender: "fender_front",
+        quarter_panel_left: "fender_rear",
+        quarter_panel_right: "fender_rear",
+        rear_window_left: "fender_rear",
+        rear_window_right: "fender_rear",
+        front_door_left: "door",
+        front_door_right: "door",
+        rear_door_left: "door",
+        rear_door_right: "door",
+        back_door_left: "door",
+        back_door_right: "door",
+        rear_hatch: "trunk",
+        tailgate: "trunk",
+        tonneau: "trunk",
+        side_skirt_left: "sill",
+        side_skirt_right: "sill"
+    };
+
     var has = Object.prototype.hasOwnProperty;
+
+    // The price of one panel at one finish, or null when either is unknown.
+    // hasOwnProperty throughout for the reason given at label() below.
+    function price(id, quality) {
+        if (!has.call(PRICE_GROUP_OF, id)) return null;
+        var row = PRICES[PRICE_GROUP_OF[id]];
+        if (quality !== "standard" && quality !== "premium" && quality !== "custom") return null;
+        return row[quality];
+    }
 
     return {
         LABELS: LABELS,
         BY_VEHICLE: BY_VEHICLE,
+        PRICES: PRICES,
+        PRICE_GROUP_OF: PRICE_GROUP_OF,
+        price: price,
+
+        // The sum of the priced panels, and how many had no price: a total
+        // that silently skipped a panel would read as the whole bill.
+        estimate: function (ids, quality) {
+            var total = 0;
+            var unpriced = 0;
+            (ids || []).forEach(function (id) {
+                var value = price(id, quality);
+                if (value === null) unpriced++;
+                else total += value;
+            });
+            return { total: total, unpriced: unpriced };
+        },
 
         // The raw id before a blank: if a model gains a panel and this file
         // has not caught up, reading «rear_hatch» beats reading nothing.

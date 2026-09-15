@@ -877,6 +877,53 @@ svg {
     color: var(--ink);
 }
 
+/* The name takes the slack so every price lines up against the remove button. */
+.car-view-3d__list-item-name {
+    flex: 1;
+    min-width: 0;
+}
+
+.car-view-3d__list-item-price {
+    color: var(--ink);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.car-view-3d__estimate {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-strong);
+}
+
+.car-view-3d__estimate-total {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--text-dim);
+}
+
+.car-view-3d__estimate-total strong {
+    font-family: var(--font-display);
+    font-size: 1.35rem;
+    font-weight: 600;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.car-view-3d__estimate-note {
+    margin: 0;
+    font-size: 0.78rem;
+    line-height: 1.45;
+    color: var(--text-dim);
+}
+
 .car-view-3d__empty {
     color: var(--text-faint);
     font-size: 0.85rem;

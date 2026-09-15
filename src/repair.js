@@ -58,6 +58,9 @@
     var carView3dList = document.getElementById("carView3dList");
     var carView3dCount = document.getElementById("carView3dCount");
     var carView3dClear = document.getElementById("carView3dClear");
+    var carView3dEstimate = document.getElementById("carView3dEstimate");
+    var carView3dTotal = document.getElementById("carView3dTotal");
+    var carView3dEstimateNote = document.getElementById("carView3dEstimateNote");
     var partsPicker = document.getElementById("partsPicker");
     var partsPickerList = document.getElementById("partsPickerList");
     var pickerVehicle = null; // vehicle the checklist is currently built for
@@ -85,6 +88,18 @@
     var partLabel = window.AUTOCOLOR_PARTS
         ? window.AUTOCOLOR_PARTS.label
         : function (id) { return id; };
+
+    // Prices come from the same file and degrade the same way: without it the
+    // summary lists the parts and shows no money, rather than a total of zero.
+    var partPrice = window.AUTOCOLOR_PARTS && window.AUTOCOLOR_PARTS.price
+        ? window.AUTOCOLOR_PARTS.price
+        : function () { return null; };
+    var QUALITY_NAMES = { standard: "Económico", premium: "Profesional", custom: "Alta gama" };
+    var soles = window.Intl ? new Intl.NumberFormat("es-PE") : null;
+
+    function formatSoles(amount) {
+        return "S/ " + (soles ? soles.format(amount) : String(amount));
+    }
 
     function toggleCarPart(id) {
         var idx = state.parts.indexOf(id);
@@ -159,7 +174,9 @@
                 var li = document.createElement("li");
                 li.className = "car-view-3d__list-item";
                 var span = document.createElement("span");
+                span.className = "car-view-3d__list-item-name";
                 span.textContent = label;
+                var price = partPrice(id, state.quality);
                 var btn = document.createElement("button");
                 btn.type = "button";
                 btn.className = "car-view-3d__list-item-remove";
@@ -167,6 +184,12 @@
                 btn.textContent = "✕";
                 btn.addEventListener("click", function () { toggleCarPart(id); });
                 li.appendChild(span);
+                if (price !== null) {
+                    var cost = document.createElement("span");
+                    cost.className = "car-view-3d__list-item-price";
+                    cost.textContent = formatSoles(price);
+                    li.appendChild(cost);
+                }
                 li.appendChild(btn);
                 carView3dList.appendChild(li);
             });
@@ -175,7 +198,25 @@
             carView3dCount.textContent = state.parts.length + (state.parts.length === 1 ? " pieza" : " piezas");
         }
         if (carView3dClear) carView3dClear.disabled = state.parts.length === 0;
+        renderEstimate();
         syncPartsPicker();
+    }
+
+    // The running total under the list, shown once something in the
+    // selection has a price. estimate() leaves a part the price list does not
+    // know out of the sum and counts it, and the note says so.
+    function renderEstimate() {
+        if (!carView3dEstimate) return;
+        var result = window.AUTOCOLOR_PARTS && window.AUTOCOLOR_PARTS.estimate
+            ? window.AUTOCOLOR_PARTS.estimate(state.parts, state.quality)
+            : { total: 0, unpriced: state.parts.length };
+        var missing = result.unpriced;
+        carView3dEstimate.hidden = missing === state.parts.length;
+        if (carView3dEstimate.hidden) return;
+        carView3dTotal.textContent = formatSoles(result.total);
+        carView3dEstimateNote.textContent = "Acabado " + QUALITY_NAMES[state.quality] + ". " +
+            (missing ? "No incluye " + missing + (missing === 1 ? " pieza" : " piezas") + " sin precio de lista. " : "") +
+            "Precio referencial: el taller confirma el presupuesto al revisar el vehículo.";
     }
 
     if (carView3dClear) {

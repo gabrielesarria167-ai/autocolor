@@ -253,6 +253,13 @@ for (const [key, expected] of Object.entries(models)) {
         console.log(`  parts.js:     ${copy.join(', ')}`);
         bad++;
     }
+    // Every part the viewer offers needs a price, or the wizard's estimate
+    // leaves it out of the total.
+    const unpriced = expected.parts.filter((id) => partsModule.price(id, 'standard') === null);
+    if (unpriced.length) {
+        console.log(`\n${key}: ✗ src/parts.js PRICE_GROUP_OF has no price for ${unpriced.join(', ')}`);
+        bad++;
+    }
 }
 for (const [key, expected] of Object.entries(models)) {
     const file = path.join(ROOT, 'imgs/assets/3d-visuals', expected.url);
