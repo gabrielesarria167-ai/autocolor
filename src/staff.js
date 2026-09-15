@@ -1695,7 +1695,7 @@
                 intake3dListEl.appendChild(item);
             });
         }
-        intake3dCountEl.textContent = String(intakeParts.length);
+        intake3dCountEl.textContent = intakeParts.length + (intakeParts.length === 1 ? " pieza" : " piezas");
         intake3dClearEl.disabled = intakeParts.length === 0;
     }
 

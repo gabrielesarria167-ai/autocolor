@@ -710,7 +710,14 @@ async function serveStatic(req, res, pathname) {
     }
 
     const body = encoding ? await compressed(filePath, stat, info, encoding) : info.buffer;
-    if (encoding) headers['Content-Encoding'] = encoding;
+    if (encoding) {
+        headers['Content-Encoding'] = encoding;
+        // three.js's FileLoader reads this before Content-Length to size its
+        // progress events, and counts decompressed bytes. With only the
+        // compressed length to go by, the 3D loading bar hit 100 % with a
+        // quarter of the model still on its way.
+        headers['X-File-Size'] = info.buffer.length;
+    }
     headers['Content-Length'] = body.length;
     res.writeHead(200, headers);
     res.end(req.method === 'HEAD' ? undefined : body);

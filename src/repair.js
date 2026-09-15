@@ -57,6 +57,11 @@
     var carView3dList = document.getElementById("carView3dList");
     var carView3dCount = document.getElementById("carView3dCount");
     var carView3dClear = document.getElementById("carView3dClear");
+    var partsPicker = document.getElementById("partsPicker");
+    var partsPickerList = document.getElementById("partsPickerList");
+    var pickerVehicle = null; // vehicle the checklist is currently built for
+    var stepHint = document.getElementById("stepHint");
+    var carMileageError = document.getElementById("carMileageError");
     var car3d = null;        // controller for the currently mounted viewer
     var car3dVehicle = null; // vehicle it is mounted (or being mounted) for
     var car3dModule = null;  // cached import() of the viewer module
@@ -89,13 +94,54 @@
         refreshConfirm();
     }
 
+    // The checklist under the viewer: the same parts as the 3D model, as
+    // checkboxes. It is the way in for a keyboard or a screen reader, and the
+    // way through when the viewer, three.js or the model does not load — before
+    // it, a failed viewer meant no part could be added and no quote sent.
+    function renderPartsPicker(vehicle) {
+        if (!partsPickerList || pickerVehicle === vehicle) return;
+        pickerVehicle = vehicle;
+        Array.prototype.slice.call(partsPickerList.querySelectorAll(".parts-picker__option"))
+            .forEach(function (option) { option.remove(); });
+        var byVehicle = window.AUTOCOLOR_PARTS && window.AUTOCOLOR_PARTS.BY_VEHICLE;
+        var ids = (byVehicle && byVehicle[vehicle]) || [];
+        if (partsPicker) partsPicker.hidden = ids.length === 0;
+        ids.forEach(function (id) {
+            var option = document.createElement("label");
+            option.className = "parts-picker__option";
+            var box = document.createElement("input");
+            box.type = "checkbox";
+            box.value = id;
+            box.checked = state.parts.indexOf(id) !== -1;
+            box.addEventListener("change", function () {
+                if (box.checked !== (state.parts.indexOf(id) !== -1)) toggleCarPart(id);
+            });
+            var text = document.createElement("span");
+            text.textContent = partLabel(id);
+            option.appendChild(box);
+            option.appendChild(text);
+            partsPickerList.appendChild(option);
+        });
+    }
+
+    function syncPartsPicker() {
+        if (!partsPickerList) return;
+        Array.prototype.forEach.call(partsPickerList.querySelectorAll("input[type=checkbox]"), function (box) {
+            box.checked = state.parts.indexOf(box.value) !== -1;
+        });
+    }
+
+    function openPartsPicker() {
+        if (partsPicker && !partsPicker.hidden) partsPicker.open = true;
+    }
+
     // ==================================================================
     // 3D viewer (step 3) — lazy-loaded, then shown/hidden as the wizard
     // steps back and forth. Each vehicle has its own model, so the viewer
     // is torn down and rebuilt whenever the chosen vehicle changes and only
     // one is ever alive. The module owns no selection state itself; it
     // reads/writes state.parts through the two callbacks below, same as the
-    // 2D SVG parts do via toggleCarPart.
+    // checklist does via toggleCarPart.
     // ==================================================================
 
     function renderPartsSummary() {
@@ -124,8 +170,11 @@
                 carView3dList.appendChild(li);
             });
         }
-        if (carView3dCount) carView3dCount.textContent = String(state.parts.length);
+        if (carView3dCount) {
+            carView3dCount.textContent = state.parts.length + (state.parts.length === 1 ? " pieza" : " piezas");
+        }
         if (carView3dClear) carView3dClear.disabled = state.parts.length === 0;
+        syncPartsPicker();
     }
 
     if (carView3dClear) {
@@ -205,8 +254,10 @@
         // module map remembers a failed fetch, so re-importing the same
         // specifier fails again without touching the network — measured, not
         // assumed: after a 404 the retry logged no request at all. The query
-        // string is what makes the retry an actual retry. It is only ever
-        // added after a failure, so the module is never loaded twice.
+        // string makes carVisual.js itself refetch. It does not reach
+        // three.js: those imports resolve through the import map to the same
+        // URLs, and a failed one stays failed until a reload. That is what the
+        // checklist is for.
         if (!car3dModule) {
             car3dModule = import("../src/carVisual.js" +
                 (car3dRetries ? "?reintento=" + car3dRetries : ""));
@@ -229,7 +280,8 @@
                 errorEl: carView3dError,
                 buttonsEl: carView3dButtons,
                 isPartSelected: function (id) { return state.parts.indexOf(id) !== -1; },
-                onPartToggle: function (id) { toggleCarPart(id); }
+                onPartToggle: function (id) { toggleCarPart(id); },
+                onLoadError: openPartsPicker
             });
         }).catch(function (err) {
             if (mountId !== car3dMountId) return;
@@ -240,8 +292,9 @@
             car3dModule = null;
             car3dRetries++;
             car3dVehicle = null;
-            console.error("[repair] No se pudo cargar el visor 3D:", err);
-            showCar3DError("No se pudo cargar el visor 3D. Intenta recargar la página.");
+            console.error("[repair] Could not load the 3D viewer:", err);
+            showCar3DError("No se pudo cargar el visor 3D. Elige las piezas en la lista de abajo.");
+            openPartsPicker();
         });
     }
 
@@ -254,6 +307,7 @@
             return !!state.vehicle &&
                 isYearValid(carYearInput.value) &&
                 PLATE_PATTERN.test(carPlateInput.value) &&
+                isMileageValid(carMileageInput.value) &&
                 firstNameInput.value.trim() !== "" &&
                 lastNameInput.value.trim() !== "";
         }
@@ -263,7 +317,66 @@
         return true;
     }
 
-    function refreshConfirm() { confirmBtn.disabled = !isStepValid(current); }
+    // The button stays clickable while the step is incomplete, marked with
+    // aria-disabled. A truly disabled one gave no reason: tapping it did
+    // nothing, and nothing said which field was missing. Clicking it now
+    // points at what is left (see explainStep).
+    function refreshConfirm() {
+        var valid = isStepValid(current);
+        confirmBtn.setAttribute("aria-disabled", String(!valid));
+        if (valid) setStepHint("");
+    }
+
+    function setStepHint(message) {
+        if (!stepHint) return;
+        stepHint.textContent = message || "";
+        stepHint.hidden = !message;
+    }
+
+    // Marks what is missing on the current step and moves focus to the first
+    // of it.
+    function explainStep(step) {
+        var first = null;
+        function need(ok, control) {
+            if (!ok && !first) first = control;
+        }
+        if (step === 1) {
+            need(!!brandSelect.value, brandSelect);
+            need(!!modelSelect.value, modelSelect);
+            var yearOk = isYearValid(carYearInput.value);
+            setFieldValidity(carYearInput, carYearError, yearOk, "Ingresa un año entre " + YEAR_MIN + " y " + YEAR_MAX + ".");
+            need(yearOk, carYearInput);
+            var plateOk = PLATE_PATTERN.test(carPlateInput.value);
+            setFieldValidity(carPlateInput, carPlateError, plateOk,
+                "Ingresa la placa con tres caracteres, guion y tres más. Por ejemplo ABC-123.");
+            need(plateOk, carPlateInput);
+            var mileageOk = isMileageValid(carMileageInput.value);
+            setFieldValidity(carMileageInput, carMileageError, mileageOk, MILEAGE_MESSAGE);
+            need(mileageOk, carMileageInput);
+            need(firstNameInput.value.trim() !== "", firstNameInput);
+            need(lastNameInput.value.trim() !== "", lastNameInput);
+            setStepHint("Completa los datos marcados para continuar.");
+        } else if (step === 2) {
+            first = qualityCards[0] || null;
+            setStepHint("Elige un nivel de acabado para continuar.");
+        } else if (step === 3) {
+            openPartsPicker();
+            setStepHint("Elige al menos una pieza: tócala en el vehículo o márcala en la lista.");
+        } else if (step === 4) {
+            need(!!(departmentSelect && departmentSelect.value), departmentSelect);
+            need(!!(provinceSelect && provinceSelect.value), provinceSelect);
+            var phoneOk = PHONE_PATTERN.test(phoneInput.value);
+            setFieldValidity(phoneInput, phoneError, phoneOk, "Ingresa " + PHONE_DIGITS + " dígitos después de +51.");
+            need(phoneOk, phoneInput);
+            var emailOk = EMAIL_PATTERN.test(emailInput.value);
+            setFieldValidity(emailInput, emailError, emailOk, emailInput.value === ""
+                ? "Escribe tu email: ahí te enviamos tu código de seguimiento."
+                : "Ingresa un email válido, por ejemplo nombre@dominio.com.");
+            need(emailOk, emailInput);
+            setStepHint("Completa los datos marcados para enviar tu solicitud.");
+        }
+        if (first && typeof first.focus === "function") first.focus();
+    }
 
     function updateProgress(step) {
         dots.forEach(function (dot) {
@@ -288,8 +401,10 @@
         backLink.hidden = step === 1;
         confirmBtn.textContent = CONFIRM_LABELS[step] || "Continuar";
         current = step;
+        setStepHint("");
         if (step === 3) {
             if (carView3d) carView3d.hidden = false;
+            renderPartsPicker(state.vehicle);
             ensureCar3D(state.vehicle);
             // On a first mount the viewer sizes itself; this is for coming
             // back to a viewer that was measured while its container was
@@ -305,11 +420,17 @@
     }
 
     backLink.addEventListener("click", function () {
+        // Not while a request is on its way: going back mid-send left the
+        // label and the eventual error on the wrong step.
+        if (submitting) return;
         if (current > 1) goTo(current - 1);
     });
 
     confirmBtn.addEventListener("click", function () {
-        if (!isStepValid(current)) return;
+        if (!isStepValid(current)) {
+            explainStep(current);
+            return;
+        }
         if (current < TOTAL_STEPS) goTo(current + 1);
         else submitRequest();
     });
@@ -381,6 +502,7 @@
         submitting = true;
         setSubmitError("");
         confirmBtn.disabled = true;
+        backLink.disabled = true;
         confirmBtn.textContent = "Enviando…";
 
         fetch(REQUESTS_ENDPOINT, {
@@ -400,7 +522,7 @@
         }).then(function (created) {
             showSuccess(created.id);
         }).catch(function (err) {
-            console.error("[repair] No se pudo enviar la solicitud:", err);
+            console.error("[repair] Could not send the request:", err);
             // fetch solo rechaza así cuando la petición nunca llegó a destino
             // (servidor apagado, sin conexión); cualquier respuesta del
             // servidor, incluso un error, ya trae su propio mensaje.
@@ -410,7 +532,9 @@
                 : err.message);
         }).then(function () {
             submitting = false;
-            confirmBtn.textContent = CONFIRM_LABELS[TOTAL_STEPS];
+            confirmBtn.disabled = false;
+            backLink.disabled = false;
+            confirmBtn.textContent = CONFIRM_LABELS[current] || "Continuar";
             refreshConfirm();
         });
     }
@@ -425,6 +549,7 @@
         progressNav.hidden = true;
         backLink.hidden = true;
         confirmBtn.hidden = true;
+        setStepHint("");
         steps.forEach(function (s) { s.hidden = true; s.classList.remove("active"); });
         successPanel.hidden = false;
         var title = successPanel.querySelector("h1");
@@ -475,6 +600,7 @@
 
 
         if (carView3d) carView3d.hidden = true;
+        if (partsPicker) partsPicker.open = false;
         renderPartsSummary();
         // The viewer stays mounted: picking the same vehicle again then
         // costs nothing, and ensureCar3D() swaps the model out if the next
@@ -508,6 +634,11 @@
     var PLATE_PATTERN = /^[A-Z0-9]{3}-[A-Z0-9]{3}$/;
     var YEAR_MIN = 1980;
     var YEAR_MAX = new Date().getFullYear() + 1;
+    // MAX_MILEAGE in server/server.js. The field allows seven digits, which
+    // reach 9 999 999, and a larger number used to pass step 1 only to be
+    // refused under the contact form on step 4, three steps away from it.
+    var MILEAGE_MAX = 2000000;
+    var MILEAGE_MESSAGE = "El kilometraje no puede pasar de 2 000 000 km.";
 
     // La foto del vehículo, por orden de preferencia:
     //
@@ -540,6 +671,10 @@
         carPreviewLogo.style.setProperty("--logo-src", 'url("' + brand.logo + '")');
         carPreviewLogo.style.setProperty("--logo-color", brand.color);
         carPreviewLogo.hidden = false;
+    }
+
+    function isMileageValid(value) {
+        return !value || Number(value) <= MILEAGE_MAX;
     }
 
     function isYearValid(value) {
@@ -686,6 +821,12 @@
         carMileageInput.addEventListener("input", function () {
             var digits = carMileageInput.value.replace(/\D/g, "").slice(0, 7);
             if (digits !== carMileageInput.value) carMileageInput.value = digits;
+            if (carMileageInput.closest(".field").classList.contains("field--invalid") && isMileageValid(digits)) {
+                setFieldValidity(carMileageInput, carMileageError, true);
+            }
+        });
+        carMileageInput.addEventListener("blur", function () {
+            setFieldValidity(carMileageInput, carMileageError, isMileageValid(carMileageInput.value), MILEAGE_MESSAGE);
         });
 
         carForm.addEventListener("input", refreshConfirm);
@@ -698,9 +839,9 @@
         brandSelect.classList.add("is-placeholder");
         modelSelect.classList.add("is-placeholder");
         carPreview.hidden = true;
-        [carYearInput, carPlateInput].forEach(function (input) {
-            setFieldValidity(input, input === carYearInput ? carYearError : carPlateError, true);
-        });
+        setFieldValidity(carYearInput, carYearError, true);
+        setFieldValidity(carPlateInput, carPlateError, true);
+        setFieldValidity(carMileageInput, carMileageError, true);
     }
 
     // ---------- Paso 2: selección de acabado ----------
@@ -810,8 +951,10 @@
     emailInput.addEventListener("input", function () {
         var cleaned = emailInput.value.replace(EMAIL_DISALLOWED, "");
         if (cleaned !== emailInput.value) emailInput.value = cleaned;
+        // Only a valid address clears the error: the email is required, so
+        // an emptied field is still wrong and keeps saying so.
         if (emailInput.closest(".field").classList.contains("field--invalid") &&
-            (cleaned === "" || EMAIL_PATTERN.test(cleaned))) {
+            EMAIL_PATTERN.test(cleaned)) {
             setFieldValidity(emailInput, emailError, true);
         }
         refreshConfirm();
@@ -833,19 +976,26 @@
     contactForm.addEventListener("input", refreshConfirm);
 
     // ---------- Menú hamburguesa ----------
-    function closeMenu() {
-        menuToggle.classList.remove("is-open");
-        menuToggle.setAttribute("aria-expanded", "false");
-        navPanel.classList.remove("is-open");
-    }
-    menuToggle.addEventListener("click", function () {
-        var open = !navPanel.classList.contains("is-open");
+    // Same behaviour as the home page's menu (src/home.js): the label says
+    // what the button will do, a tapped link closes the panel, and Escape
+    // hands focus back to the button.
+    function setMenu(open) {
         menuToggle.classList.toggle("is-open", open);
         menuToggle.setAttribute("aria-expanded", String(open));
+        menuToggle.setAttribute("aria-label", open ? "Cierra el menú" : "Abre el menú");
         navPanel.classList.toggle("is-open", open);
+    }
+    function closeMenu() { setMenu(false); }
+    menuToggle.addEventListener("click", function () {
+        setMenu(!navPanel.classList.contains("is-open"));
+    });
+    navPanel.addEventListener("click", function (e) {
+        if (e.target.closest("a")) closeMenu();
     });
     document.addEventListener("keydown", function (e) {
-        if (e.key === "Escape") closeMenu();
+        if (e.key !== "Escape" || !navPanel.classList.contains("is-open")) return;
+        closeMenu();
+        menuToggle.focus();
     });
     document.addEventListener("click", function (e) {
         if (!navPanel.classList.contains("is-open")) return;

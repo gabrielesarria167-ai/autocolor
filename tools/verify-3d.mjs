@@ -15,6 +15,7 @@
    ========================================================================== */
 
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -239,6 +240,20 @@ if (args.length === 2) {
 
 // Modo línea base.
 let bad = 0;
+
+// src/parts.js keeps its own copy of every model's part list for the wizard's
+// no-3D checklist. It has to match VEHICLE_MODELS exactly, or the checklist
+// offers panels the viewer does not (or misses ones it does).
+const partsModule = createRequire(import.meta.url)(path.join(ROOT, 'src/parts.js'));
+for (const [key, expected] of Object.entries(models)) {
+    const copy = (partsModule.BY_VEHICLE || {})[key] || [];
+    if (copy.join(',') !== expected.parts.join(',')) {
+        console.log(`\n${key}: ✗ src/parts.js BY_VEHICLE does not match VEHICLE_MODELS in src/carVisual.js`);
+        console.log(`  carVisual.js: ${expected.parts.join(', ')}`);
+        console.log(`  parts.js:     ${copy.join(', ')}`);
+        bad++;
+    }
+}
 for (const [key, expected] of Object.entries(models)) {
     const file = path.join(ROOT, 'imgs/assets/3d-visuals', expected.url);
     let d;

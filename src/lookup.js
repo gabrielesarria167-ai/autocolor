@@ -47,7 +47,11 @@
     // Los estados y sus etiquetas viven en src/statuses.js, que esta página
     // carga antes que este archivo. El taller los cambia desde su panel
     // (pgs/taller.html); aquí solo se traducen a algo legible.
-    var STATUSES = window.AUTOCOLOR_STATUSES;
+    //
+    // Guarded like repair.js guards parts.js: without statuses.js the raw
+    // status shows instead of a label, rather than a TypeError while painting
+    // a lookup that succeeded.
+    var STATUS_LABELS = (window.AUTOCOLOR_STATUSES && window.AUTOCOLOR_STATUSES.LABELS) || {};
 
     function setError(message) {
         if (!errorEl) return;
@@ -61,7 +65,7 @@
         resultVehicle.textContent = car || VEHICLE_LABELS[request.vehicle] || request.vehicle;
         resultFirstName.textContent = request.firstName;
         resultLastName.textContent = request.lastName;
-        resultStatus.textContent = STATUSES.LABELS[request.status] || request.status;
+        resultStatus.textContent = STATUS_LABELS[request.status] || request.status;
         // El color del distintivo sale del estado en crudo (ver .status-pill
         // en styles.css), no de la etiqueta traducida.
         resultStatus.dataset.status = request.status;
@@ -105,15 +109,24 @@
                 }
                 return body;
             });
+        }, function (err) {
+            // Only a rejected fetch means the request never left. A TypeError
+            // thrown later, while painting the answer, is a bug in this page
+            // and must not be reported as the customer's connection.
+            err.offline = true;
+            throw err;
         }).then(function (request) {
             showResult(request);
         }).catch(function (err) {
             resultEl.hidden = true;
-            // Igual que al enviar el formulario: un TypeError significa que la
-            // petición no llegó a salir, no que el servidor haya respondido.
-            setError(err instanceof TypeError
-                ? "No pudimos conectar con el servidor. Revisa tu conexión e inténtalo nuevamente."
-                : err.message);
+            if (err.offline) {
+                setError("No pudimos conectar con el servidor. Revisa tu conexión e inténtalo nuevamente.");
+            } else if (err instanceof TypeError) {
+                console.error("[lookup]", err);
+                setError("No pudimos mostrar tu solicitud. Inténtalo nuevamente.");
+            } else {
+                setError(err.message);
+            }
         }).then(function () {
             submitBtn.disabled = false;
             submitBtn.textContent = "Consultar";

@@ -1,15 +1,13 @@
 /* =========================================================================
    carVisual.js — 3D panel-picker for step 3 of the Autocolor wizard
 
-   One viewer, three vehicles. The camera rig, picking and overlays here are
-   the ones built and hardened in the three standalone pages under
-   imgs/assets/3d-visuals/ (button-only camera, front initial view,
-   gimbal-lock-safe orientation), with the flights reworked into continuous
-   arcs around the car — see flyToView. What those pages each hardcoded for
-   their own model — the
-   GLB, its paintable node names, its paint material and its axis
-   convention — lives in VEHICLE_MODELS below instead, so the same viewer
-   drives the furgoneta, the familiar and the SUV.
+   One viewer, four vehicles: the furgoneta, the familiar, the pickup and the
+   SUV. The camera is driven by buttons only (front initial view,
+   gimbal-lock-safe orientation) and flies in continuous arcs around the car —
+   see flyToView. What differs per model — the GLB, its paintable node names,
+   its paint material and its axis convention — lives in VEHICLE_MODELS below.
+   The wizard (src/repair.js) and the walk-in form of the workshop panel
+   (src/staff.js) both mount it.
 
      - It owns NO selection state of its own. Every click asks the host
        page (via `onPartToggle`) to mutate its shared `state.parts`, and
@@ -17,21 +15,21 @@
        the selected/hover overlays. This keeps repair.js's `state.parts`
        array as the single source of truth.
      - It exposes a small controller API (resize / refreshSelection /
-       resetView / destroy) instead of wiring its own buttons + sidebar,
-       since those now live in repair.html/repair.js so they can match the
-       site's own styling.
+       resetView / destroy / loadFailed) instead of wiring its own sidebar,
+       which lives in the host page so it can match the site's styling.
+     - It draws on demand (see requestRender), not in a permanent loop.
 
    Import this lazily (`import('../src/carVisual.js')`) — only when a user
-   actually reaches step 3 — so nobody pays for three.js or a 26–91 MB
-   model download before then. Exactly one viewer is alive at a time:
-   picking a different vehicle destroys the previous one (see destroy()
-   here and ensureCar3D() in repair.js), since three resident models of
-   this size are not free to keep on the GPU.
+   actually reaches step 3 — so nobody pays for three.js or a 7–13 MB
+   model download (5–9 MB compressed on the wire) before then. Exactly one
+   viewer is alive at a time: picking a different vehicle destroys the
+   previous one (see destroy() here and ensureCar3D() in repair.js), since
+   resident models of this size are not free to keep on the GPU.
    ========================================================================= */
 
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-// Los tres GLB van comprimidos con EXT_meshopt_compression. El decodificador
+// Los cuatro GLB van comprimidos con EXT_meshopt_compression. El decodificador
 // es un módulo ES de unos 25 KB que resuelve por el mismo importmap que three
 // (ver pgs/repair.html), así que no hay una segunda versión que mantener.
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
@@ -43,16 +41,18 @@ import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
    names, primitive counts and material assignments read out of each file's
    glTF JSON; axis conventions derived from where the hood/bumper/fender
    nodes actually sit in world space) — not taken on trust from the node
-   names, which are misleading in several places on all three models.
+   names, which are misleading in several places on every model.
 
    `front` / `left` are unit axes in the model's own space: `front` points
    out of the vehicle's nose, `left` out of its driver-side flank. They
-   differ per model because the three GLBs come from different sources with
-   different export conventions; all three are Y-up.
+   differ per model because the GLBs come from different sources with
+   different export conventions; all four are Y-up.
 
    `parts` are the GLB node names of the panels a customer can select. They
    are the ids stored in repair.js's `state.parts`, and their Spanish labels
-   live in that file's PART_LABELS.
+   live in src/parts.js, which also keeps a copy of each list (BY_VEHICLE)
+   for the wizard's no-3D checklist; tools/verify-3d.mjs fails if the two
+   copies disagree.
 ------------------------------------------------------------------------- */
 export const VEHICLE_MODELS = {
   // Furgoneta. Its node names are NOT literal: 'back_door_left/right' are
@@ -129,8 +129,8 @@ export const VEHICLE_MODELS = {
   },
 
   // Pickup (Hilux double cab). Its bed is one 'tonneau' panel, and its only
-  // fenders are the front pair. It stands in for the SUVs too: de las tres
-  // siluetas es la única con esa altura y ese volumen.
+  // fenders are the front pair. Pickups map to it (BODY_TYPES in
+  // src/carModels.js); SUVs have their own model below.
   pickup: {
     url: new URL('../imgs/assets/3d-visuals/pickup/pickup.glb', import.meta.url).href,
     paintMaterial: 'carpaint',
@@ -230,9 +230,9 @@ const UP_AXIS = new THREE.Vector3(0, 1, 0);
 const FOV_DEG = 45;
 const CAMERA_PADDING = 1.2;
 
-const HOVER_COLOR = 0x299fdf;   // --accent-strong, "preview" cue
+const HOVER_COLOR = 0x299fdf;   // a light blue "preview" cue, distinct from the selection red
 const HOVER_OPACITY = 0.35;
-const SELECTED_COLOR = 0xe5352b; // --paint-red — mirrors the 2D flow's is-selected fill
+const SELECTED_COLOR = 0xc9302a; // --paint-red in styles.css, the red of the selected-parts list
 const SELECTED_OPACITY = 0.55;
 const HOVER_THROTTLE_MS = 50;
 // Flights are timed by how far the camera actually travels around the car,
@@ -260,6 +260,7 @@ export function mountCar3D(options) {
     buttonsEl,       // container holding buttons with [data-view]
     isPartSelected,  // fn(id) => bool — reads the host's shared state
     onPartToggle,    // fn(id) => void — mutates the host's shared state
+    onLoadError,     // optional fn() — the GLB failed; the host can offer another way
   } = options;
 
   const model = VEHICLE_MODELS[vehicle];
@@ -274,7 +275,7 @@ export function mountCar3D(options) {
 
   // near/far are placeholders until the model's own size is known — see the
   // load handler, which resets both from its bounding sphere. They have to
-  // be model-relative because the three GLBs differ by ~100x in scale.
+  // be model-relative because the GLBs differ by ~100x in scale.
   const camera = new THREE.PerspectiveCamera(FOV_DEG, 1, 0.05, 500);
   camera.position.set(6, 3, 8);
 
@@ -297,6 +298,21 @@ export function mountCar3D(options) {
   rimLight.position.set(-6, 4, -7);
   scene.add(rimLight);
 
+  // Frames are drawn on demand, not in a permanent loop. The scene only
+  // changes when the camera moves, a panel's overlay changes, the canvas is
+  // resized or the model arrives, and a loop redrew about a million triangles
+  // (plus a second transmission pass on the SUV and the pickup) every frame
+  // for as long as the page stayed open, on steps where the viewer was not
+  // even visible. Everything that changes the picture calls this instead.
+  let renderQueued = null;
+  function requestRender() {
+    if (renderQueued !== null || destroyed) return;
+    renderQueued = requestAnimationFrame(() => {
+      renderQueued = null;
+      if (!destroyed) renderer.render(scene, camera);
+    });
+  }
+
   // Set by destroy(). The GLB fetch can't be aborted (GLTFLoader exposes no
   // cancel), so every loader callback checks this before touching anything:
   // a switch to another vehicle mid-download must not have the outgoing
@@ -310,6 +326,7 @@ export function mountCar3D(options) {
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
+    requestRender();
   }
   resizeRenderer();
 
@@ -431,11 +448,10 @@ export function mountCar3D(options) {
 
   let center = new THREE.Vector3();
   // Model extents measured along the vehicle's own axes rather than along
-  // world X/Y/Z, so the camera math below reads the same for all three
-  // models however each one happens to be oriented in its file.
+  // world X/Y/Z, so the camera math below reads the same for every
+  // model however each one happens to be oriented in its file.
   let lengthFB = 0, widthLR = 0, heightUD = 0;
   let presets = {};
-  let introPos = new THREE.Vector3();
 
   // Interpolates a unit direction along the great circle between two others.
   // Callers never pass a pair further apart than a quarter turn or so — any
@@ -474,6 +490,7 @@ export function mountCar3D(options) {
     camera.up.copy(upHintFor(forwardTmp));
     camera.position.copy(position);
     camera.lookAt(center);
+    requestRender();
   }
 
   function computePresets() {
@@ -492,15 +509,6 @@ export function mountCar3D(options) {
       right: center.clone().addScaledVector(LEFT_AXIS, -distLR),
       top:   center.clone().addScaledVector(UP_AXIS, distTop),
     };
-
-    const introDist = Math.max(distFB, distLR) * 1.05;
-    introPos = center.clone().addScaledVector(
-      LEFT_AXIS.clone().multiplyScalar(0.55)
-        .addScaledVector(UP_AXIS, 0.42)
-        .addScaledVector(FRONT_AXIS, 0.72)
-        .normalize(),
-      introDist
-    );
   }
 
   /* -----------------------------------------------------------------------
@@ -533,7 +541,7 @@ export function mountCar3D(options) {
   }
 
   function positionForView(view) {
-    return view === 'intro' ? introPos : presets[view];
+    return presets[view];
   }
 
   function prefersReducedMotion() {
@@ -614,7 +622,10 @@ export function mountCar3D(options) {
 
       if (t < 1) requestAnimationFrame(step);
       else {
-        placeCamera(target); // land on the preset exactly, not on the last lerp
+        // Land on the preset exactly, not on the last lerp — and on the preset
+        // as it is NOW: a resize during the flight recomputed the presets, and
+        // `target` still holds the framing for the old aspect ratio.
+        placeCamera(positionForView(view) || target);
         flying = false;
       }
     }
@@ -736,6 +747,7 @@ export function mountCar3D(options) {
       placeCamera(presets.front);
       currentView = 'front';
       syncViewButtons();
+      requestRender();
 
       if (overlayEl) overlayEl.classList.add('hidden');
     },
@@ -753,7 +765,8 @@ export function mountCar3D(options) {
       if (destroyed) return;
       loadFailed = true;
       console.error('[car3d] GLTFLoader error:', err);
-      showError('No se pudo cargar el visor 3D. Verifica tu conexión e inténtalo nuevamente.');
+      showError('No se pudo cargar el modelo 3D. Elige las piezas en la lista de abajo.');
+      if (typeof onLoadError === 'function') onLoadError();
     }
   );
 
@@ -779,7 +792,11 @@ export function mountCar3D(options) {
 
   let lastHoverTime = 0;
   function onPointerMove(event) {
-    if (pickable.length === 0) return;
+    // Hover is a mouse thing. On a touchscreen pointermove only fires while a
+    // finger drags or right before a tap, where the highlight is cleared again
+    // straight away (see clearHover), so the raycast bought nothing but work
+    // on the phones that can least afford it.
+    if (pickable.length === 0 || event.pointerType !== 'mouse') return;
     const now = performance.now();
     if (now - lastHoverTime < HOVER_THROTTLE_MS) return;
     lastHoverTime = now;
@@ -798,6 +815,7 @@ export function mountCar3D(options) {
       }
       hoveredMesh = newHovered;
       canvasEl.classList.toggle('hoverable', !!newHovered);
+      requestRender();
     }
   }
 
@@ -813,6 +831,7 @@ export function mountCar3D(options) {
     const nowSelected = isPartSelected(info.id);
     info.selectedOverlay.visible = nowSelected;
     info.hoverOverlay.visible = !nowSelected && mesh === hoveredMesh;
+    requestRender();
   }
 
   // Forgets whatever the pointer was last over. On a mouse this is the cursor
@@ -830,6 +849,7 @@ export function mountCar3D(options) {
     if (info && !isPartSelected(info.id)) info.hoverOverlay.visible = false;
     hoveredMesh = null;
     canvasEl.classList.remove('hoverable');
+    requestRender();
   }
 
   // pointerup lands BEFORE click, which is what makes this work: by the time
@@ -848,16 +868,9 @@ export function mountCar3D(options) {
   canvasEl.addEventListener('pointerleave', clearHover);
 
   /* -----------------------------------------------------------------------
-     Render loop
+     Sizing
   ----------------------------------------------------------------------- */
-  let rafId = null;
-  function animate() {
-    rafId = requestAnimationFrame(animate);
-    renderer.render(scene, camera);
-  }
-  animate();
-
-  function onWindowResize() {
+  function onResize() {
     resizeRenderer();
     if (!(lengthFB || widthLR || heightUD)) return;
     // Framing distance depends on the aspect ratio, so the current view has
@@ -867,7 +880,15 @@ export function mountCar3D(options) {
     const here = positionForView(currentView);
     if (here && !flying) placeCamera(here);
   }
-  window.addEventListener('resize', onWindowResize);
+  // The wrapper and not the window: its size also changes without the window
+  // changing (a scrollbar appearing as the parts list grows, the step being
+  // shown again), and a window listener left the drawing buffer stretched.
+  const resizeObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(onResize) : null;
+  if (resizeObserver) resizeObserver.observe(canvasWrapEl);
+  else window.addEventListener('resize', onResize);
+
+  // A lost-and-restored WebGL context comes back blank until something draws.
+  canvasEl.addEventListener('webglcontextrestored', requestRender);
 
   /* -----------------------------------------------------------------------
      Controller returned to the host page
@@ -883,7 +904,7 @@ export function mountCar3D(options) {
     // hidden, so sizing (and the framing that depends on it) has to happen
     // once it's actually visible again.
     resize() {
-      onWindowResize();
+      onResize();
     },
     // Call after state.parts changes from *outside* a canvas click (e.g.
     // the resume list's remove button, or a "clear all" action) so every
@@ -894,6 +915,7 @@ export function mountCar3D(options) {
         info.selectedOverlay.visible = sel;
         info.hoverOverlay.visible = !sel && mesh === hoveredMesh;
       });
+      requestRender();
     },
     resetView() {
       flyToView('front');
@@ -905,8 +927,10 @@ export function mountCar3D(options) {
     // swaps in a fresh one before mounting the next vehicle.
     destroy() {
       destroyed = true;
-      if (rafId !== null) cancelAnimationFrame(rafId);
-      window.removeEventListener('resize', onWindowResize);
+      if (renderQueued !== null) cancelAnimationFrame(renderQueued);
+      if (resizeObserver) resizeObserver.disconnect();
+      else window.removeEventListener('resize', onResize);
+      canvasEl.removeEventListener('webglcontextrestored', requestRender);
       canvasEl.removeEventListener('pointermove', onPointerMove);
       canvasEl.removeEventListener('click', onPointerClick);
       canvasEl.removeEventListener('pointerup', onPointerUp);

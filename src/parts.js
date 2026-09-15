@@ -67,10 +67,58 @@
         "rear_hatch": "Portón trasero"
     };
 
+    // Which panels each vehicle offers, in the order the viewer declares them.
+    // A copy of VEHICLE_MODELS[*].parts in src/carVisual.js, and it has to be:
+    // the wizard's checklist (src/repair.js) is the way to pick parts when that
+    // module, three.js or the model failed to load, or when the customer cannot
+    // use a pointer, so it cannot read the list out of the module. The copy is
+    // checked: tools/verify-3d.mjs fails when the two disagree.
+    var BY_VEHICLE = {
+        van: [
+            "hood", "roof",
+            "front_door_left", "front_door_right",
+            "back_door_left", "back_door_right",
+            "left_fender", "right_fender",
+            "rear_window_left", "rear_window_right",
+            "quarter_panel_left", "quarter_panel_right",
+            "side_skirt_left", "side_skirt_right",
+            "rear_hatch"
+        ],
+        wagon: [
+            "hood", "roof",
+            "front_door_left", "front_door_right",
+            "rear_door_left", "rear_door_right",
+            "fender_left", "fender_right",
+            "quarter_panel_left", "quarter_panel_right",
+            "side_skirt_left", "side_skirt_right",
+            "rear_hatch",
+            "bumper", "back_bumper",
+            "Object_26"
+        ],
+        pickup: [
+            "hood", "roof", "front_bumper",
+            "front_door_left", "front_door_right",
+            "rear_door_left", "rear_door_right",
+            "fender_left", "fender_right",
+            "tonneau"
+        ],
+        suv: [
+            "hood", "roof",
+            "front_door_left", "front_door_right",
+            "rear_door_left", "rear_door_right",
+            "fender_left", "fender_right",
+            "quarter_panel_left", "quarter_panel_right",
+            "side_skirt_left", "side_skirt_right",
+            "tailgate",
+            "bumper", "rear_bumper"
+        ]
+    };
+
     var has = Object.prototype.hasOwnProperty;
 
     return {
         LABELS: LABELS,
+        BY_VEHICLE: BY_VEHICLE,
 
         // The raw id before a blank: if a model gains a panel and this file
         // has not caught up, reading «rear_hatch» beats reading nothing.

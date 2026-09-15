@@ -1058,15 +1058,18 @@ svg {
     transition: background 0.2s var(--ease-out), transform 0.1s var(--ease-out), opacity 0.2s var(--ease-out);
 }
 
-.step-confirm:hover:not(:disabled) {
+.step-confirm:hover:not(:disabled):not([aria-disabled="true"]) {
     background: var(--accent);
 }
 
-.step-confirm:active:not(:disabled) {
+.step-confirm:active:not(:disabled):not([aria-disabled="true"]) {
     transform: scale(0.98);
 }
 
-.step-confirm:disabled {
+/* aria-disabled: the step is incomplete but the button still answers a click
+   by pointing at what is missing (see explainStep in src/repair.js). */
+.step-confirm:disabled,
+.step-confirm[aria-disabled="true"] {
     opacity: 0.4;
     cursor: not-allowed;
 }
@@ -2857,6 +2860,50 @@ body.wizard {
     background: var(--brand);
 }
 
+/* ===== Wizard: parts checklist (step 3) =====
+   The 3D picker's twin for keyboards, screen readers and failed viewers. */
+.parts-picker {
+    margin: 0 0 18px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+}
+
+.parts-picker__toggle {
+    padding: 12px 16px;
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: var(--ink);
+    cursor: pointer;
+}
+
+.parts-picker__list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: 2px 12px;
+    min-width: 0;
+    margin: 0;
+    padding: 4px 12px 14px;
+    border: 0;
+}
+
+.parts-picker__option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 40px;
+    padding: 6px 4px;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.parts-picker__option input {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    accent-color: var(--ink);
+}
+
 /* ===== Wizard: form fields ===== */
 /* ===== Wizard: vehicle data ===== */
 .wizard .data-card__icon,
@@ -2986,6 +3033,19 @@ body.wizard {
     max-width: none;
     margin: 0 0 0 auto;
     padding: 0;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px 14px;
+}
+
+.confirm-hint {
+    margin: 0;
+    max-width: 30ch;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    text-align: right;
+    color: var(--paint-red);
 }
 
 .wizard .step-confirm {
@@ -2997,11 +3057,12 @@ body.wizard {
         opacity 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out);
 }
 
-.wizard .step-confirm:hover:not(:disabled) {
+.wizard .step-confirm:hover:not(:disabled):not([aria-disabled="true"]) {
     background: var(--ink-deep);
 }
 
-.wizard .step-confirm:disabled {
+.wizard .step-confirm:disabled,
+.wizard .step-confirm[aria-disabled="true"] {
     background: var(--border-strong);
     color: #fff;
     opacity: 1;

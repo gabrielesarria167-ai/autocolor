@@ -151,7 +151,8 @@
                         <div class="field">
                             <label for="carMileage">Kilometraje <span class="field__optional">(opcional)</span></label>
                             <input type="text" id="carMileage" name="carMileage" inputmode="numeric" maxlength="7"
-                                placeholder="Ej. 85000" autocomplete="off">
+                                placeholder="Ej. 85000" autocomplete="off" aria-describedby="carMileageError">
+                            <p class="field__error" id="carMileageError" role="alert" hidden></p>
                         </div>
                         <div class="field">
                             <label for="carColorCode">Código de color <span class="field__optional">(opcional)</span></label>
@@ -352,7 +353,7 @@
                 <aside class="car-view-3d__summary" aria-label="Resumen de piezas seleccionadas">
                     <div class="car-view-3d__summary-head">
                         <h2>Piezas seleccionadas</h2>
-                        <span class="car-view-3d__count"><span id="carView3dCount">0</span> piezas</span>
+                        <span class="car-view-3d__count" id="carView3dCount">0 piezas</span>
                     </div>
                     <ul class="car-view-3d__list" id="carView3dList">
                         <li class="car-view-3d__empty">Ninguna pieza seleccionada. Toca el vehículo para elegir.</li>
@@ -360,6 +361,17 @@
                     <button type="button" class="car-view-3d__clear" id="carView3dClear" disabled>Quitar todas</button>
                 </aside>
             </div>
+
+            <!-- The same choice without the 3D model: for a keyboard or a
+                 screen reader, and for when the viewer or its model fails to
+                 load (src/repair.js opens it then). Filled per vehicle from
+                 BY_VEHICLE in src/parts.js and kept in sync with the model. -->
+            <details class="parts-picker" id="partsPicker">
+                <summary class="parts-picker__toggle">Elegir las piezas de una lista</summary>
+                <fieldset class="parts-picker__list" id="partsPickerList">
+                    <legend class="sr-only">Piezas de la carrocería</legend>
+                </fieldset>
+            </details>
         </section>
 
         <section class="step" data-step="4" hidden>
@@ -441,7 +453,9 @@
             </button>
 
             <div class="confirm-container">
-                <button class="step-confirm" type="button" id="stepConfirm" disabled>Continuar</button>
+                <p class="confirm-hint" id="stepHint" role="status" hidden></p>
+                <button class="step-confirm" type="button" id="stepConfirm" aria-disabled="true"
+                    aria-describedby="stepHint">Continuar</button>
             </div>
         </div>
       </div><!-- /.wizard-card -->
