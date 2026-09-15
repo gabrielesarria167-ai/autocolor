@@ -578,7 +578,7 @@ let retryTimer = null;
  * asunto de drain().
  */
 function notifyNewRequest(created, data, options) {
-    if (!isConfigured()) return;
+    if (!isConfigured()) return { customer: false };
     // Registered at the counter rather than sent from the website. Only the
     // wording changes — both messages go out the same way, to the same two
     // places — but a walk-in told «te contactaremos en 24 horas con tu
@@ -587,16 +587,72 @@ function notifyNewRequest(created, data, options) {
 
     // Uno y otro por separado: que armar el del taller falle no puede dejar al
     // cliente sin su código, ni al revés.
-    enqueue(`aviso al taller de ${created.id}`, () => shopMessage(created, data, walkIn));
+    if (withinDailyCap('shop', '')) {
+        enqueue(`aviso al taller de ${created.id}`, () => shopMessage(created, data, walkIn));
+    }
 
     // El asistente ya lo exige, pero la guarda se queda: en la base hay
     // solicitudes anteriores a que el correo fuera obligatorio, y sin ella
     // reenviar una de esas mandaría un mensaje a `undefined`.
-    if (data.email) {
+    let customer = false;
+    if (data.email && withinDailyCap('customer', data.email)) {
         enqueue(`confirmación al cliente de ${created.id}`, () => customerMessage(created, data, walkIn));
+        customer = true;
     }
 
     kick();
+    // Whether the customer's confirmation was queued, so the staff panel does
+    // not promise an email that was never going to be sent.
+    return { customer };
+}
+
+/* -----------------------------------------------------------------------------
+   Daily caps
+
+   The customer confirmation is the one message whose recipient is chosen by
+   whoever calls the public API. Without a ceiling a script could send the
+   shop's branded mail to any address and use up Brevo's free quota (300 a
+   day) within minutes, after which real customers stop getting their tracking
+   code and the account's sender reputation takes the blame.
+
+   The counters live in memory and reset at midnight UTC or on restart, which is
+   enough: this is a ceiling against abuse, not accounting.
+-------------------------------------------------------------------------- */
+
+const DAILY_CAP = Number(process.env.AUTOCOLOR_MAIL_DAILY_CAP) || 280;
+const CUSTOMER_DAILY_CAP = Number(process.env.AUTOCOLOR_MAIL_CUSTOMER_DAILY_CAP) || 120;
+const PER_ADDRESS_DAILY_CAP = 3;
+
+const today = { day: '', total: 0, customer: 0, perAddress: new Map(), warned: new Set() };
+
+function withinDailyCap(kind, address) {
+    const day = new Date().toISOString().slice(0, 10);
+    if (today.day !== day) {
+        Object.assign(today, { day, total: 0, customer: 0, perAddress: new Map(), warned: new Set() });
+    }
+    const refuse = (reason) => {
+        // Once per reason per day: under attack this would otherwise be one
+        // log line per request.
+        if (!today.warned.has(reason)) {
+            today.warned.add(reason);
+            console.warn(`[mail] daily cap reached (${reason}); further messages of this kind are skipped until midnight UTC`);
+        }
+        return false;
+    };
+
+    if (today.total >= DAILY_CAP) return refuse(`all mail, ${DAILY_CAP}`);
+    if (kind === 'customer') {
+        const key = address.trim().toLowerCase();
+        const sent = today.perAddress.get(key) || 0;
+        // Per address, silently: three confirmations to one inbox in a day is
+        // already more than a real customer needs.
+        if (sent >= PER_ADDRESS_DAILY_CAP) return false;
+        if (today.customer >= CUSTOMER_DAILY_CAP) return refuse(`customer confirmations, ${CUSTOMER_DAILY_CAP}`);
+        today.perAddress.set(key, sent + 1);
+        today.customer += 1;
+    }
+    today.total += 1;
+    return true;
 }
 
 /**

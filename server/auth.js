@@ -46,13 +46,24 @@ const PASSWORD = process.env.AUTOCOLOR_STAFF_PASSWORD || '';
 //
 // Both live in the environment and not in this repository on purpose: the
 // repository is public, and between them these two say who works at the shop.
-function parseRoster(raw) {
+//
+// A code of any other shape is skipped with a warning. The database columns
+// that store a code (occupied_by, worker_id) CHECK this same shape, so a code
+// like «JEFE» would log in fine and then fail with a 500 on the first vehicle
+// it took or the first note written to it.
+const CODE_RE = /^[A-Z]{2}[0-9]{5}$/;
+
+function parseRoster(raw, variable) {
     const codes = new Set();
     const names = new Map();
     for (const entry of String(raw || '').split(',')) {
         const colon = entry.indexOf(':');
         const code = (colon === -1 ? entry : entry.slice(0, colon)).trim().toUpperCase();
         if (!code) continue;
+        if (!CODE_RE.test(code)) {
+            console.warn(`[auth] ${variable}: skipping «${code}», codes are two letters and five digits (AB12345)`);
+            continue;
+        }
         codes.add(code);
         const name = colon === -1 ? '' : entry.slice(colon + 1).trim();
         if (name) names.set(code, name);
@@ -60,7 +71,7 @@ function parseRoster(raw) {
     return { codes, names };
 }
 
-const roster = parseRoster(process.env.AUTOCOLOR_WORKER_IDS);
+const roster = parseRoster(process.env.AUTOCOLOR_WORKER_IDS, 'AUTOCOLOR_WORKER_IDS');
 const WORKER_IDS = roster.codes;
 const WORKER_NAMES = roster.names;
 
@@ -78,9 +89,16 @@ const WORKER_NAMES = roster.names;
 //
 // Empty is the normal case: with no boss configured nobody sees the monitor
 // and the panel works as it always did.
-const bossRoster = parseRoster(process.env.AUTOCOLOR_BOSS_ID);
+const bossRoster = parseRoster(process.env.AUTOCOLOR_BOSS_ID, 'AUTOCOLOR_BOSS_ID');
 const BOSS_ID = bossRoster.codes.values().next().value || '';
-for (const [code, name] of bossRoster.names) WORKER_NAMES.set(code, name);
+if (bossRoster.codes.size > 1) {
+    console.warn(`[auth] AUTOCOLOR_BOSS_ID lists ${bossRoster.codes.size} codes; only the first, ${BOSS_ID}, is the boss`);
+}
+const bossName = bossRoster.names.get(BOSS_ID);
+if (bossName) WORKER_NAMES.set(BOSS_ID, bossName);
+// Listed in both variables, the boss would show up in his own monitor as a
+// worker holding nothing, and could be sent notes.
+if (BOSS_ID) WORKER_IDS.delete(BOSS_ID);
 
 // Las sesiones viven en memoria y se pierden al reiniciar el servidor: el
 // panel es de una máquina y de un puñado de personas, y una tabla en la base

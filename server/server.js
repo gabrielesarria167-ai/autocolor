@@ -36,11 +36,17 @@
 // PGDATABASE, ALLOWED_ORIGINS y la contraseña del panel salen de ahí si están).
 require('./env');
 
+const crypto = require('node:crypto');
 const http = require('node:http');
 const fs = require('node:fs');
 const fsp = require('node:fs/promises');
 const net = require('node:net');
 const path = require('node:path');
+const { promisify } = require('node:util');
+const zlib = require('node:zlib');
+
+const brotli = promisify(zlib.brotliCompress);
+const gzip = promisify(zlib.gzip);
 const {
     createRequest, findRequest, listRequests, listOccupied, updateRequestStatus,
     occupyRequest, releaseRequest,
@@ -68,52 +74,38 @@ const TRUST_PROXY = Number(process.env.TRUST_PROXY) || 0;
 const ROOT = path.join(__dirname, '..');
 const MAX_BODY_BYTES = 32 * 1024;
 
-// Lo que este servidor no sirve nunca, pase lo que pase.
+// What this server serves: the files the site is made of, and nothing else.
 //
-// ROOT es la raíz del repositorio, así que sin esta lista `GET /.env` devuelve
-// el archivo con la contraseña del taller dentro, y `/server/auth.js` o
-// `/.git/config` se leen igual de fácil. Que hoy no se note es solo porque se
-// escucha en 127.0.0.1 (ver HOST arriba) — y el README recomienda 0.0.0.0 para
-// probar desde el móvil, que es justo cuando dejaría de no notarse.
-const DENY_PREFIXES = [
-    '/.env',
-    // Entrada aparte: isDenied compara por igualdad las que no acaban en '/',
-    // así que '/.env' no cubre '/.env.example'. Y el ejemplo dice, con nombre y
-    // apellido, cuál es la variable que guarda la contraseña del taller.
-    '/.env.example',
-    '/.git/',
-    '/.gitignore',
-    '/.nvmrc',
-    '/.claude/',
-    '/server/',
-    '/node_modules/',
-    '/package.json',
-    '/package-lock.json',
-    '/render.yaml',
-    '/tools/',
-];
+// ROOT is the repository root, which also holds `.env` (the shop password),
+// `server/`, `.git/`, the working notes (README.md, NEXT-STEPS.md, the
+// gitignored LAUNCH-CHECKLIST.md), the design canvas and, on the work machine,
+// hundreds of MB of .blend sources. A denylist had to name every one of those
+// and quietly served whatever it forgot; an allowlist fails closed, so a file
+// added at the root later is private until someone lists it here.
+//
+// A file is public when it sits under one of PUBLIC_DIRS (or is one of
+// PUBLIC_FILES), has an extension in MIME, and no segment of its path is a
+// dotfile or a `src/` source folder inside imgs/ (where the uncompressed GLBs
+// live next to the served ones).
+const PUBLIC_FILES = new Set(['/index.html', '/styles.css']);
+const PUBLIC_DIRS = ['/pgs/', '/src/', '/imgs/', '/vendor/'];
 
-// De ruta absoluta en disco a ruta dentro del repositorio, siempre con '/'
-// aunque el sistema use otro separador.
+// From an absolute path on disk to a path inside the repository, always with
+// '/' whatever separator the system uses.
 function repoPath(filePath) {
     return '/' + path.relative(ROOT, filePath).split(path.sep).join('/');
 }
 
-// 404 y no 403: un 403 confirma que el archivo está ahí, que es justo lo que no
-// hace falta decirle a quien va probando nombres.
-//
-// La comparación va en minúscula porque el sistema de archivos de la máquina de
-// trabajo (APFS) no distingue mayúsculas: `GET /.ENV` abre el mismo archivo que
-// `GET /.env`, y con la lista comparada tal cual llegaba, la primera se servía.
-// Ahí dentro está la contraseña del taller, y el HOST=0.0.0.0 que el README
-// recomienda para probar desde el móvil es justo lo que la pone al alcance.
-// En Linux esos nombres no existen y la respuesta es 404 de todos modos, así
-// que bajar a minúscula no cierra nada que antes estuviera abierto.
-function isDenied(pathname) {
+// Compared in lower case because the work machine's file system (APFS) is case
+// insensitive: `GET /SERVER/auth.js` opens the same file as `/server/auth.js`,
+// and has to be refused the same way.
+function isPublic(pathname) {
     const lower = pathname.toLowerCase();
-    return DENY_PREFIXES.some((prefix) => (
-        prefix.endsWith('/') ? lower.startsWith(prefix) : lower === prefix
-    ));
+    if (!MIME[path.posix.extname(lower)]) return false;
+    const segments = lower.split('/');
+    if (segments.some((segment) => segment.startsWith('.'))) return false;
+    if (lower.startsWith('/imgs/') && segments.includes('src')) return false;
+    return PUBLIC_FILES.has(lower) || PUBLIC_DIRS.some((dir) => lower.startsWith(dir));
 }
 
 // Orígenes que pueden llamar a la API desde otro dominio, separados por comas:
@@ -431,6 +423,51 @@ function clientIp(req) {
     return candidate.startsWith('::ffff:') ? candidate.slice(7) : candidate;
 }
 
+// The rate-limit key for an address. IPv4 as is; IPv6 cut down to its /64,
+// because one IPv6 client usually controls the whole /64 and could otherwise
+// give every request a fresh address and a fresh bucket.
+function rateKey(ip) {
+    if (net.isIPv6(ip) !== true) return ip;
+    const [head, tail = ''] = ip.split('::');
+    const left = head ? head.split(':') : [];
+    const right = tail ? tail.split(':') : [];
+    const missing = ip.includes('::') ? 8 - left.length - right.length : 0;
+    const groups = [...left, ...Array(Math.max(missing, 0)).fill('0'), ...right];
+    return groups.slice(0, 4).map((group) => group.toLowerCase().replace(/^0+(?=.)/, '')).join(':') + '::/64';
+}
+
+// Whether a browser request comes from this site. Browsers send Origin on
+// every POST, same-origin ones included, so a missing header means a client
+// that is not a browser (the rate limit and the mail cap cover those). A
+// present one has to be this site: otherwise any page on the internet could
+// make its visitors submit the form, each from their own address, and send
+// the shop's confirmation email wherever it liked.
+//
+// Several names count as "this site" because Render's Host is the one the
+// visitor typed, the custom domain will add another, and ALLOWED_ORIGINS
+// keeps working for a site hosted apart from the API.
+function isOwnOrigin(req) {
+    const origin = req.headers.origin;
+    if (!origin) return true;
+    if (ALLOWED_ORIGINS.has(origin)) return true;
+    let host;
+    try {
+        host = new URL(origin).host;
+    } catch {
+        return false;
+    }
+    const own = [req.headers.host, req.headers['x-forwarded-host'], process.env.RENDER_EXTERNAL_URL, process.env.AUTOCOLOR_SITE_URL]
+        .filter(Boolean)
+        .map((value) => {
+            try {
+                return /^https?:\/\//.test(value) ? new URL(value).host : String(value).split(',')[0].trim();
+            } catch {
+                return '';
+            }
+        });
+    return own.includes(host);
+}
+
 const WINDOW_MS = 60_000;
 const buckets = new Map(); // clave -> { count, resetAt }
 
@@ -471,16 +508,24 @@ function readJsonBody(req) {
     return new Promise((resolve, reject) => {
         let size = 0;
         const chunks = [];
-        req.on('data', (chunk) => {
+        const onData = (chunk) => {
             size += chunk.length;
             if (size > MAX_BODY_BYTES) {
+                // Stop buffering, but do not destroy the request: that tore the
+                // socket down before the 400 below could be written, and the
+                // browser reported a network failure instead of the reason.
+                // Node closes the connection itself once the response ends with
+                // the rest of the body unread.
+                req.off('data', onData);
+                req.pause();
                 reject(new BadRequest('El formulario es demasiado grande.'));
-                req.destroy();
                 return;
             }
             chunks.push(chunk);
-        });
+        };
+        req.on('data', onData);
         req.on('end', () => {
+            if (size > MAX_BODY_BYTES) return;
             try {
                 resolve(JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'));
             } catch {
@@ -515,7 +560,77 @@ const MIME = {
     '.ico': 'image/x-icon',
     '.glb': 'model/gltf-binary',
     '.woff2': 'font/woff2',
+    // The photo credits in imgs/assets/stock-models/ stay reachable: the
+    // licences of those photos ask for attribution.
+    '.md': 'text/markdown; charset=utf-8',
 };
+
+// Worth compressing: text, and the GLBs, which are meshopt-encoded but still
+// shrink by a quarter under brotli (meshopt is designed to be followed by a
+// general-purpose compressor). PNG, JPEG, WebP and WOFF2 are already compressed.
+const COMPRESSIBLE = new Set(['.html', '.css', '.js', '.mjs', '.json', '.svg', '.glb', '.md']);
+
+// Content hashes and compressed bodies, keyed by path, size and mtime so an
+// edited file is never served from a stale entry. Each is computed once per
+// process. Only compressible files keep their bytes in memory (about 40 MB
+// raw plus 30 MB compressed, almost all of it the four models); photos keep
+// just their hash and are streamed from disk.
+const fileCache = new Map(); // key -> Promise<{ etag, buffer }> or Promise<Buffer>
+
+function cacheKey(filePath, stat) {
+    return `${filePath}:${stat.size}:${stat.mtimeMs}`;
+}
+
+function fileInfo(filePath, stat) {
+    const key = cacheKey(filePath, stat);
+    let entry = fileCache.get(key);
+    if (!entry) {
+        const keep = COMPRESSIBLE.has(path.extname(filePath).toLowerCase());
+        entry = fsp.readFile(filePath).then((buffer) => ({
+            // A hash of the content and not the mtime: every deploy checks the
+            // repository out afresh, so an mtime-based validator would make each
+            // visitor download every unchanged 10 MB model again after a deploy.
+            etag: `"${crypto.createHash('sha1').update(buffer).digest('base64url')}"`,
+            buffer: keep ? buffer : null,
+        }));
+        fileCache.set(key, entry);
+        // Whatever failed (the file vanished between stat and read) is not kept.
+        entry.catch(() => fileCache.delete(key));
+    }
+    return entry;
+}
+
+function compressed(filePath, stat, info, encoding) {
+    const key = `${cacheKey(filePath, stat)}:${encoding}`;
+    let entry = fileCache.get(key);
+    if (!entry) {
+        // Quality 5 for anything big: on the 12.6 MB pickup it takes 0.3 s and
+        // lands within 1 % of quality 9, which takes 5.7 s.
+        const quality = info.buffer.length > 1024 * 1024 ? 5 : 9;
+        entry = encoding === 'br'
+            ? brotli(info.buffer, { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: quality } })
+            : gzip(info.buffer, { level: 6 });
+        fileCache.set(key, entry);
+        entry.catch(() => fileCache.delete(key));
+    }
+    return entry;
+}
+
+function pickEncoding(req, ext) {
+    if (!COMPRESSIBLE.has(ext)) return null;
+    const accepted = String(req.headers['accept-encoding'] || '');
+    if (/\bbr\b/.test(accepted)) return 'br';
+    if (/\bgzip\b/.test(accepted)) return 'gzip';
+    return null;
+}
+
+// Evicts the entries of older versions of a file that changed on disk, so
+// editing styles.css all day does not keep every past version in memory.
+function pruneFileCache(filePath, currentKey) {
+    for (const key of fileCache.keys()) {
+        if (key.startsWith(`${filePath}:`) && !key.startsWith(currentKey)) fileCache.delete(key);
+    }
+}
 
 async function serveStatic(req, res, pathname) {
     // Un porcentaje suelto ('/%', '/%zz') hace que decodeURIComponent lance
@@ -537,9 +652,10 @@ async function serveStatic(req, res, pathname) {
         return;
     }
 
-    // La lista se comprueba sobre la ruta ya resuelta y no sobre la que llegó:
-    // '/server/../.env' no empieza por '/.env', pero apunta ahí igual.
-    if (isDenied(repoPath(filePath))) {
+    // Checked against the resolved path and not the one that arrived:
+    // '/pgs/../.env' starts with '/pgs/' but points somewhere else. A 404 and
+    // not a 403, so probing names does not confirm which files exist.
+    if (!isPublic(repoPath(filePath))) {
         res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }).end('No encontrado');
         return;
     }
@@ -557,33 +673,47 @@ async function serveStatic(req, res, pathname) {
     }
 
     const ext = path.extname(filePath).toLowerCase();
-    // Los modelos 3D pesan decenas de MB y no cambian; el resto se revalida en
-    // cada carga para no servir código viejo mientras se trabaja en el sitio.
-    const cacheControl = decoded.startsWith('/imgs/') ? 'public, max-age=86400' : 'no-cache';
+    // Everything is revalidated on every load, models included. File names
+    // carry no version, and the pieces depend on each other: part ids in
+    // src/carVisual.js are node names inside the GLB, and the hero's paint mask
+    // has to match its photo pixel for pixel. A day of max-age on the models
+    // alone meant a returning visitor could get today's script with yesterday's
+    // model after a re-export. With a content-hash ETag the revalidation is a
+    // 304 of a few hundred bytes whenever nothing changed.
+    const cacheControl = 'no-cache';
 
-    // Sin validador, «revalidar» es volver a mandar el archivo entero: styles.css
-    // son 78 KB en cada visita, y van.glb 20 MB cada vez que se le vence el día.
-    // La fecha ya la trae el stat de arriba, así que el 304 no cuesta nada. Se
-    // compara truncada al segundo, que es la resolución de una fecha HTTP.
-    const mtimeSec = Math.floor(stat.mtimeMs / 1000) * 1000;
-    const lastModified = new Date(mtimeSec).toUTCString();
-    const since = Date.parse(req.headers['if-modified-since'] || '');
-    if (!Number.isNaN(since) && since >= mtimeSec) {
-        res.writeHead(304, { 'Cache-Control': cacheControl, 'Last-Modified': lastModified }).end();
-        return;
-    }
-
-    res.writeHead(200, {
+    const info = await fileInfo(filePath, stat);
+    pruneFileCache(filePath, cacheKey(filePath, stat));
+    const encoding = pickEncoding(req, ext);
+    const headers = {
         'Content-Type': MIME[ext] || 'application/octet-stream',
-        'Content-Length': stat.size,
-        'Last-Modified': lastModified,
         'Cache-Control': cacheControl,
-    });
-    if (req.method === 'HEAD') {
-        res.end();
+        ETag: info.etag,
+    };
+    if (COMPRESSIBLE.has(ext)) headers.Vary = 'Accept-Encoding';
+
+    const ifNoneMatch = String(req.headers['if-none-match'] || '');
+    if (ifNoneMatch.split(',').some((tag) => tag.trim().replace(/^W\//, '') === info.etag)) {
+        res.writeHead(304, headers).end();
         return;
     }
-    fs.createReadStream(filePath).on('error', () => res.destroy()).pipe(res);
+
+    if (!info.buffer) {
+        headers['Content-Length'] = stat.size;
+        res.writeHead(200, headers);
+        if (req.method === 'HEAD') {
+            res.end();
+            return;
+        }
+        fs.createReadStream(filePath).on('error', () => res.destroy()).pipe(res);
+        return;
+    }
+
+    const body = encoding ? await compressed(filePath, stat, info, encoding) : info.buffer;
+    if (encoding) headers['Content-Encoding'] = encoding;
+    headers['Content-Length'] = body.length;
+    res.writeHead(200, headers);
+    res.end(req.method === 'HEAD' ? undefined : body);
 }
 
 /* -----------------------------------------------------------------------------
@@ -674,21 +804,30 @@ function refuseBoss(req) {
 // Detrás de la contraseña del taller porque enseña la cadena de proxies. No
 // dice nada que quien la consulta no sepa ya: su propia dirección.
 function whoami(req, ip) {
+    const workerId = auth.sessionWorkerId(req);
+    const isBoss = auth.isBoss(workerId);
+    const answer = {
+        clientIp: ip,                                  // lo que usa el límite
+        workerId,                                      // quién tiene la sesión
+        isBoss,                                        // y si es el jefe del taller
+    };
+    // The proxy chain and the mail account are for whoever runs the workshop.
+    // A worker checking their own session has no use for the shop inbox, the
+    // Brevo endpoint or the hosting's internal headers.
+    if (!isBoss) return answer;
+
     const forwarding = {};
     for (const [name, value] of Object.entries(req.headers)) {
         if (/^(x-forwarded|x-real-ip|forwarded|cf-|true-client-ip|fly-|x-render|x-client)/i.test(name)) {
             forwarding[name] = value;
         }
     }
-    return {
-        clientIp: ip,                                  // lo que usa el límite
+    return Object.assign(answer, {
         socket: req.socket.remoteAddress,              // el último salto
         trustProxy: TRUST_PROXY,
         forwarding,                                    // de dónde podría salir
-        workerId: auth.sessionWorkerId(req),           // quién tiene la sesión
-        isBoss: auth.isBoss(auth.sessionWorkerId(req)), // y si es el jefe del taller
         mail: mail.describe(),                         // a qué cuenta salen los avisos
-    };
+    });
 }
 
 async function handleStaff(req, res, pathname, ip) {
@@ -701,9 +840,13 @@ async function handleStaff(req, res, pathname, ip) {
         if (!auth.isConfigured()) {
             return sendJson(res, 503, { error: 'El panel del taller no está configurado en este servidor.' });
         }
-        // Cinco intentos por minuto: con una sola contraseña compartida, el
-        // límite es lo que hace inviable probarlas a ciegas.
-        if (!rateLimit(`login:${ip}`, 5)) {
+        // Five FAILED attempts a minute: with one shared password, the limit is
+        // what makes guessing it impractical. Only failures count, because the
+        // whole shop signs in from one NAT address and a shift change is several
+        // correct logins inside the same minute.
+        const loginKey = `login:${rateKey(ip)}`;
+        const failures = buckets.get(loginKey);
+        if (failures && Date.now() <= failures.resetAt && failures.count >= 5) {
             return sendJson(res, 429, { error: 'Demasiados intentos. Espera un minuto.' });
         }
         // Sin códigos de trabajador configurados el panel quedaría abierto
@@ -716,8 +859,13 @@ async function handleStaff(req, res, pathname, ip) {
         // Hacen falta los dos: un código de trabajador válido y la contraseña.
         // El error no dice cuál de los dos falló, para no revelar qué códigos
         // existen a quien prueba.
+        // Both checks always run: short-circuiting on an unknown code skipped
+        // the password hashing, and the faster answer told a prober which codes
+        // do not exist.
         const workerId = auth.verifyWorkerId(body.workerId);
-        if (!workerId || !auth.verifyPassword(body.password)) {
+        const passwordOk = auth.verifyPassword(body.password);
+        if (!workerId || !passwordOk) {
+            rateLimit(loginKey, 5);
             console.warn(`[taller] intento fallido desde ${ip}`);
             return sendJson(res, 401, { error: 'Código de trabajador o contraseña incorrectos.' });
         }
@@ -776,11 +924,12 @@ async function handleStaff(req, res, pathname, ip) {
         const created = await createRequest(data);
         const viewerId = auth.sessionWorkerId(req);
         console.log(`[taller] ${created.id} registrado en el local por ${viewerId}`);
-        sendJson(res, 201, created);
-        // After the answer and without await, exactly as the public route does:
-        // the row is saved and the boss already has the code to read out, so a
-        // stumble in the mail cannot turn into a failed registration.
-        mail.notifyNewRequest(created, data, { walkIn: true });
+        // Queued before answering so the answer can say whether the customer's
+        // email is on its way. notifyNewRequest() only fills a queue and never
+        // throws, so a stumble in the mail still cannot fail the registration;
+        // the sending itself happens afterwards, as on the public route.
+        const queued = mail.notifyNewRequest(created, data, { walkIn: true });
+        sendJson(res, 201, Object.assign({}, created, { mailQueued: !!(queued && queued.customer) }));
         return;
     }
 
@@ -956,7 +1105,17 @@ async function handleApi(req, res, pathname) {
     }
 
     if (req.method === 'POST' && pathname === '/api/requests') {
-        if (!rateLimit(`post:${ip}`, 10)) {
+        // JSON only. A cross-site `<form enctype="text/plain">` can post a body
+        // that parses as JSON, but it cannot set this header without a CORS
+        // preflight, which this server does not grant to other sites.
+        if (!/^application\/json\b/i.test(String(req.headers['content-type'] || ''))) {
+            return sendJson(res, 415, { error: 'El formulario debe enviarse como JSON.' });
+        }
+        if (!isOwnOrigin(req)) {
+            console.warn(`[requests] refused origin ${req.headers.origin} (host ${req.headers.host})`);
+            return sendJson(res, 403, { error: 'Envía tu solicitud desde el formulario del sitio.' });
+        }
+        if (!rateLimit(`post:${rateKey(ip)}`, 10)) {
             return sendJson(res, 429, { error: 'Demasiadas solicitudes. Espera un minuto.' });
         }
         const data = validateRequest(await readJsonBody(req), WIZARD_REQUIRED);
@@ -978,7 +1137,7 @@ async function handleApi(req, res, pathname) {
     if (req.method === 'GET') {
         const match = LOOKUP_PATH.exec(pathname);
         if (match) {
-            if (!rateLimit(`get:${ip}`, 30)) {
+            if (!rateLimit(`get:${rateKey(ip)}`, 30)) {
                 return sendJson(res, 429, { error: 'Demasiadas consultas. Espera un minuto.' });
             }
             const request = await findRequest(match[1]);
@@ -998,7 +1157,16 @@ async function handleApi(req, res, pathname) {
 }
 
 const server = http.createServer(async (req, res) => {
-    const pathname = new URL(req.url, `http://${req.headers.host || 'localhost'}`).pathname;
+    // A fixed base and not the Host header, and inside the try: `GET //` or a
+    // Host such as `a b` make WHATWG URL throw, and a throw out here rejected the
+    // handler with no response ever written, leaving the connection open.
+    let pathname;
+    try {
+        pathname = new URL(req.url, 'http://localhost').pathname;
+    } catch {
+        sendJson(res, 400, { error: 'La dirección no es válida.' });
+        return;
+    }
 
     try {
         // La comprobación de salud del alojamiento. No toca la base a
