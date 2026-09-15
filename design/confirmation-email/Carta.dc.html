@@ -1,0 +1,69 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600&family=Schibsted+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+  <style>
+    body { margin: 0; background: #f3f4f7; color: #262d40; font-family: 'Schibsted Grotesk', 'Helvetica Neue', Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+    a { color: #262d40; text-underline-offset: 3px; } a:hover { color: #1b2130; }
+    p, h1 { margin: 0; }
+  </style>
+</helmet>
+
+<div style="width: 680px; min-height: 1180px; box-sizing: border-box; padding: 40px; background: #f3f4f7; display: flex; flex-direction: column; gap: 20px">
+
+  <div style="background: #ffffff; border: 1px solid #dadde5; display: flex; flex-direction: column">
+
+    <div style="padding: 44px 56px 0 56px; display: flex; align-items: center; justify-content: space-between">
+      <img src="mark.svg" alt="Autocolor" style="display: block; width: 30px; height: auto">
+      <span style="font-size: 13px; color: #666e81">Ayacucho, 15 de setiembre de 2026</span>
+    </div>
+
+    <div style="padding: 56px 56px 0 56px; display: flex; flex-direction: column; gap: 22px">
+      <h1 style="font-family: 'Jost', 'Futura', 'Century Gothic', Arial, sans-serif; font-size: 44px; line-height: 50px; font-weight: 400; letter-spacing: -0.8px; text-wrap: balance">Juan, recibimos tu Toyota Corolla.</h1>
+      <p style="font-size: 17px; line-height: 28px; color: #5a6275; text-wrap: pretty">Pediste pintar el <span style="color: #262d40">capó</span>, la <span style="color: #262d40">puerta delantera izquierda</span> y el <span style="color: #262d40">techo</span> con acabado <span style="color: #262d40">Profesional</span>. Lo revisamos y te llamamos en las próximas 24 horas con el precio cerrado y la fecha de entrega.</p>
+    </div>
+
+    <div style="margin: 44px 56px 0 56px; border-top: 2px solid #262d40; border-bottom: 1px solid #dadde5; padding: 22px 0 26px 0; display: flex; flex-direction: column; gap: 8px">
+      <span style="font-family: 'IBM Plex Mono', 'Courier New', monospace; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: #666e81">Tu código de seguimiento</span>
+      <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 16px">
+        <span style="font-family: 'IBM Plex Mono', 'Courier New', monospace; font-size: 52px; line-height: 56px; font-weight: 500; letter-spacing: 2px">48201 75639</span>
+        <span style="font-family: 'IBM Plex Mono', 'Courier New', monospace; font-size: 15px; line-height: 20px; font-weight: 600; letter-spacing: 1.5px; padding: 6px 10px; border: 1.5px solid #262d40; margin-bottom: 8px">ABC-123</span>
+      </div>
+    </div>
+
+    <div style="padding: 28px 56px 0 56px; display: flex; align-items: center; gap: 24px">
+      <a href="#" style="display: flex; align-items: center; gap: 10px; background: #262d40; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; padding: 15px 22px; min-height: 44px; box-sizing: border-box">
+        <span>Consultar mi solicitud</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: block"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+      </a>
+      <span style="font-size: 14px; line-height: 21px; color: #666e81; text-wrap: pretty">Guarda el código: es lo único que necesitas para ver el avance.</span>
+    </div>
+
+    <div style="padding: 52px 56px 48px 56px; display: flex; flex-direction: column; gap: 4px">
+      <span style="font-size: 16px; line-height: 24px">Hasta pronto,</span>
+      <span style="font-family: 'Jost', 'Futura', 'Century Gothic', Arial, sans-serif; font-size: 20px; line-height: 28px; font-weight: 500">El equipo de Autocolor</span>
+    </div>
+
+    <div style="background: #262d40; color: #c3c8d4; padding: 32px 56px; display: flex; justify-content: space-between; align-items: flex-end; gap: 24px">
+      <div style="display: flex; flex-direction: column; gap: 14px">
+        <img src="lockup-horizontal-white.svg" alt="Autocolor" style="display: block; width: 140px; height: auto">
+        <span style="font-size: 13px; line-height: 21px">Jr. San Juan Masías, Ayacucho<br>Lunes a Sábado · 07:30 – 20:00</span>
+      </div>
+      <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px">
+        <span style="font-family: 'IBM Plex Mono', 'Courier New', monospace; font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: #8e96a8">Tel. / WhatsApp</span>
+        <a href="#" style="font-size: 17px; line-height: 24px; font-weight: 600; color: #ffffff; text-decoration: none">+51 935 646 304</a>
+      </div>
+    </div>
+  </div>
+
+  <p style="font-size: 12px; line-height: 19px; color: #666e81; text-align: center">Recibiste este correo porque enviaste una solicitud en Autocolor.</p>
+</div>
+</x-dc>
+</body>
+</html>

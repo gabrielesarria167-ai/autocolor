@@ -36,6 +36,7 @@ const ACCENT = '#262d40';   // the logo's ink: labels, links, the plate, the but
 const INK = '#262d40';      // headings and data
 const BODY = '#5a6275';     // running text
 const MUTED = '#666e81';    // labels and small print, 4.5:1 on CARD and on GROUND
+const RULE_STRONG = '#c4c9d4'; // the dotted rail and the rings of the steps still ahead
 
 // The same palette for readers with a dark system theme. The ink is too dark
 // to read as type on the dark card, so text that was ink turns to a light
@@ -56,6 +57,8 @@ const NOTE_DARK = '#161b27';    // the notes box
 // Google stylesheet (few: Gmail strips it). Arial is what nearly everyone
 // really sees, and the layout is built to hold up in it.
 const FONT = "'Schibsted Grotesk',Arial,Helvetica,sans-serif";
+// The site's display face, for the customer email's headline. Same caveat.
+const DISPLAY = "'Jost','Century Gothic',Futura,Arial,sans-serif";
 const MONO = "'Courier New',Courier,monospace";
 
 
@@ -138,15 +141,78 @@ function codePanel(label, code) {
             </table>`;
 }
 
-/** El botón. Va en su propia tabla con bgcolor para que Outlook lo pinte. */
-function button(href, text) {
+/** El botón. Va en su propia tabla con bgcolor para que Outlook lo pinte.
+ *  `compact` is the smaller one that sits beside the tracking code. */
+function button(href, text, compact) {
+    const size = compact
+        ? 'font-size:14px; line-height:20px; letter-spacing:0.5px; padding:12px 18px; white-space:nowrap;'
+        : 'font-size:15px; line-height:20px; letter-spacing:1px; padding:16px 40px;';
     return `<table role="presentation" cellpadding="0" cellspacing="0" border="0">
               <tr>
                 <td class="c-button" align="center" bgcolor="${ACCENT}" style="border-radius:0;">
-                  <a class="c-button-label" href="${escapeHtml(href)}" target="_blank" style="display:block; font-family:${FONT}; font-size:15px; line-height:20px; font-weight:bold; letter-spacing:1px; color:#ffffff; text-decoration:none; padding:16px 40px; border-radius:0;">${escapeHtml(text)}</a>
+                  <a class="c-button-label" href="${escapeHtml(href)}" target="_blank" style="display:block; font-family:${FONT}; ${size} font-weight:bold; color:#ffffff; text-decoration:none; border-radius:0;">${escapeHtml(text)}</a>
                 </td>
               </tr>
             </table>`;
+}
+
+/** The square at the head of each step: a tick once done, its number otherwise.
+ *  A character and not an icon, because mail clients do not draw SVG. */
+function stepMarker(step, number) {
+    const cell = 'align="center" valign="middle"';
+    if (step.state === 'done') {
+        return `<table role="presentation" width="28" cellpadding="0" cellspacing="0" border="0"><tr><td class="c-step-done" ${cell} width="28" height="28" bgcolor="${INK}" style="width:28px; height:28px; background-color:${INK}; font-family:Arial,Helvetica,sans-serif; font-size:15px; line-height:28px; font-weight:bold; color:#ffffff;">&#10003;</td></tr></table>`;
+    }
+    const ring = step.state === 'now'
+        ? `class="c-step-now" width="24" height="24" style="width:24px; height:24px; border:2px solid ${INK}; background-color:${CARD}; font-family:${MONO}; font-size:13px; line-height:24px; font-weight:bold; color:${INK};"`
+        : `class="c-step-next" width="26" height="26" style="width:26px; height:26px; border:1px solid ${RULE_STRONG}; background-color:${CARD}; font-family:${MONO}; font-size:13px; line-height:26px; color:${MUTED};"`;
+    return `<table role="presentation" width="28" cellpadding="0" cellspacing="0" border="0"><tr><td ${cell} ${ring}>${number}</td></tr></table>`;
+}
+
+/**
+ * What happens after the request, as a vertical track (see customerSteps in
+ * server/mail.js for the copy).
+ *
+ * Each step is two rows: the marker beside the title, then the rail beside
+ * the detail. The rail is the left border of a 15 px cell after a 13 px one,
+ * which puts it on the marker's centre line. A border on a cell is the only
+ * way to draw a line that stretches with the text next to it in every client,
+ * Outlook included; a div with a height does not.
+ */
+function timeline(steps) {
+    const gap = '<td width="18" style="width:18px; font-size:0; line-height:0;">&nbsp;</td>';
+    return steps.map((step, i) => {
+        const last = i === steps.length - 1;
+        const ahead = step.state === 'next';
+        // The rail below a step leads to the next one: solid once this one is done.
+        const rail = last ? ['', '']
+            : step.state === 'done'
+                ? ['c-rail-done', `border-left:2px solid ${INK};`]
+                : ['c-rail', `border-left:2px dotted ${RULE_STRONG};`];
+        return `<tr>
+                <td colspan="2" width="28" valign="top" style="width:28px;">${stepMarker(step, i + 1)}</td>
+                ${gap}
+                <td class="${ahead ? 'c-body' : 'c-ink'}" valign="middle" style="font-family:${FONT}; font-size:16px; line-height:28px; color:${ahead ? BODY : INK};${ahead ? '' : ' font-weight:bold;'}">${escapeHtml(step.title)}</td>
+              </tr>
+              <tr>
+                <td width="13" style="width:13px; font-size:0; line-height:0;">&nbsp;</td>
+                <td class="${rail[0]}" width="15" style="width:15px; ${rail[1]} font-size:0; line-height:0;">&nbsp;</td>
+                ${gap}
+                <td class="${ahead ? 'c-muted' : 'c-body'}" valign="top" style="font-family:${FONT}; font-size:14px; line-height:20px; color:${ahead ? MUTED : BODY}; padding:2px 0 ${last ? 0 : 22}px 0;">${escapeHtml(step.detail)}</td>
+              </tr>`;
+    }).join('\n');
+}
+
+/** The short label / value lines under the tracking code. Empty ones drop out,
+ *  as in detailRows. `html` is for values that are already escaped. */
+function summaryRows(rows) {
+    return rows
+        .filter((r) => r.value !== '' && r.value !== null && r.value !== undefined)
+        .map((row) => `<tr>
+                <td class="c-muted summary-label" width="116" valign="top" style="width:116px; font-family:${FONT}; font-size:14px; line-height:21px; color:${MUTED}; padding:4px 16px 4px 0;">${escapeHtml(row.label)}</td>
+                <td class="c-ink summary-value" valign="top" style="font-family:${FONT}; font-size:14px; line-height:21px; color:${INK}; padding:4px 0;">${row.html || escapeHtml(row.value)}</td>
+              </tr>`)
+        .join('\n');
 }
 
 /**
@@ -199,7 +265,7 @@ function shell({ title, preheader, kicker, body, footerNote, logoUrl, logoDarkUr
   table, td, div, p, a { font-family: Arial, sans-serif; }
 </style>
 <![endif]-->
-<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Jost:wght@500&family=Schibsted+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   body { margin:0; padding:0; width:100%; background-color:${GROUND}; }
   table { border-collapse:collapse; }
@@ -210,6 +276,10 @@ function shell({ title, preheader, kicker, body, footerNote, logoUrl, logoDarkUr
     .px { padding-left:24px !important; padding-right:24px !important; }
     .detail-label { width:100% !important; display:block !important; padding-bottom:2px !important; border-bottom:0 !important; }
     .detail-value { width:100% !important; display:block !important; }
+    .stack { width:100% !important; display:block !important; text-align:left !important; }
+    .stack-gap { padding-left:0 !important; padding-top:16px !important; }
+    .summary-label { width:100% !important; display:block !important; padding:6px 0 0 0 !important; }
+    .summary-value { width:100% !important; display:block !important; padding:0 0 2px 0 !important; }
   }
   /* Modo oscuro.
      Todo lleva !important porque el color de verdad va en el atributo style de
@@ -231,6 +301,14 @@ function shell({ title, preheader, kicker, body, footerNote, logoUrl, logoDarkUr
     .c-note { background-color:${NOTE_DARK} !important; }
     .c-button { background-color:${ACCENT_DARK} !important; }
     .c-button-label { color:${CARD_DARK} !important; }
+    .c-box { background-color:${NOTE_DARK} !important; border-color:${LINE_DARK} !important; }
+    .c-box-rule { border-top-color:${LINE_DARK} !important; }
+    .c-outline { border-color:${ACCENT_DARK} !important; }
+    .c-step-done { background-color:${ACCENT_DARK} !important; color:${CARD_DARK} !important; }
+    .c-step-now { background-color:${CARD_DARK} !important; border-color:${ACCENT_DARK} !important; color:${INK_DARK} !important; }
+    .c-step-next { background-color:${CARD_DARK} !important; border-color:${LINE_DARK} !important; color:${MUTED_DARK} !important; }
+    .c-rail-done { border-left-color:${ACCENT_DARK} !important; }
+    .c-rail { border-left-color:${LINE_DARK} !important; }
     .c-logo-light { display:none !important; }
     .c-logo-dark { display:block !important; }
   }
@@ -281,71 +359,117 @@ ${body}
 /* -----------------------------------------------------------------------------
    El correo del cliente
 
-   Confirma y tranquiliza: el código bien grande, cuatro datos para que
-   reconozca su solicitud, y el enlace para consultarla. Nada operativo.
+   Answers the question a customer has right after sending: now what? It
+   leads with the steps ahead, the first one already ticked, then the tracking
+   code beside the button that uses it and a short summary of what was asked
+   for, and ends on the one way to ask something before the call.
 -------------------------------------------------------------------------- */
 
 function customerHtml(created, data, ctx, walkIn) {
     const name = ctx.oneLine(data.firstName);
-    const vehicle = ctx.vehicleName(data, true, true);
-    const zone = ctx.zoneLabel(data);
+    const model = ctx.oneLine(data.model);
+    const plate = ctx.oneLine(data.plate);
     const lookupUrl = ctx.siteUrl ? `${ctx.siteUrl}/pgs/repair.html#consulta` : '';
+    const whatsappUrl = `https://wa.me/${SHOP_PHONE_TEL.replace(/\D/g, '')}`;
 
-    const rows = detailRows([
-        { label: 'Vehículo', value: vehicle },
-        { label: 'Placa', value: ctx.oneLine(data.plate) },
+    // «Juan, tu Corolla ya está en nuestra lista.» Without a model (a walk-in
+    // picks a silhouette, not a catalogue entry) it names the request or the
+    // vehicle instead; without a name the sentence starts at «Tu».
+    const subject = model ? `tu ${model}` : walkIn ? 'tu vehículo' : 'tu solicitud';
+    const where = walkIn ? 'ya está en el taller' : 'ya está en nuestra lista';
+    const headline = name
+        ? `${name}, ${subject} ${where}.`
+        : `${subject.charAt(0).toUpperCase()}${subject.slice(1)} ${where}.`;
+
+    const vehicle = ctx.vehicleName(data, true, true);
+    const plateHtml = `<span class="c-ink" style="font-family:${MONO}; font-weight:bold; letter-spacing:1px; color:${INK};">${escapeHtml(plate)}</span>`;
+    const summary = summaryRows([
+        {
+            label: 'Vehículo',
+            value: vehicle || plate,
+            html: [vehicle && escapeHtml(vehicle), plate && plateHtml].filter(Boolean).join(' · '),
+        },
+        { label: 'Piezas', value: ctx.partsLabel(data.parts) },
         { label: 'Acabado', value: ctx.qualityLabel(data.quality) },
-        { label: 'Piezas a pintar', value: ctx.partsLabel(data.parts) },
-
-        { label: 'Zona', value: zone },
+        { label: 'Zona', value: ctx.zoneLabel(data) },
     ]);
 
     const body = `
         <tr>
           <td class="px" align="left" style="padding:36px 48px 0 48px;">
-            ${eyebrow(walkIn ? 'Vehículo recibido' : 'Solicitud recibida')}
-            <div class="c-ink" style="font-family:${FONT}; font-size:30px; line-height:38px; color:${INK}; font-weight:normal;">${name ? `Gracias, ${escapeHtml(name)}` : 'Gracias'}</div>
-            <div class="c-body" style="font-family:${FONT}; font-size:16px; line-height:26px; color:${BODY}; padding-top:16px;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td class="c-step-done" align="center" valign="middle" width="22" height="22" bgcolor="${INK}" style="width:22px; height:22px; background-color:${INK}; font-family:Arial,Helvetica,sans-serif; font-size:13px; line-height:22px; font-weight:bold; color:#ffffff;">&#10003;</td>
+                <td class="c-accent" style="padding-left:10px; font-family:${FONT}; font-size:11px; line-height:14px; letter-spacing:3px; color:${ACCENT}; text-transform:uppercase; font-weight:bold;">${walkIn ? 'Vehículo recibido' : 'Solicitud recibida'}</td>
+              </tr>
+            </table>
+            <div class="c-ink" style="font-family:${DISPLAY}; font-size:32px; line-height:40px; color:${INK}; font-weight:500; padding-top:14px;">${escapeHtml(headline)}</div>
+            <div class="c-body" style="font-family:${FONT}; font-size:16px; line-height:26px; color:${BODY}; padding-top:14px;">
               ${walkIn
-                ? `Recibimos tu vehículo en el taller y ya está registrado. Cualquier
-                   cosa que necesitemos consultarte, te llamamos.`
-                : `Recibimos tu solicitud de pintura y ya está registrada. Te contactaremos
-                   en 24 horas con tu presupuesto personalizado.`}
+                ? 'Esto es lo que sigue. Cualquier cosa que necesitemos consultarte, te llamamos.'
+                : 'Esto es lo que sigue. No tienes que hacer nada hasta que te llamemos.'}
             </div>
           </td>
         </tr>
 
         <tr>
-          <td class="px" style="padding:28px 48px 0 48px;">
-            ${codePanel('Código de seguimiento', created.id)}
-            <div class="c-muted" style="font-family:${FONT}; font-size:13px; line-height:20px; color:${MUTED}; padding-top:10px;">Guárdalo: con este código puedes ver el estado de tu ${walkIn ? 'vehículo' : 'solicitud'} cuando quieras.</div>
+          <td class="px" style="padding:32px 48px 0 48px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+${timeline(ctx.customerSteps(created, walkIn))}
+            </table>
           </td>
         </tr>
 
         <tr>
-          <td class="px" style="padding:28px 48px 0 48px;">
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-${rows}
+          <td class="px" style="padding:36px 48px 0 48px;">
+            <table role="presentation" class="c-box" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${GROUND}" style="background-color:${GROUND}; border:1px solid ${LINE};">
+              <tr>
+                <td style="padding:22px 24px;">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                    <tr>
+                      <td class="stack" valign="middle">
+                        <div class="c-muted" style="font-family:${FONT}; font-size:11px; line-height:14px; letter-spacing:2.5px; color:${MUTED}; text-transform:uppercase; padding-bottom:6px;">Código de seguimiento</div>
+                        <div class="c-ink" style="font-family:${MONO}; font-size:30px; line-height:34px; letter-spacing:3px; color:${INK}; font-weight:bold;">${escapeHtml(created.id)}</div>
+                      </td>${lookupUrl ? `
+                      <td class="stack stack-gap" align="right" valign="middle" style="padding-left:16px;">
+                        ${button(lookupUrl, 'Ver el avance →', true)}
+                      </td>` : ''}
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+              <tr>
+                <td class="c-box-rule" style="border-top:1px solid ${LINE}; padding:14px 24px 16px 24px;">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+${summary}
+                  </table>
+                </td>
+              </tr>
             </table>
           </td>
         </tr>
-${lookupUrl ? `
-        <tr>
-          <td class="px" align="center" style="padding:32px 48px 0 48px;">
-            ${button(lookupUrl, walkIn ? 'CONSULTAR MI VEHÍCULO' : 'CONSULTAR MI SOLICITUD')}
-          </td>
-        </tr>` : ''}
 
 ${hairline('36px 48px 0 48px')}
 
         <tr>
-          <td class="px" align="left" style="padding:24px 48px 32px 48px;">
-            ${eyebrow('Contacto')}
-            <div class="c-body" style="font-family:${FONT}; font-size:14px; line-height:24px; color:${BODY};">
-              ${escapeHtml(SHOP_ADDRESS)}<br>
-              Tel. / WhatsApp: <a class="c-accent" href="tel:${SHOP_PHONE_TEL}" style="color:${ACCENT}; text-decoration:none;">${SHOP_PHONE}</a><br>
-              ${escapeHtml(SHOP_HOURS)}
-            </div>
+          <td class="px" style="padding:24px 48px 36px 48px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td class="stack" valign="middle">
+                  <div class="c-ink" style="font-family:${FONT}; font-size:15px; line-height:22px; color:${INK}; font-weight:bold;">${walkIn ? '¿Una duda sobre tu vehículo?' : '¿Una duda antes de la llamada?'}</div>
+                  <div class="c-body" style="font-family:${FONT}; font-size:14px; line-height:22px; color:${BODY};">${escapeHtml(SHOP_HOURS)}</div>
+                </td>
+                <td class="stack stack-gap" align="right" valign="middle" style="padding-left:24px;">
+                  <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                    <tr>
+                      <td class="c-outline" style="border:1px solid ${INK};">
+                        <a class="c-accent" href="${whatsappUrl}" target="_blank" style="display:block; font-family:${FONT}; font-size:14px; line-height:20px; font-weight:bold; color:${ACCENT}; text-decoration:none; white-space:nowrap; padding:11px 16px;">WhatsApp · ${SHOP_PHONE}</a>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
           </td>
         </tr>`;
 

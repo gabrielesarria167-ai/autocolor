@@ -257,7 +257,45 @@ function htmlContext() {
     return { oneLine, partLabel, qualityLabel, bodyTypeLabel, vehicleLabel,
              formatPhone, mileageLabel, zoneLabel, vehicleName,
              siteUrl: SITE_URL, logoUrl: LOGO_URL, logoDarkUrl: LOGO_DARK_URL,
+             customerSteps,
              partsLabel: (parts) => parts.map(partLabel).join(', ') };
+}
+
+// When the request came in, as the shop's clock reads it: «15 de setiembre a
+// las 21:30». The server runs in UTC on Render, so the zone is set here and
+// not left to the machine.
+const RECEIVED_AT = new Intl.DateTimeFormat('es-PE', {
+    day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit',
+    hour12: false, timeZone: 'America/Lima',
+});
+
+/**
+ * What happens after the customer's email arrives, one step per line. The
+ * HTML draws them as a track (mailhtml.js timeline) and the text lists them,
+ * so the copy lives here once. `state` is what the track paints: `done`, the
+ * step in progress (`now`) or one still ahead (`next`).
+ *
+ * The promises are the site's own, word for word where it can be: 24 hours
+ * and a closed price from the home page's four steps, WhatsApp updates from
+ * its «Seguimiento» fact, 5 years of written guarantee from its description.
+ * A walk-in skips the quote and the drop-off, which already happened.
+ */
+function customerSteps(created, walkIn) {
+    const when = created.createdAt ? RECEIVED_AT.format(new Date(created.createdAt)) : '';
+    const pickUp = { state: 'next', title: 'Lo recoges pintado', detail: 'Con 5 años de garantía por escrito.' };
+    if (walkIn) {
+        return [
+            { state: 'done', title: 'Recibimos tu vehículo', detail: when },
+            { state: 'now', title: 'Lo trabajamos en el taller', detail: 'Te avisamos por WhatsApp en cada etapa, con fotos del avance.' },
+            pickUp,
+        ];
+    }
+    return [
+        { state: 'done', title: 'Recibimos tu solicitud', detail: when },
+        { state: 'now', title: 'Te llamamos con el presupuesto', detail: 'En las próximas 24 horas: precio cerrado y fecha de entrega.' },
+        { state: 'next', title: 'Traes el vehículo', detail: 'Solo si apruebas el presupuesto.' },
+        pickUp,
+    ];
 }
 
 function isConfigured() {
@@ -457,10 +495,14 @@ function customerMessage(created, data, walkIn) {
         // and did not send a request from a website: telling them otherwise
         // reads as a form letter that did not notice they were there.
         ...(walkIn
-            ? ['Recibimos tu vehículo en el taller y ya está registrado. Cualquier',
-               'cosa que necesitemos consultarte, te llamamos.']
-            : ['Recibimos tu solicitud de pintura. Te contactaremos en 24 horas con tu',
-               'presupuesto personalizado.']),
+            ? ['Recibimos tu vehículo en el taller y ya está registrado. Esto es lo que',
+               'sigue; cualquier cosa que necesitemos consultarte, te llamamos.']
+            : ['Recibimos tu solicitud de pintura. Esto es lo que sigue; no tienes que',
+               'hacer nada hasta que te llamemos.']),
+        '',
+        // The same steps the HTML draws as a track, as a numbered list.
+        ...customerSteps(created, walkIn).map((step, i) =>
+            `  ${i + 1}. ${step.title}${step.detail ? ` — ${step.detail}` : ''}`),
         '',
         'Tu código de seguimiento es:',
         '',

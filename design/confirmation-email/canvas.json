@@ -1,0 +1,38 @@
+{
+  "artboards": [
+    { "file": "Ficha.dc.html", "title": "A · Ficha", "x": 0, "y": 0, "w": 680, "h": 1260 },
+    { "file": "Main.dc.html", "title": "B · Seguimiento", "x": 780, "y": 0, "w": 680, "h": 1300 },
+    { "file": "Carta.dc.html", "title": "C · Carta", "x": 1560, "y": 0, "w": 680, "h": 1180 }
+  ],
+  "annotations": [
+    {
+      "id": "brief",
+      "x": 0,
+      "y": -250,
+      "w": 560,
+      "text": "Customer confirmation email (server/mailhtml.js › customerHtml), three directions. Same brand: ink #262D40, square corners, Jost / Schibsted Grotesk / Plex Mono. Sample data from tools/mailpreview.js.\n\nIn real inboxes most people see Arial and Courier New (Gmail strips web fonts); every layout here can be rebuilt as nested tables."
+    },
+    {
+      "id": "a-ficha",
+      "x": 0,
+      "y": -110,
+      "w": 560,
+      "text": "A · Ficha — a work-order ticket. The code is the hero, details sit in a grid, pieces as tags. Closest to today's email, just tighter. Tradeoff: still reads like a receipt, not a welcome."
+    },
+    {
+      "id": "b-seguimiento",
+      "x": 780,
+      "y": -110,
+      "w": 560,
+      "text": "B · Seguimiento — leads with what happens next (4 steps, from the home page's flow). Answers the real question after sending: \"now what?\". Tradeoff: adds a new section; the code is smaller."
+    },
+    {
+      "id": "c-carta",
+      "x": 1560,
+      "y": -110,
+      "w": 560,
+      "text": "C · Carta — a short letter from the shop. The request is retold as one sentence, big code between rules, ink footer. Most personal. Tradeoff: details are prose, harder to scan; long piece lists will stretch the sentence."
+    }
+  ],
+  "launch": { "view": "canvas" }
+}

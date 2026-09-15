@@ -518,7 +518,7 @@ Cuando alguien termina el asistente salen dos avisos (`server/mail.js`):
 
 | A quién | Qué lleva |
 | --- | --- |
-| Al cliente | Confirmación con el código de seguimiento y cuatro datos para reconocer su solicitud |
+| Al cliente | Confirmación con lo que sigue, el código de seguimiento y un resumen de su solicitud |
 | Al taller | La ficha para presupuestar: contacto, vehículo, piezas y notas, con `Reply-To` al cliente |
 
 Los dos van maquetados (`server/mailhtml.js`) sobre el mismo diseño —fondo
@@ -528,7 +528,11 @@ resto de cuando no había HTML: es lo que se ve en los clientes que no lo pintan
 y en los avisos del móvil, así que cuando cambie uno hay que cambiar el otro.
 
 Son dos maquetas y no una porque el trabajo es distinto. La del cliente
-confirma: código grande, cuatro datos, un enlace para consultar. La del taller
+confirma y contesta «¿y ahora qué?»: los pasos que siguen, con el primero ya
+marcado; el código junto al botón que lo usa; un resumen corto de lo pedido, y
+el WhatsApp para una duda antes de la llamada. The step copy lives once in
+`customerSteps()` (`server/mail.js`), which both the HTML track and the plain
+text list read. The mock-ups are in `design/confirmation-email/` (direction B). La del taller
 es una ficha de trabajo: el titular es el cliente y la placa —que es como se
 reconoce un trabajo en una bandeja con varios—, el teléfono y el correo van
 arriba y como enlaces porque lo primero que se hace es llamar, y las piezas van
