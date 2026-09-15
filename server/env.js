@@ -17,8 +17,8 @@
    el valor de todos los días y no un obstáculo cuando se quiere otro.
 
    El .env está en .gitignore y no debe salir de la máquina. Importa más de lo
-   normal aquí: este repositorio se publica entero en GitHub Pages, así que un
-   secreto versionado quedaría a la vista de cualquiera. Ver .env.example.
+   normal aquí: el repositorio es público en GitHub, así que un secreto
+   versionado quedaría a la vista de cualquiera. Ver .env.example.
    ========================================================================== */
 
 const fs = require('node:fs');

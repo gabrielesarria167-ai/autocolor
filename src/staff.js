@@ -1491,8 +1491,9 @@
 
        A car driven to the shop instead of booked through the website. It
        becomes the same kind of row as any other — the queue does not care how
-       one arrived — but the form asks six things instead of thirteen, because
-       the customer is at the counter and the rest can be filled in later.
+       one arrived — but the form asks fewer things than the website, because
+       the customer is at the counter. Nothing can be edited afterwards, so
+       everything it asks for except the notes is required.
 
        The checks here are the same ones the server applies (validateRequest in
        server/server.js), repeated so a missing field costs nothing. The server
@@ -1581,12 +1582,12 @@
     );
 
     // Brand and model, cascading, out of the same catalogue the website uses.
-    // Optional: without them the table's «Vehículo» column reads «—», which is
-    // recoverable, and the boss may be holding keys in the other hand.
+    // Both are required (see firstIntakeProblem and WALK_IN_REQUIRED), so the
+    // empty first option is a prompt, not a choice.
     function buildBrandOptions() {
         var catalog = window.CAR_CATALOG;
         if (!catalog) return;                 // carModels.js did not load
-        intakeBrandEl.appendChild(new Option("Sin especificar", ""));
+        intakeBrandEl.appendChild(new Option("Elige la marca", ""));
         catalog.brands.forEach(function (brand) {
             intakeBrandEl.appendChild(new Option(brand.name, brand.id));
         });
@@ -1601,7 +1602,7 @@
         intakeModelEl.textContent = "";
         var catalog = window.CAR_CATALOG;
         var brand = brandId && catalog ? catalog.findBrand(brandId) : null;
-        intakeModelEl.appendChild(new Option("Sin especificar", ""));
+        intakeModelEl.appendChild(new Option("Elige el modelo", ""));
         intakeModelEl.disabled = !brand;
         if (!brand) return;
         brand.models.forEach(function (model) {

@@ -74,7 +74,8 @@ lo abre a propósito, por ejemplo para probar el sitio desde el móvil.
 | `index.html`, `src/home.js` | Portada |
 | `pgs/repair.html`, `src/repair.js` | Asistente de cotización |
 | `src/carVisual.js` | Visor 3D de piezas (three.js, un modelo por silueta). Lo montan el asistente y el panel |
-| `src/parts.js` | El nombre de cada pieza de carrocería, compartido por los dos formularios y por los correos |
+| `src/parts.js` | El nombre de cada pieza de carrocería y la lista de piezas de cada silueta, compartidos por los dos formularios, la lista sin 3D del paso 3 y los correos |
+| `vendor/three@0.169.0/` | The four three.js files the viewer imports, self-hosted (MIT licence alongside) |
 | `src/lookup.js` | Consulta de una solicitud por su código |
 | `pgs/taller.html`, `src/staff.js` | Panel del taller: la cola de trabajo, el monitor del jefe y el registro de vehículos del local |
 | `src/cities.js` | Departamentos y provincias del Perú |
@@ -122,11 +123,25 @@ Mientras no haya API detrás, el sitio publicado lo dice con todas sus
 letras en vez de pedir que se reintente: el formulario avisa que el envío no
 está disponible en esa versión del sitio, y la consulta por código, lo mismo.
 
-The site isn't published on GitHub Pages any more, so there is no
-`_config.yml`. What Render's server refuses to serve (`.env`, `server/`,
-`tools/` and the like) is the `DENY_PREFIXES` list in `server/server.js`. No
-passwords or keys go in the repository either way: they live in the service's
-environment variables or in the local `.env`, which isn't versioned.
+The site is meant to be published on Render only, and `_config.yml` is gone.
+**GitHub Pages is still switched on for this repository, though** (Settings →
+Pages, building from `main`): until it is turned off, merging to `main`
+publishes a second, API-less copy of the site at
+`gabrielesarria167-ai.github.io/autocolor`, and without `_config.yml` that copy
+includes the staff panel page and `server/`. Turn Pages off before merging.
+
+What Render's server serves is an allowlist in `server/server.js`
+(`isPublic`): `index.html`, `styles.css`, and files with a known extension under
+`pgs/`, `src/`, `imgs/` and `vendor/`, never a dotfile and never an `imgs/**/src/`
+source folder. Everything else — `README.md`, `NEXT-STEPS.md`, `design/`,
+`server/`, `.env` — answers 404. No passwords or keys go in the repository
+either way: they live in the service's environment variables or in the local
+`.env`, which isn't versioned.
+
+Static responses are compressed (brotli, or gzip), cached in memory per file
+version, and revalidated on every load with a content-hash `ETag` and
+`Cache-Control: no-cache`, so an unchanged 10 MB model costs a 304 after a
+deploy and a changed one is never served stale.
 
 ## Desplegar en Render
 
@@ -209,10 +224,10 @@ Conviene saberlo antes de repartir el enlace:
 - **No poner un cron que lo despierte.** 24/7 son unas 730 horas contra un tope
   de 750 al mes: se gastaría la cuota entera en comprar el problema del
   arranque en frío.
-- **100 GB de salida al mes.** Cada primera visita que llega al paso 3 se lleva
-  un `.glb` de entre 9.5 y 20.5 MB, así que son del orden de 5 000 a 10 000
-  primeras visitas. Las repetidas dentro del día no cuentan, por el
-  `Cache-Control` de `/imgs/`.
+- **Bandwidth.** Render's Hobby workspace includes 5 GB a month, then $0.15
+  per GB. Each first visit that reaches step 3 downloads one model, 4.4 to
+  9.4 MB compressed, so that is roughly 600 to 1 100 such visits a month.
+  Repeat visits revalidate with a 304 and download nothing.
 
 El instante gratuito se quita con el plan de pago de Render. Lo que arregla las
 sesiones en cualquier plan —incluso al desplegar, que el plan de pago no cubre—
@@ -273,12 +288,12 @@ forzado, que es una decisión aparte.
 Los cuatro modelos servidos van comprimidos con `EXT_meshopt_compression`. Es
 lo que hace usable el paso 3 en un móvil:
 
-| Modelo | Original | Servido |
-|---|---|---|
-| `van.glb` | 91.7 MB | 6.9 MB |
-| `pickup.glb` | 47.8 MB | 12.6 MB |
-| `wagon.glb` | 35.4 MB | 10.0 MB |
-| `suv.glb` | 27.6 MB | 9.5 MB |
+| Modelo | Original | Servido | On the wire (brotli) |
+|---|---|---|---|
+| `van.glb` | 91.7 MB | 6.9 MB | 4.4 MB |
+| `pickup.glb` | 47.8 MB | 12.6 MB | 9.4 MB |
+| `wagon.glb` | 35.4 MB | 10.0 MB | 6.6 MB |
+| `suv.glb` | 27.6 MB | 9.5 MB | 6.5 MB |
 
 Con `@gltf-transform/cli`, sin instalarlo como dependencia del proyecto. Los
 comandos, en este orden y a archivos intermedios aparte —así, si algo se rompe,
@@ -338,7 +353,9 @@ falte ningún nombre de nodo, que ninguno quede duplicado tras la normalización
 de `GLTFLoader` —un `hood` repetido se carga como `hood_1` y la pieza se pinta
 en el lugar equivocado—, que cada pieza configurada conserve sus primitivas y
 sus materiales, y que no haya aparecido `EXT_mesh_gpu_instancing`. Lee lo que
-espera de `src/carVisual.js`, no de una copia a mano. Sale con código 1 si algo
+espera de `src/carVisual.js`, no de una copia a mano. It also checks that the
+per-vehicle part lists in `src/parts.js` (`BY_VEHICLE`, used by step 3's
+no-3D checklist) match `VEHICLE_MODELS` exactly. Sale con código 1 si algo
 falla; no se commitea un modelo que no pase.
 
 Pasar esa comprobación no exime de abrir el paso 3 en el navegador con los
@@ -437,8 +454,11 @@ que el paso 1 nunca se queda con un hueco.
 
 ### La previsualización de color de la portada
 
-El vehículo de la portada (`imgs/assets/suv.png`) cambia de color al tocar los
-swatches. La chapa se recorta con `imgs/assets/suv-paint-mask.png`, un PNG
+El vehículo de la portada (`imgs/assets/suv.png`, served as `suv.webp`) cambia
+de color al tocar los swatches. The page loads WebP copies of the photo (99 KB
+instead of 542 KB) and of the mask; the PNGs are the sources, and
+`build-paint-mask.py` writes both. La chapa se recorta con
+`imgs/assets/suv-paint-mask.png`, un PNG
 blanco cuyo canal alfa vale 1 sobre la carrocería pintable y 0 sobre cristales,
 neumáticos, llantas, cromados, faros, placa y logo.
 
@@ -471,7 +491,7 @@ razonable.
 
 | Ruta | Qué hace |
 | --- | --- |
-| `POST /api/requests` | Guarda una solicitud y devuelve `{ id, status, createdAt }` |
+| `POST /api/requests` | Guarda una solicitud y devuelve `{ id, status, createdAt }`. Requires `Content-Type: application/json` (415 otherwise) and, from a browser, this site's `Origin` (403 otherwise); 10 a minute per IPv4 address or IPv6 /64 |
 | `GET /api/requests/:id` | Devuelve `{ id, brand, model, vehicle, firstName, lastName, status }` |
 
 La consulta devuelve solo eso: el código circula en mensajes y papeles, así
@@ -484,7 +504,7 @@ Las del panel del taller, todas detrás de la contraseña compartida:
 | --- | --- |
 | `POST /api/staff/login` | Abre sesión con la contraseña del taller |
 | `POST /api/staff/logout` | La cierra |
-| `GET /api/staff/whoami` | Qué ve el servidor: IP, proxies y la cuenta de correo configurada |
+| `GET /api/staff/whoami` | The session's IP and worker code; for the boss, also the proxy headers and the mail account |
 | `GET /api/staff/requests?status=` | La cola de trabajo, opcionalmente por estado |
 | `POST /api/staff/requests` | Registra un vehículo que llegó al local. Solo el jefe; a los demás, `403` |
 | `GET /api/staff/workers` | Quién tiene qué vehículo, con la nota del jefe de cada uno. Solo el jefe |
@@ -594,16 +614,16 @@ Both emails carry a palette for readers with a dark system theme, in an
 `@media (prefers-color-scheme: dark)` block in the `<style>`. The grounds are
 darkened cuts of the logo's ink (`#141824` window, `#1B2130` card).
 
-**Ink text turns light, the button doesn't.** The ink is far too dark to read as
-type on the dark card, so labels, links and the plate switch to `#C3C8D4`
-(10.2:1). The button keeps its ink fill in both modes: there the ink is the
-ground, and what has to read is the white label on it.
+**Ink text turns light, and so does the button.** The ink is far too dark to
+read as type on the dark card, so labels, links and the plate switch to
+`#C3C8D4` (10.2:1). The button's ink fill was 1.2:1 against the dark card, so
+in dark mode it turns `#C3C8D4` with an ink label.
 
 Todas las reglas del bloque llevan `!important` porque el color de verdad va en
 el atributo `style` de cada etiqueta —así tiene que ser en correo— y una regla
 de hoja normal no le gana a un estilo en línea. **La de los enlaces es la
-excepción**, a propósito: el texto del botón es blanco en línea, y con
-`!important` se lo llevaría por delante dejando acero claro sobre tinta.
+excepción**, a propósito, so it does not override the button label, which has
+its own rule (`.c-button-label`).
 
 #### Dónde se ve y dónde no
 
@@ -615,12 +635,29 @@ excepción**, a propósito: el texto del botón es blanco en línea, y con
 
 Es decir: en Gmail **no se puede** elegir los colores del modo oscuro, haga uno
 lo que haga. Lo que sí se puede es que su inversión no destroce nada, y de eso
-se ocupan dos decisiones de arriba: el logotipo sin fondo (que era lo único que
-quedaba feo de verdad) y no usar blanco ni negro puros en ningún sitio.
+se ocupan tres decisiones: el logotipo sin fondo, a thin white halo around the
+ink logo (added by `tools/tracelogo.py`, invisible on a light card, and what
+keeps it readable once Gmail darkens the card around an image it does not
+invert), y no usar blanco ni negro puros en ningún sitio.
 
 Queda fuera a propósito el juego de atributos `[data-ogsc]` / `[data-ogsb]`,
 que reconocen Samsung Mail y Outlook.com: sería una tercera paleta que mantener
 al día para un trozo pequeño de lectores.
+
+### Daily caps
+
+The customer confirmation goes to whatever address the public form was given,
+so the server caps it: at most 3 confirmations to one address a day, 120
+customer confirmations a day (`AUTOCOLOR_MAIL_CUSTOMER_DAILY_CAP`) and 280
+messages of any kind (`AUTOCOLOR_MAIL_DAILY_CAP`), against Brevo's free 300.
+The counters reset at midnight UTC or on restart. When a cap is reached the
+request is still saved and shown in the panel; the log says so once:
+
+```
+[mail] daily cap reached (customer confirmations, 120); further messages of this kind are skipped until midnight UTC
+```
+
+The walk-in form's done screen only promises an email when one was queued.
 
 ### La cola: un correo que falla se reintenta
 
@@ -667,8 +704,8 @@ dice:
        llegado; no se reintenta para no duplicarlo — la API no contestó a tiempo (Brevo, tras 15.0 s)
 ```
 
-`GET /api/staff/whoami` trae `mail.pending`, cuántos avisos están esperando su
-turno. Un número que no baja entre dos consultas es la señal de que el correo
+`GET /api/staff/whoami`, signed in as the boss, trae `mail.pending`, cuántos
+avisos están esperando su turno. Un número que no baja entre dos consultas es la señal de que el correo
 está caído.
 
 **La cola vive en memoria**, y eso es una decisión: guardarla en Postgres
@@ -787,6 +824,12 @@ La contraseña es el secreto que abre; el código —dos letras y cinco dígitos
 uno por persona— dice quién abrió, y queda en el registro del servidor y en
 `GET /api/staff/whoami`. Entrar pide los dos, y el error no distingue cuál de
 los dos falló, para que probar códigos a ciegas no revele cuáles existen.
+Both checks always run, so the answer takes the same time either way. Five
+failed attempts a minute from one address (or IPv6 /64) lock logins for that
+minute; successful logins do not count, so a shift signing in together from
+the shop's one connection is never locked out. A code that is not two letters
+and five digits is skipped at startup with a warning, and the boss's code
+never counts as a worker.
 
 Después de los dos puntos va el nombre de quien tiene ese código, que es lo que
 el panel enseña en su lugar: en la ficha, en la columna «Ocupado» y en el

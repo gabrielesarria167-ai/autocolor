@@ -67,8 +67,9 @@ const HOST = process.env.HOST || '127.0.0.1';
 
 // Cuántos proxies de confianza hay delante de este proceso. 0 —lo normal en
 // esta máquina— significa que nadie lo intermedia y que la dirección del socket
-// es la del cliente. En un alojamiento como Render, o detrás de un nginx
-// propio, hay uno: ver clientIp() más abajo, que es lo único que lo usa.
+// es la del cliente. Behind a proxy it is the number of hops that append to
+// X-Forwarded-For: 3 on Render (see render.yaml), 1 behind a single nginx.
+// clientIp() below is the only thing that uses it.
 const TRUST_PROXY = Number(process.env.TRUST_PROXY) || 0;
 
 const ROOT = path.join(__dirname, '..');
@@ -919,8 +920,10 @@ async function handleStaff(req, res, pathname, ip) {
 
     // A vehicle driven straight to the shop. Same table and same code as one
     // that came through the website — the queue does not care how a car
-    // arrived — but far fewer questions, because the customer is at the counter
-    // and the rest can be filled in from the panel afterwards.
+    // arrived — but fewer questions (WALK_IN_REQUIRED): the customer is at the
+    // counter and has no reason to be asked for year, department or province.
+    // Nothing can be edited from the panel afterwards, so what it does ask for
+    // is required.
     //
     // No rate limit, unlike the public route: this one is behind the shop
     // password, and the ten-a-minute cap there would bite a shop booking three

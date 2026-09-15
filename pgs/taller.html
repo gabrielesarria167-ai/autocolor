@@ -192,10 +192,10 @@
         </section>
 
         <!-- Registering a vehicle that came to the shop instead of through the
-             website. One page and six answers: the customer is standing at the
-             counter, and everything the row can still be missing (plate, brand,
-             model, notes) is right below, marked optional, or can be filled in
-             from the table afterwards.
+             website. One page and fewer questions than the website: the
+             customer is standing at the counter. Nothing can be edited from
+             the table afterwards, so everything here except the notes is
+             required (WALK_IN_REQUIRED in server/server.js).
 
              Boss only. What actually enforces that is requireBoss on
              POST /api/staff/requests, not this markup. -->
@@ -278,9 +278,8 @@
                          silhouette to draw, because the model to load is what
                          the choice decides.
 
-                         Optional, like the rest of the second card: a vehicle
-                         can enter the shop before anybody has decided what gets
-                         painted, and `parts` defaults to an empty array. -->
+                         At least one part is required, like the rest of the
+                         second card (see firstIntakeProblem in src/staff.js). -->
                     <div class="staff-intake__parts" id="intakeParts" hidden>
                         <p class="staff-intake__parts-title">
                             Piezas a pintar <span>— toca el vehículo</span>

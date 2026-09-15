@@ -32,7 +32,7 @@ const net = require('node:net');
 // Un tope corto a propósito: esto es un diagnóstico y va detrás de un correo
 // que ya falló. Una conexión sana a cualquiera de estos tarda milésimas (la de
 // Gmail, 22 ms medidos), así que ocho segundos es de sobra generoso y mantiene
-// el arranque por debajo de eso: las cuatro pruebas van a la vez.
+// el arranque por debajo de eso: las tres pruebas van a la vez.
 const PROBE_TIMEOUT_MS = 8000;
 
 // Las tres preguntas, en el orden en que se leen: el destino que usamos, otro
@@ -47,8 +47,8 @@ const PROBES = [
 /**
  * ¿Se completa el saludo TCP contra este destino?
  *
- * `family: 4` por lo mismo que server/mail.js resuelve el registro A a mano:
- * Render no tiene salida IPv6, y una prueba que salga por IPv6 diría «no
+ * `family: 4` because Render has no outbound IPv6 (server/mail.js no longer
+ * resolves anything by hand; it just uses fetch). Render no tiene salida IPv6, y una prueba que salga por IPv6 diría «no
  * llego» de un destino perfectamente alcanzable.
  *
  * No lanza: devuelve el resultado, que aquí es el dato.

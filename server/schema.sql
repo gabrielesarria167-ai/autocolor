@@ -43,11 +43,12 @@ CREATE TABLE IF NOT EXISTS requests (
     -- Los ids de panel que usa el visor 3D ('hood', 'rear_door_left', …). Son
     -- distintos por modelo, así que se guardan tal cual llegan, como arreglo:
     -- una solicitud sigue siendo una sola fila y el taller ve las piezas de un
-    -- vistazo. Sus etiquetas en español viven en src/repair.js (PART_LABELS).
+    -- vistazo. Sus etiquetas en español viven en src/parts.js.
     parts       text[]      NOT NULL DEFAULT '{}',
 
-    -- Datos de contacto (paso 4). Solo nombre, apellido y teléfono son
-    -- obligatorios, igual que en el formulario.
+    -- Datos de contacto (paso 4). Only name, surname and phone are NOT NULL
+    -- here, for rows older than the current rules; the wizard and the server
+    -- (WIZARD_REQUIRED) also require email, department and province.
     first_name  text        NOT NULL CHECK (length(btrim(first_name)) > 0),
     last_name   text        NOT NULL CHECK (length(btrim(last_name)) > 0),
     department  text,

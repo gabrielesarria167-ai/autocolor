@@ -128,3 +128,10 @@ services:
       # esta línea y un reinicio, no un cambio de código.
       - key: AUTOCOLOR_MAIL_SHOP
         value: "gabrielesarria167@gmail.com"
+
+      # The public address used in email links and logo URLs, and accepted as
+      # this site's Origin on POST /api/requests. Without it both fall back to
+      # RENDER_EXTERNAL_URL (the onrender.com host). Set it in Render once the
+      # custom domain serves the site.
+      - key: AUTOCOLOR_SITE_URL
+        sync: false

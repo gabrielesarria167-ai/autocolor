@@ -16,8 +16,9 @@
 
        { id: "corolla", name: "Corolla", type: "sedan", family: "corolla" }
 
-   `id`      identifica al modelo dentro de su marca y es lo que se guarda en
-             la solicitud; no se cambia una vez publicado.
+   `id`      identifica al modelo dentro de su marca y nombra su foto en
+             stock-models/; no se cambia una vez publicado. The request
+             stores `name`, not `id`.
    `type`    la carrocería, de las de BODY_TYPES. De ella sale sola la
              categoría con la que trabaja el visor 3D del paso 3.
    `family`  el nombre del modelo tal como lo escribe el proveedor de fotos
@@ -54,8 +55,8 @@
         van: { label: "Furgoneta", vehicle: "van" }
     };
 
-    // Las rutas de los logos son relativas a pgs/repair.html, que es la única
-    // página que carga este catálogo.
+    // Las rutas de los logos son relativas a pgs/, where both pages that load
+    // this catalogue live (repair.html and taller.html).
     var BRANDS = [
         {
             id: "toyota",

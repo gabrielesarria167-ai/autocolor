@@ -517,8 +517,8 @@ function shopMessage(created, data, walkIn) {
         ]),
         block('TRABAJO', [
             row('Acabado', quality),
-            // Sin piezas es un vehículo del local que entró antes de decidir
-            // qué se pinta. «(0)» a secas se lee como un dato que se perdió.
+            // No parts only happens on rows from before both forms required
+            // them. «(0)» on its own would read as data that got lost.
             row('Piezas', data.parts.length
                 ? `(${data.parts.length}) ${data.parts.map(partLabel).join(', ')}`
                 : 'Sin definir'),
@@ -532,8 +532,8 @@ function shopMessage(created, data, walkIn) {
     const message = {
         to: [SHOP],
         // La placa ya pasó por PLATE_RE y el código lo genera el servidor: los
-        // dos son seguros de poner en el asunto. Sin placa —un vehículo del
-        // local todavía sin anotar— queda el código, que siempre está.
+        // dos son seguros de poner en el asunto. With no plate (only rows from
+        // before walk-ins required one) the code is left, which always exists.
         subject: data.plate
             ? `Solicitud ${created.id} — ${data.plate}`
             : `Solicitud ${created.id}`,

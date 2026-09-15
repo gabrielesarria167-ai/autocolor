@@ -627,7 +627,7 @@
     // El cliente ya no elige una silueta: escribe qué vehículo tiene y el
     // resto sale de ahí. La marca llena la lista de modelos, el modelo trae
     // su carrocería desde el catálogo (src/carModels.js) y la carrocería
-    // decide sola sobre cuál de los tres modelos 3D se pintará en el paso 3.
+    // decide sola sobre cuál de los cuatro modelos 3D se pintará en el paso 3.
     // ==================================================================
 
     var NO_CATALOG = function () { return null; };
@@ -645,12 +645,12 @@
     var MILEAGE_MAX = 2000000;
     var MILEAGE_MESSAGE = "El kilometraje no puede pasar de 2 000 000 km.";
 
-    // La foto del vehículo, por orden de preferencia:
+    // La foto del vehículo:
     //
-    //   1. la que trae el sitio, una por modelo, en imgs/assets/stock-models/;
-    //   2. la de imagin.studio —recortada, sin fondo, por año— si el taller
-    //      tiene clave contratada (ver src/config.js);
-    //   3. el logo de la marca, si cualquiera de las dos no carga.
+    //   1. imagin.studio —recortada, sin fondo, por año— when the shop has a
+    //      key configured (see src/config.js), which then takes precedence;
+    //   2. otherwise the site's own, one per model, in imgs/assets/stock-models/;
+    //   3. el logo de la marca, si la foto no carga.
     //
     // Las del sitio son fotos de verdad, con su calle y su fondo detrás, y no
     // dependen de nadie; la ficha las llama «imagen referencial» porque eso

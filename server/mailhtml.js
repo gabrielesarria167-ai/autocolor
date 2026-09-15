@@ -422,10 +422,9 @@ function shopHtml(created, data, ctx, walkIn) {
         { label: 'Acabado', value: ctx.qualityLabel(data.quality) },
         {
             label: `Piezas (${data.parts.length})`,
-            // Como en la versión de texto: sin piezas es un vehículo del local
-            // que entró antes de decidir qué se pinta, no un dato que falta. Y
-            // entonces sin la lista, que saldría como una viñeta vacía —
-            // detailRows prefiere `html` sobre `value` cuando lo hay.
+            // As in the text version: no parts only happens on rows from before
+            // both forms required them. Then no list either, which would show
+            // as an empty bullet — detailRows prefers `html` over `value`.
             value: ctx.partsLabel(data.parts) || 'Sin definir',
             html: data.parts.length
                 ? `<ul style="margin:0; padding-left:18px;">${data.parts.map((p) => `<li style="padding-bottom:2px;">${escapeHtml(ctx.partLabel(p))}</li>`).join('')}</ul>`
@@ -496,8 +495,8 @@ ${panelUrl ? `
 
     return shell({
         title: data.plate ? `Solicitud ${created.id} — ${data.plate}` : `Solicitud ${created.id}`,
-        // Sin placa —un vehículo del local que todavía no la tiene anotada— se
-        // cae del renglón en vez de dejar un « ·  · » vacío.
+        // A row with no plate (only from before walk-ins required one) drops
+        // out of the line instead of leaving an empty « ·  · ».
         preheader: [fullName || 'Cliente', data.plate, vehicle, `${data.parts.length} pieza(s)`]
             .filter(Boolean).join(' · '),
         kicker: 'Aviso interno del taller',
