@@ -474,8 +474,14 @@
         function choose(next) {
             var previous = wrap.dataset.status;
             if (next === previous) return;
+            // One change at a time. A second pick while the first PATCH is out
+            // sent two requests whose answers could arrive in the opposite
+            // order to their commits, leaving the pill on one status and the
+            // database on the other.
+            if (wrap.dataset.saving) return;
 
             wrap.dataset.saving = "1";
+            pill.disabled = true;
             setError("");
 
             patchStatus(request.id, next)
@@ -491,7 +497,17 @@
                     // Con un filtro puesto, la fila deja de pertenecer a la
                     // lista que se está viendo: se vuelve a pedir para no
                     // dejarla ahí contradiciendo al filtro.
-                    if (statusFilter && statusFilter !== updated.status) loadRequests();
+                    if (statusFilter && statusFilter !== updated.status) {
+                        loadRequests();
+                        return;
+                    }
+                    // A finished status (entregado, cancelado) releases the
+                    // vehicle on the server, so the «Ocupado» cell has to follow.
+                    if (updated.occupiedBy !== request.occupiedBy) {
+                        request.occupiedBy = updated.occupiedBy;
+                        request.occupiedName = updated.occupiedName;
+                        rebuildRow(request);
+                    }
                 })
                 .catch(function (err) {
                     // Sesión vencida —o servidor reiniciado, que se lleva las
@@ -510,6 +526,7 @@
                 })
                 .then(function () {
                     delete wrap.dataset.saving;
+                    pill.disabled = false;
                 });
         }
 
@@ -1224,6 +1241,9 @@
     // board being thirty seconds stale matters less than losing a sentence.
     function holdMonitorRefresh(open) {
         noteEditorFor = open;
+        // «Actualizar» repaints the same list, so it waits for the editor too.
+        // Left enabled it looked like it worked and did nothing.
+        monitorRefreshBtn.disabled = !!open;
         if (open) stopMonitorTimer();
         else if (view === "monitor") startMonitorTimer();
     }
@@ -1309,8 +1329,10 @@
     }
 
     function openNoteEditor(card, worker) {
-        // A second click on «Editar nota» should not stack two editors.
-        var already = card.querySelector(".staff-noteedit");
+        // One editor on the whole board, not one per card: noteEditorFor tracks
+        // a single worker, so a second open editor was released by the first
+        // one's Cancel and then wiped by the next refresh, typed text and all.
+        var already = monitorListEl.querySelector(".staff-noteedit");
         if (already) {
             already.querySelector("textarea").focus();
             return;
@@ -1347,7 +1369,7 @@
         save.addEventListener("click", function () {
             save.disabled = true;
             save.textContent = "Guardando…";
-            putNote(worker, input.value, card);
+            putNote(worker, input.value, card, save);
         });
         actions.appendChild(save);
 
@@ -1368,8 +1390,15 @@
 
     // Writes the note, or removes it when the text is empty — the same request
     // either way, which is why the route is a PUT.
-    function putNote(worker, note, card) {
+    function putNote(worker, note, card, save) {
         setError("");
+        // On failure the editor stays open with the text in it and Save usable
+        // again, so the note can be retried; the refresh stays held so the text
+        // survives until then.
+        function reopen() {
+            save.disabled = false;
+            save.textContent = "Guardar";
+        }
         fetch(API_BASE + "/api/staff/workers/" + encodeURIComponent(worker.workerId) + "/note", {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
@@ -1379,6 +1408,12 @@
             .then(function (response) {
                 return response.json().catch(function () { return null; }).then(function (body) {
                     if (response.status === 401) {
+                        // The editor goes with the session. Leaving
+                        // noteEditorFor set froze the monitor after logging
+                        // back in: every refresh saw an editor and skipped.
+                        var stale = card.querySelector(".staff-noteedit");
+                        if (stale) stale.remove();
+                        holdMonitorRefresh("");
                         showLogin();
                         setError("Tu sesión venció. Vuelve a entrar.");
                         return;
@@ -1396,16 +1431,16 @@
                 });
             })
             .catch(function (err) {
-                holdMonitorRefresh("");
+                reopen();
                 setError(err instanceof TypeError ? NETWORK_MESSAGE : err.message);
             });
     }
 
     function renderWorkers(workers) {
         // An open editor means somebody is typing into this list. Rebuilding it
-        // would take the textarea away mid-sentence; the refresh that asked for
-        // this is off while the editor is open, but a manual «Actualizar» is
-        // still one click away.
+        // would take the textarea away mid-sentence. The timer and «Actualizar»
+        // are both off while the editor is open (see holdMonitorRefresh); this
+        // guard covers an answer that was already on its way when it opened.
         if (noteEditorFor) return;
 
         monitorListEl.textContent = "";
@@ -1936,9 +1971,12 @@
                     }
                     intakeDoneNameEl.textContent = payload.firstName + " " + payload.lastName;
                     intakeDoneCodeEl.textContent = body.id;
-                    intakeDoneHintEl.textContent = payload.email
-                        ? "Le mandamos el código a " + payload.email + "."
-                        : "";
+                    // Only promised when the server queued the email: with the
+                    // mail switched off or the daily cap reached, nothing goes
+                    // out and the code has to be read out at the counter.
+                    intakeDoneHintEl.textContent = body.mailQueued
+                        ? "Le enviaremos el código a " + payload.email + ". Dáselo también en persona por si no le llega."
+                        : "El correo no está disponible ahora: dale el código en persona.";
                     show(intakeFormEl, false);
                     show(intakeDoneEl, true);
                 });

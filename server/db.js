@@ -161,19 +161,30 @@ async function findRequest(id) {
  * esto ya pasó por la contraseña del taller y llamar al cliente es justamente
  * el trabajo. El correo y las notas siguen fuera hasta que haga falta.
  *
- * El LIMIT no es paginación, es un tope: sin él, el día que la tabla tenga
- * miles de filas el panel las pediría todas de una vez.
+ * The ceiling applies to finished jobs only. Every request still in the shop
+ * comes back whatever its age: the panel searches and filters «Mis vehículos»
+ * in the browser over exactly these rows, and with a flat LIMIT 200 a car that
+ * arrived before the 200 newest requests vanished from both while it was still
+ * being painted. Finished ones (entregado, cancelado) are capped at the 200
+ * newest, which is the part of the table that grows without end.
  */
+const FINISHED = ['entregado', 'cancelado'];
+
 async function listRequests(options) {
     const status = (options || {}).status || null;
     const { rows } = await pool.query(
         `SELECT id, created_at, first_name, last_name, phone, brand, model,
                 plate, quality, status, occupied_by, cardinality(parts) AS part_count
            FROM requests
-          WHERE $1::text IS NULL OR status = $1
-          ORDER BY created_at DESC
-          LIMIT 200`,
-        [status]
+          WHERE ($1::text IS NULL OR status = $1)
+            AND (status <> ALL($2::text[]) OR id IN (
+                    SELECT id FROM requests
+                     WHERE status = ANY($2::text[])
+                       AND ($1::text IS NULL OR status = $1)
+                     ORDER BY created_at DESC
+                     LIMIT 200))
+          ORDER BY created_at DESC`,
+        [status, FINISHED]
     );
     return rows.map((row) => ({
         id: row.id.trim(),
@@ -241,27 +252,41 @@ async function listOccupied() {
  * `viewerId` es el código de la sesión (ver server/auth.js); nunca llega del
  * cuerpo de la petición, así que no se puede falsear para tocar la de otro.
  */
+//
+// Moving a job to a finished status also releases the vehicle. A delivered or
+// cancelled car is in nobody's hands, and leaving it occupied kept it on the
+// boss's monitor as «held» forever.
+//
+// One statement with the check, the change and the reason for a refusal:
+// `cur` locks the row and reports who held it at that moment, so a refusal
+// can no longer blame a holder read by a second query after someone else had
+// already changed it.
 async function updateRequestStatus(id, status, viewerId) {
     const { rows } = await pool.query(
-        `UPDATE requests SET status = $2
-          WHERE id = $1 AND occupied_by = $3
-      RETURNING id, status, occupied_by, updated_at`,
-        [id, status, viewerId]
+        `WITH cur AS (
+             SELECT id, occupied_by FROM requests WHERE id = $1 FOR UPDATE
+         ), upd AS (
+             UPDATE requests r
+                SET status = $2,
+                    occupied_by = CASE WHEN $2 = ANY($4::text[]) THEN NULL ELSE r.occupied_by END
+               FROM cur
+              WHERE r.id = cur.id AND cur.occupied_by = $3
+          RETURNING r.id, r.status, r.occupied_by, r.updated_at
+         )
+         SELECT cur.occupied_by AS holder, upd.id, upd.status, upd.occupied_by, upd.updated_at
+           FROM cur LEFT JOIN upd ON true`,
+        [id, status, viewerId, FINISHED]
     );
-    if (rows.length > 0) {
-        return {
-            ok: true,
-            id: rows[0].id.trim(),
-            status: rows[0].status,
-            occupiedBy: rows[0].occupied_by,
-            updatedAt: rows[0].updated_at,
-        };
-    }
-    // No cambió nada: o el código no existe, o la tiene otro trabajador. Una
-    // segunda consulta lo distingue para dar el error correcto.
-    const cur = await pool.query('SELECT occupied_by FROM requests WHERE id = $1', [id]);
-    if (cur.rows.length === 0) return { ok: false, reason: 'not_found' };
-    return { ok: false, reason: 'forbidden', occupiedBy: cur.rows[0].occupied_by };
+    if (rows.length === 0) return { ok: false, reason: 'not_found' };
+    const row = rows[0];
+    if (!row.id) return { ok: false, reason: 'forbidden', occupiedBy: row.holder };
+    return {
+        ok: true,
+        id: row.id.trim(),
+        status: row.status,
+        occupiedBy: row.occupied_by,
+        updatedAt: row.updated_at,
+    };
 }
 
 /**
@@ -273,20 +298,25 @@ async function updateRequestStatus(id, status, viewerId) {
  * ('not_found' o 'taken', esta última con el código de quien la tiene).
  */
 async function occupyRequest(id, workerId) {
+    // Same single-statement shape as updateRequestStatus, for the same reason.
     const { rows } = await pool.query(
-        `UPDATE requests SET occupied_by = $2
-          WHERE id = $1 AND occupied_by IS NULL
-      RETURNING id, occupied_by`,
+        `WITH cur AS (
+             SELECT id, occupied_by FROM requests WHERE id = $1 FOR UPDATE
+         ), upd AS (
+             UPDATE requests r SET occupied_by = $2
+               FROM cur
+              WHERE r.id = cur.id AND cur.occupied_by IS NULL
+          RETURNING r.id
+         )
+         SELECT cur.occupied_by AS holder, upd.id FROM cur LEFT JOIN upd ON true`,
         [id, workerId]
     );
-    if (rows.length > 0) return { ok: true, occupiedBy: rows[0].occupied_by };
-
-    const cur = await pool.query('SELECT occupied_by FROM requests WHERE id = $1', [id]);
-    if (cur.rows.length === 0) return { ok: false, reason: 'not_found' };
+    if (rows.length === 0) return { ok: false, reason: 'not_found' };
+    if (rows[0].id) return { ok: true, occupiedBy: workerId };
     // Si ya la tenía este mismo trabajador, no es un error: ocupar lo que uno ya
     // ocupa es idempotente y se responde éxito.
-    if (cur.rows[0].occupied_by === workerId) return { ok: true, occupiedBy: workerId };
-    return { ok: false, reason: 'taken', occupiedBy: cur.rows[0].occupied_by };
+    if (rows[0].holder === workerId) return { ok: true, occupiedBy: workerId };
+    return { ok: false, reason: 'taken', occupiedBy: rows[0].holder };
 }
 
 /**
@@ -299,17 +329,20 @@ async function occupyRequest(id, workerId) {
  */
 async function releaseRequest(id, workerId) {
     const { rows } = await pool.query(
-        `UPDATE requests SET occupied_by = NULL
-          WHERE id = $1 AND occupied_by = $2
-      RETURNING id`,
+        `WITH cur AS (
+             SELECT id, occupied_by FROM requests WHERE id = $1 FOR UPDATE
+         ), upd AS (
+             UPDATE requests r SET occupied_by = NULL
+               FROM cur
+              WHERE r.id = cur.id AND cur.occupied_by = $2
+          RETURNING r.id
+         )
+         SELECT cur.occupied_by AS holder, upd.id FROM cur LEFT JOIN upd ON true`,
         [id, workerId]
     );
-    if (rows.length > 0) return { ok: true };
-
-    const cur = await pool.query('SELECT occupied_by FROM requests WHERE id = $1', [id]);
-    if (cur.rows.length === 0) return { ok: false, reason: 'not_found' };
-    if (cur.rows[0].occupied_by === null) return { ok: true };
-    return { ok: false, reason: 'forbidden', occupiedBy: cur.rows[0].occupied_by };
+    if (rows.length === 0) return { ok: false, reason: 'not_found' };
+    if (rows[0].id || rows[0].holder === null) return { ok: true };
+    return { ok: false, reason: 'forbidden', occupiedBy: rows[0].holder };
 }
 
 /* -----------------------------------------------------------------------------
