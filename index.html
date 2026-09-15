@@ -317,7 +317,7 @@
                         <span class="step-card__num">3</span>
                         <h3>Marca las piezas</h3>
                         <p>Sobre un modelo 3D de la carrocería de tu vehículo, tocas exactamente lo que
-                            quieres pintar o reparar.</p>
+                            quieres pintar o reparar, y ves el precio estimado al instante.</p>
                     </li>
                     <li class="step-card reveal">
                         <span class="step-card__num">4</span>
@@ -393,7 +393,24 @@
                     </article>
                 </div>
 
-                <p class="tiers__note">Los precios mostrados son referenciales por pieza. El presupuesto final
+                <!-- The steps are DISCOUNT_STEPS in src/parts.js, which the wizard
+                     applies; change both together. -->
+                <div class="discount reveal">
+                    <div class="discount__copy">
+                        <h3>Mientras más piezas, menos pagas</h3>
+                        <p>Si pintas varias piezas en el mismo trabajo, te descontamos un porcentaje del total, en
+                            cualquier nivel de acabado. Lo ves aplicado en tu cotización en línea.</p>
+                    </div>
+                    <ol class="discount__steps">
+                        <li><strong>5%</strong><span>2 piezas</span></li>
+                        <li><strong>7%</strong><span>3 piezas</span></li>
+                        <li><strong>9%</strong><span>4 piezas</span></li>
+                        <li><strong>10%</strong><span>5 o más</span></li>
+                    </ol>
+                </div>
+
+                <p class="tiers__note">Los precios mostrados son referenciales por pieza, antes del descuento por
+                    varias piezas. El presupuesto final
                     depende del estado de la pieza, el tipo de vehículo y el color.</p>
             </div>
         </section>

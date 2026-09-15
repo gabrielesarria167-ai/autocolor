@@ -71,6 +71,17 @@
     var intake3dListEl = document.getElementById("intake3dList");
     var intake3dCountEl = document.getElementById("intake3dCount");
     var intake3dClearEl = document.getElementById("intake3dClear");
+    var intake3dNudgeEl = document.getElementById("intake3dNudge");
+    var intake3dNudgeTextEl = document.getElementById("intake3dNudgeText");
+    var intake3dEstimateEl = document.getElementById("intake3dEstimate");
+    var intake3dSubtotalRowEl = document.getElementById("intake3dSubtotalRow");
+    var intake3dSubtotalEl = document.getElementById("intake3dSubtotal");
+    var intake3dDiscountRowEl = document.getElementById("intake3dDiscountRow");
+    var intake3dDiscountLabelEl = document.getElementById("intake3dDiscountLabel");
+    var intake3dDiscountEl = document.getElementById("intake3dDiscount");
+    var intake3dTotalRowEl = document.getElementById("intake3dTotalRow");
+    var intake3dTotalEl = document.getElementById("intake3dTotal");
+    var intake3dEstimateNoteEl = document.getElementById("intake3dEstimateNote");
     var intakeErrorEl = document.getElementById("intakeError");
     var intakeSubmitEl = document.getElementById("intakeSubmit");
     var intakeCancelEl = document.getElementById("intakeCancel");
@@ -1578,7 +1589,11 @@
         Object.keys(QUALITY_LABELS).map(function (value) {
             return { value: value, label: QUALITY_LABELS[value] };
         }),
-        function (value) { intakeQuality = value; }
+        function (value) {
+            intakeQuality = value;
+            // Every price in the parts summary depends on the finish.
+            renderIntakeParts();
+        }
     );
 
     // Brand and model, cascading, out of the same catalogue the website uses.
@@ -1652,6 +1667,9 @@
     var partLabel = window.AUTOCOLOR_PARTS
         ? window.AUTOCOLOR_PARTS.label
         : function (id) { return id; };
+    // Prices and the discount too, when parts.js arrived; without it the
+    // summary lists the panels and shows no money.
+    var PARTS = window.AUTOCOLOR_PARTS || null;
 
     var intakeParts = [];
     var intake3d = null;         // the mounted viewer, if any
@@ -1682,8 +1700,17 @@
                 item.className = "car-view-3d__list-item";
 
                 var name = document.createElement("span");
+                name.className = "car-view-3d__list-item-name";
                 name.textContent = label;
                 item.appendChild(name);
+
+                var price = PARTS ? PARTS.price(id, intakeQuality) : null;
+                if (price !== null) {
+                    var cost = document.createElement("span");
+                    cost.className = "car-view-3d__list-item-price";
+                    cost.textContent = PARTS.formatSoles(price);
+                    item.appendChild(cost);
+                }
 
                 var remove = document.createElement("button");
                 remove.type = "button";
@@ -1698,6 +1725,49 @@
         }
         intake3dCountEl.textContent = intakeParts.length + (intakeParts.length === 1 ? " pieza" : " piezas");
         intake3dClearEl.disabled = intakeParts.length === 0;
+        renderIntakeEstimate();
+    }
+
+    // The same estimate the customer sees in the wizard (renderEstimate in
+    // src/repair.js), from the same price list and discount steps in
+    // src/parts.js, so a walk-in is quoted at the counter the way the website
+    // would have quoted it. The finish is picked in this same form and can
+    // come after the panels: until it is, the summary asks for it instead of
+    // showing a total it cannot work out.
+    function renderIntakeEstimate() {
+        var result = PARTS ? PARTS.estimate(intakeParts, intakeQuality) : { priced: 0 };
+        var hasParts = intakeParts.length > 0;
+        var priced = result.priced > 0;
+        var discounted = priced && result.rate > 0;
+
+        show(intake3dEstimateEl, PARTS !== null && hasParts);
+        show(intake3dNudgeEl, priced);
+        show(intake3dTotalRowEl, priced);
+        show(intake3dSubtotalRowEl, discounted);
+        show(intake3dDiscountRowEl, discounted);
+        if (!PARTS || !hasParts) return;
+
+        if (!intakeQuality) {
+            intake3dEstimateNoteEl.textContent = "Elige el nivel de acabado para ver los precios.";
+            return;
+        }
+        if (!priced) {
+            intake3dEstimateNoteEl.textContent = "Estas piezas no tienen precio de lista.";
+            return;
+        }
+        if (discounted) {
+            intake3dSubtotalEl.textContent = PARTS.formatSoles(result.subtotal);
+            intake3dDiscountLabelEl.textContent = "Descuento por " + result.priced + " piezas (" + result.rate + "%)";
+            intake3dDiscountEl.textContent = "−" + PARTS.formatSoles(result.discount);
+        }
+        intake3dNudgeTextEl.textContent = PARTS.discountHint(result.priced);
+        intake3dNudgeEl.classList.toggle("is-maxed",
+            PARTS.discountRate(result.priced + 1) === PARTS.discountRate(result.priced));
+        intake3dTotalEl.textContent = PARTS.formatSoles(result.total);
+        var missing = result.unpriced;
+        intake3dEstimateNoteEl.textContent = "Acabado " + PARTS.QUALITY_NAMES[intakeQuality] + ". " +
+            (missing ? "No incluye " + missing + (missing === 1 ? " pieza" : " piezas") + " sin precio de lista. " : "") +
+            "Precio de lista: el presupuesto se cierra al revisar el vehículo.";
     }
 
     // A canvas is single-use: tearing a viewer down drops its WebGL context

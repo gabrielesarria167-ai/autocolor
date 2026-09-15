@@ -101,12 +101,6 @@
     var partPrice = window.AUTOCOLOR_PARTS && window.AUTOCOLOR_PARTS.price
         ? window.AUTOCOLOR_PARTS.price
         : function () { return null; };
-    var QUALITY_NAMES = { standard: "Económico", premium: "Profesional", custom: "Alta gama" };
-    var soles = window.Intl ? new Intl.NumberFormat("es-PE") : null;
-
-    function formatSoles(amount) {
-        return "S/ " + (soles ? soles.format(amount) : String(amount));
-    }
 
     function toggleCarPart(id) {
         var idx = state.parts.indexOf(id);
@@ -194,7 +188,7 @@
                 if (price !== null) {
                     var cost = document.createElement("span");
                     cost.className = "car-view-3d__list-item-price";
-                    cost.textContent = formatSoles(price);
+                    cost.textContent = window.AUTOCOLOR_PARTS.formatSoles(price);
                     li.appendChild(cost);
                 }
                 li.appendChild(btn);
@@ -230,28 +224,19 @@
         carView3dSubtotalRow.hidden = !discounted;
         carView3dDiscountRow.hidden = !discounted;
         if (discounted) {
-            carView3dSubtotal.textContent = formatSoles(result.subtotal);
+            carView3dSubtotal.textContent = parts.formatSoles(result.subtotal);
             carView3dDiscountLabel.textContent = "Descuento por " + result.priced + " piezas (" + result.rate + "%)";
-            carView3dDiscount.textContent = "−" + formatSoles(result.discount);
+            carView3dDiscount.textContent = "−" + parts.formatSoles(result.discount);
         }
-        renderNudge(result.priced);
-        carView3dTotal.textContent = formatSoles(result.total);
-        carView3dEstimateNote.textContent = "Acabado " + QUALITY_NAMES[state.quality] + ". " +
+        if (carView3dNudge && carView3dNudgeText) {
+            carView3dNudgeText.textContent = parts.discountHint(result.priced);
+            carView3dNudge.classList.toggle("is-maxed",
+                parts.discountRate(result.priced + 1) === parts.discountRate(result.priced));
+        }
+        carView3dTotal.textContent = parts.formatSoles(result.total);
+        carView3dEstimateNote.textContent = "Acabado " + parts.QUALITY_NAMES[state.quality] + ". " +
             (missing ? "No incluye " + missing + (missing === 1 ? " pieza" : " piezas") + " sin precio de lista. " : "") +
             "Precio referencial: el taller confirma el presupuesto al revisar el vehículo.";
-    }
-
-    function renderNudge(count) {
-        if (!carView3dNudge || !carView3dNudgeText) return;
-        var parts = window.AUTOCOLOR_PARTS;
-        var next = parts.discountRate(count + 1);
-        var maxed = next === parts.discountRate(count);
-        carView3dNudge.classList.toggle("is-maxed", maxed);
-        carView3dNudgeText.textContent = maxed
-            ? "Tienes el descuento máximo por varias piezas: " + next + "%."
-            : count === 1
-                ? "Pinta 2 piezas o más y te descontamos " + next + "%."
-                : "Agrega 1 pieza más y el descuento sube a " + next + "%.";
     }
 
     if (carView3dClear) {

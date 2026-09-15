@@ -172,7 +172,8 @@
     // The multi-part discount, in percent, indexed by how many priced panels
     // the request has: none for one, then 5, 7 and 9, and 10 from five panels
     // up (the last step is the cap). It comes off the subtotal, not off each
-    // panel, so the list keeps showing list prices.
+    // panel, so the list keeps showing list prices. The home page spells the
+    // steps out in its #acabados section, so a change here goes there too.
     var DISCOUNT_STEPS = [0, 0, 5, 7, 9, 10];
 
     function discountRate(count) {
@@ -181,6 +182,9 @@
     }
 
     var has = Object.prototype.hasOwnProperty;
+
+    var QUALITY_NAMES = { standard: "Económico", premium: "Profesional", custom: "Alta gama" };
+    var soles = typeof Intl !== "undefined" ? new Intl.NumberFormat("es-PE") : null;
 
     // The price of one panel at one finish, or null when either is unknown.
     // hasOwnProperty throughout for the reason given at label() below.
@@ -199,6 +203,26 @@
         price: price,
         DISCOUNT_STEPS: DISCOUNT_STEPS,
         discountRate: discountRate,
+        QUALITY_NAMES: QUALITY_NAMES,
+
+        // «S/ 1,250»: soles the way Peru writes them.
+        formatSoles: function (amount) {
+            return "S/ " + (soles ? soles.format(amount) : String(amount));
+        },
+
+        // The line over the estimate: what one more panel would earn, or that
+        // the cap is reached. Worded here so the wizard and the walk-in form
+        // say it the same way. Empty for no panels.
+        discountHint: function (count) {
+            if (!(count > 0)) return "";
+            var next = discountRate(count + 1);
+            if (next === discountRate(count)) {
+                return "Tienes el descuento máximo por varias piezas: " + next + "%.";
+            }
+            return count === 1
+                ? "Pinta 2 piezas o más y te descontamos " + next + "%."
+                : "Agrega 1 pieza más y el descuento sube a " + next + "%.";
+        },
 
         // The sum of the priced panels, the discount their count earns (in
         // whole soles), and how many had no price: a total that silently
