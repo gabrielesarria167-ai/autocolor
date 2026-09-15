@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#0b0c0e">
+    <meta name="theme-color" content="#ffffff">
     <meta name="description"
         content="Autocolor — planchado y pintura automotriz al horno. Color idéntico al original, 5 años de garantía por escrito y presupuesto en línea en 2 minutos.">
     <meta property="og:title" content="Autocolor — Planchado y pintura automotriz">
@@ -12,13 +12,15 @@
         content="Devolvemos a tu vehículo el color de fábrica. Cotiza en línea en 2 minutos.">
     <meta property="og:type" content="website">
     <!-- TODO: reemplazar por la URL real del sitio y una foto real del taller -->
-    <meta property="og:image" content="imgs/logoLight.png">
+    <meta property="og:image" content="imgs/brand/og-image.png">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600;700&display=swap"
+    <link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600&family=Schibsted+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
         rel="stylesheet">
-    <link rel="shortcut icon" href="imgs/logoDark.ico">
+    <link rel="icon" href="imgs/brand/favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="imgs/brand/favicon.ico" sizes="48x48">
+    <link rel="apple-touch-icon" href="imgs/brand/apple-touch-icon.png">
     <link rel="stylesheet" href="styles.css">
     <script src="src/home.js" defer></script>
 
@@ -31,7 +33,7 @@
 
     <header class="site-header">
         <a class="site-header__brand" href="index.html" aria-label="Autocolor — inicio">
-            <img src="imgs/logoDark.png" alt="Autocolor" class="site-header__logo">
+            <img src="imgs/brand/lockup-horizontal.svg" alt="Autocolor" class="site-header__logo" width="199" height="30">
         </a>
 
         <nav class="site-nav" aria-label="Navegación principal">
@@ -42,6 +44,7 @@
         </nav>
 
         <div class="site-header__actions">
+            <a class="site-header__phone" href="tel:+51935646304">935 646 304</a>
             <a class="btn btn--primary btn--sm" href="pgs/repair.html">Cotizar ahora</a>
             <button class="menu-toggle" type="button" id="menuToggle" aria-label="Abre el menú" aria-expanded="false"
                 aria-controls="navPanel">
@@ -73,7 +76,7 @@
         <section class="hero">
             <div class="hero__inner">
                 <div class="hero__copy reveal">
-                    <p class="eyebrow">Planchado y pintura al horno</p>
+                    <p class="eyebrow eyebrow--mark">Laboratorio de matizado y pintado al horno</p>
                     <h1 class="hero__title">Tu vehículo, con el color <em>de fábrica</em>.</h1>
                     <p class="hero__lede">
                         Igualamos el color original con colorimetría y secamos en cabina de horno,
@@ -159,27 +162,27 @@
                             <button type="button" class="swatch is-active" role="radio" aria-checked="true"
                                 data-tint="" data-filter="" data-tint-opacity="" style="--sw:#cbbda4"
                                 title="Color original">
-                                <span class="sr-only">Color original</span>
+                                <span class="swatch__name">Original</span>
                             </button>
                             <button type="button" class="swatch" role="radio" aria-checked="false"
                                 data-tint="#d61f14" data-filter="brightness(0.74)" data-tint-opacity="0.92"
                                 style="--sw:#d61f14" title="Rojo Fuego">
-                                <span class="sr-only">Rojo Fuego</span>
+                                <span class="swatch__name">Rojo Fuego</span>
                             </button>
                             <button type="button" class="swatch" role="radio" aria-checked="false"
                                 data-tint="#1f6feb" data-filter="brightness(0.78)" data-tint-opacity="0.92"
                                 style="--sw:#1f6feb" title="Azul Océano">
-                                <span class="sr-only">Azul Océano</span>
+                                <span class="swatch__name">Azul Océano</span>
                             </button>
                             <button type="button" class="swatch" role="radio" aria-checked="false"
                                 data-tint="#245b12" data-filter="brightness(0.68)" data-tint-opacity="0.95"
                                 style="--sw:#245b12" title="Verde Bosque">
-                                <span class="sr-only">Verde Bosque</span>
+                                <span class="swatch__name">Verde Bosque</span>
                             </button>
                             <button type="button" class="swatch" role="radio" aria-checked="false" data-tint=""
                                 data-filter="saturate(0.05) brightness(1.22)" data-tint-opacity=""
                                 style="--sw:#e8e8e6" title="Blanco Perla">
-                                <span class="sr-only">Blanco Perla</span>
+                                <span class="swatch__name">Blanco Perla</span>
                             </button>
                         </div>
                         <p class="swatches__note">Referencia visual. El tono final se define por el código de
@@ -457,7 +460,7 @@
 
         <!-- ===== FAQ ===== -->
         <section class="section section--tint" id="faq">
-            <div class="section__inner section__inner--narrow">
+            <div class="section__inner section__inner--aside">
                 <header class="section__head reveal">
                     <p class="eyebrow">Preguntas frecuentes</p>
                     <h2>Antes de dejarnos tu vehículo</h2>
@@ -638,8 +641,9 @@
     <footer class="site-footer">
         <div class="site-footer__inner">
             <div class="site-footer__brand">
-                <img src="imgs/logoDark.png" alt="Autocolor" class="site-footer__logo">
-                <p>Planchado y pintura automotriz. Color idéntico al original, 5 años de garantía por escrito.</p>
+                <img src="imgs/brand/lockup-stacked-white.svg"
+                    alt="Autocolor — Laboratorio de Matizado y Pintado al Horno" class="site-footer__logo"
+                    width="240" height="192">
             </div>
 
             <nav class="site-footer__nav" aria-label="Pie de página">

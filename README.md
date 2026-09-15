@@ -228,6 +228,35 @@ El instante gratuito se quita con el plan de pago de Render. Lo que arregla las
 sesiones en cualquier plan —incluso al desplegar, que el plan de pago no cubre—
 es guardarlas en una tabla en vez de en memoria.
 
+## Brand
+
+The logo arrived as one JPEG, `imgs/logo.jpeg`. Everything the site uses is
+traced from it by `python3 tools/tracelogo.py` (Pillow only) into
+`imgs/brand/`:
+
+| File | Used for |
+| --- | --- |
+| `lockup-horizontal.svg`, `-white.svg` | Site header, staff panel bar |
+| `lockup-stacked.svg`, `-white.svg` | Footer (white); the logo as supplied |
+| `mark.svg` | The hero label; the symbol on its own |
+| `favicon.svg`, `favicon.ico`, `apple-touch-icon.png` | Browser and home-screen icons |
+| `logo-email.png`, `logo-email-white.png` | The two emails |
+| `og-image.png` | Social preview (`og:image`) |
+
+The mark is fitted as two cubic curves; the wordmark and tagline are traced
+with marching squares and stay within a fraction of a source pixel. The
+horizontal lockup (mark beside the wordmark, no tagline) is composed from the
+same parts; the supplied artwork only has the stacked one. When a vector
+original arrives, replace the traced paths and keep the file names.
+
+The visual system that goes with it is one ink, `#262D40` (the logo's), on
+white and a cool tint `#F3F4F7`; square corners like the mark; Jost for
+headings, Schibsted Grotesk for text and IBM Plex Mono for labels and codes.
+The tokens are at the top of `styles.css`. The only other colours are the
+paint's own: the preview swatches, the vehicle, and the green and gold of the
+Económico and Alta gama finish levels. The design canvas the redesign was
+drawn on is in `design/rebrand/`.
+
 ## Fuentes de los modelos 3D
 
 Los `.glb` que están versionados son los que sirve el sitio. Sus fuentes —los
@@ -483,7 +512,7 @@ Cuando alguien termina el asistente salen dos avisos (`server/mail.js`):
 | Al taller | La ficha para presupuestar: contacto, vehículo, piezas y notas, con `Reply-To` al cliente |
 
 Los dos van maquetados (`server/mailhtml.js`) sobre el mismo diseño —fondo
-gris, tarjeta blanca de 600 px, rojo `#c8102e` de acento— y **los dos llevan
+tintado, tarjeta blanca de 600 px, la tinta del logo `#262D40` de acento— y **los dos llevan
 también su versión en texto plano**, en el mismo mensaje. El texto no es un
 resto de cuando no había HTML: es lo que se ve en los clientes que no lo pintan
 y en los avisos del móvil, así que cuando cambie uno hay que cambiar el otro.
@@ -556,13 +585,13 @@ con nombre, no un adjunto incrustado.
 Así que ahora es una URL del propio sitio, que es público y sirve `/imgs/`.
 Un `data:` URI tampoco valía: Gmail lo borra.
 
-Son **dos**, y **PNG con transparencia**: `imgs/logoEmail.png` con la palabra
-«AUTO» en negro, para fondo claro, y `imgs/logoEmailDark.png` en blanco, para
-fondo oscuro. Antes era un JPEG con el fondo blanco pegado, y eso se rompía en
-los clientes que invierten los colores por su cuenta: no tocan las imágenes, así
-que la tarjeta se volvía oscura y el logotipo quedaba de ladrillo blanco en
-medio. Sin fondo cae bien sobre lo que haya. De paso pesan 5 y 6 KB contra los
-18 del JPEG, porque el dibujo son tres tintas y entra en una paleta.
+There are **two**, both **transparent PNGs** of the stacked lockup:
+`imgs/brand/logo-email.png` in the logo's ink for light clients and
+`imgs/brand/logo-email-white.png` for dark ones. Mail clients don't render SVG,
+so `tools/tracelogo.py` renders them from the traced vectors (see "Brand"
+below). They have no background on purpose: clients that invert colours on
+their own leave images alone, and a logo with a white ground baked in turns
+into a white brick on a dark card.
 
 Sin dirección de sitio conocida —la máquina de trabajo, donde no hay
 `RENDER_EXTERNAL_URL`— no hay URL que poner, y en su lugar se escribe el nombre
@@ -571,22 +600,20 @@ alternativo hace lo mismo en los clientes que no bajan imágenes remotas.
 
 ### Modo oscuro
 
-Los dos correos traen su paleta para quien tenga el sistema en oscuro, en un
-`@media (prefers-color-scheme: dark)` del `<style>`. Los tonos son los mismos
-cálidos del sitio (`#17150f` es el de la cabecera del panel del taller).
+Both emails carry a palette for readers with a dark system theme, in an
+`@media (prefers-color-scheme: dark)` block in the `<style>`. The grounds are
+darkened cuts of the logo's ink (`#141824` window, `#1B2130` card).
 
-**El rojo del texto se aclara y el del botón no.** `#c8102e` sobre la tarjeta
-oscura da 2,79 de contraste, por debajo de lo legible; `#f04a5f` da 4,57. Pero
-eso solo vale para el rojo que es *texto* —antetítulos, enlaces, la placa—:
-en el botón el rojo es el fondo y lo que tiene que leerse es el blanco encima,
-que sobre `#c8102e` da 5,88 y sobre el aclarado bajaría a 3,59. Así que el
-botón se queda igual en los dos modos.
+**Ink text turns light, the button doesn't.** The ink is far too dark to read as
+type on the dark card, so labels, links and the plate switch to `#C3C8D4`
+(10.2:1). The button keeps its ink fill in both modes: there the ink is the
+ground, and what has to read is the white label on it.
 
 Todas las reglas del bloque llevan `!important` porque el color de verdad va en
 el atributo `style` de cada etiqueta —así tiene que ser en correo— y una regla
 de hoja normal no le gana a un estilo en línea. **La de los enlaces es la
 excepción**, a propósito: el texto del botón es blanco en línea, y con
-`!important` se lo llevaría por delante dejando rojo claro sobre rojo.
+`!important` se lo llevaría por delante dejando acero claro sobre tinta.
 
 #### Dónde se ve y dónde no
 
