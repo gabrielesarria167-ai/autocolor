@@ -217,16 +217,19 @@ def main():
         write(f'lockup-horizontal{suffix}.svg',
               f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {mw + gap + ww:.2f} {wh}" fill="{colour}">'
               f'<title>Autocolor</title>{horiz}</svg>\n')
-    # Favicons: the mark alone, on paper so it holds on a dark browser tab.
+    # Favicons: the mark alone, no background. The SVG follows the browser's
+    # theme with its own media query: ink on a light tab strip, white on a
+    # dark one (Chrome, Edge, Firefox). Browsers that don't take SVG icons get
+    # the ICO, in ink. The home-screen icon needs a solid ground, so it is the
+    # white mark on ink.
     mark = mark_loops()
     write('favicon.svg',
-          f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="-60 -40 392 377">'
-          f'<rect x="-60" y="-40" width="392" height="377" fill="#FFFFFF"/>'
-          f'<path fill="{INK}" d="{MARK}"/></svg>\n')
-    icons = [raster([(mark, 0, 0)], (n, n), (MARK_W, MARK_H), INK, ground=(255, 255, 255, 255), pad=0.14)
-             for n in (16, 32, 48)]
+          f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="-20 -8 312 313">'
+          f'<style>path{{fill:{INK}}}@media (prefers-color-scheme:dark){{path{{fill:#FFFFFF}}}}</style>'
+          f'<path d="{MARK}"/></svg>\n')
+    icons = [raster([(mark, 0, 0)], (n, n), (MARK_W, MARK_H), INK, pad=0.04) for n in (16, 32, 48)]
     icons[-1].save(os.path.join(OUT, 'favicon.ico'), sizes=[(16, 16), (32, 32), (48, 48)], append_images=icons[:-1])
-    raster([(mark, 0, 0)], (180, 180), (MARK_W, MARK_H), INK, ground=(255, 255, 255, 255), pad=0.16) \
+    raster([(mark, 0, 0)], (180, 180), (MARK_W, MARK_H), '#FFFFFF', ground=(38, 45, 64, 255), pad=0.2) \
         .save(os.path.join(OUT, 'apple-touch-icon.png'))
 
     # Email logos: the stacked lockup, 480 px wide for a 240 px slot on

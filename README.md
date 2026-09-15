@@ -239,7 +239,7 @@ traced from it by `python3 tools/tracelogo.py` (Pillow only) into
 | `lockup-horizontal.svg`, `-white.svg` | Site header, staff panel bar |
 | `lockup-stacked.svg`, `-white.svg` | Footer (white); the logo as supplied |
 | `mark.svg` | The hero label; the symbol on its own |
-| `favicon.svg`, `favicon.ico`, `apple-touch-icon.png` | Browser and home-screen icons |
+| `favicon.svg`, `favicon.ico`, `apple-touch-icon.png` | Browser and home-screen icons. The SVG has no background and switches itself between ink and white with the browser theme; the ICO is the ink one |
 | `logo-email.png`, `logo-email-white.png` | The two emails |
 | `og-image.png` | Social preview (`og:image`) |
 

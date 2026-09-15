@@ -1477,6 +1477,17 @@
     ];
 
     var PLATE_RE = /^[A-Z0-9]{3}-[A-Z0-9]{3}$/;
+
+    // Peruvian plate: three characters, a dash, three more (ABC-123). The
+    // field puts the dash in as you type, the same as the public wizard, so
+    // the boss only types the six characters.
+    if (intakePlateEl) {
+        intakePlateEl.addEventListener("input", function () {
+            var raw = intakePlateEl.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+            var formatted = raw.length > 3 ? raw.slice(0, 3) + "-" + raw.slice(3) : raw;
+            if (formatted !== intakePlateEl.value) intakePlateEl.value = formatted;
+        });
+    }
     var EMAIL_RE = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
     var intakeVehicle = "";

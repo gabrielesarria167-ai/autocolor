@@ -532,17 +532,20 @@ svg {
 
 .quality-card--standard {
     --tier: var(--tier-standard);
-    --tier-soft: rgba(30, 138, 85, 0.07);
+    --tier-text: var(--tier-standard-text);
+    --tier-soft: rgba(46, 204, 113, 0.09);
 }
 
 .quality-card--premium {
     --tier: var(--ink);
+    --tier-text: var(--ink);
     --tier-soft: rgba(38, 45, 64, 0.06);
 }
 
 .quality-card--alta-gama {
     --tier: var(--tier-alta);
-    --tier-soft: rgba(154, 108, 6, 0.07);
+    --tier-text: var(--tier-alta-text);
+    --tier-soft: rgba(244, 180, 0, 0.11);
 }
 
 .quality-card:hover {
@@ -584,7 +587,7 @@ svg {
 .quality-card__sub {
     font-weight: 600;
     font-size: 0.9rem;
-    color: var(--tier);
+    color: var(--tier-text, var(--tier));
     margin-top: -4px;
 }
 
@@ -1188,11 +1191,15 @@ body.home {
        all derive from this. */
     --header-h: 64px;
 
-    /* The two finish levels that carry a colour of their own, cut dark
-       enough to be read as type on white (4.6:1 and 4.7:1). The recommended
-       level is the ink. */
-    --tier-standard: #1e8a55;
-    --tier-alta: #9a6c06;
+    /* The two finish levels that carry a colour of their own. The bright cut
+       fills the chip, the ticks, the radio and the card border; it is under
+       2.2:1 on white, so anything set as type in the colour (the price, the
+       subtitle) takes the -text cut, 4.4:1 and 4.6:1. The recommended level
+       is the ink. */
+    --tier-standard: #2ecc71;
+    --tier-alta: #f4b400;
+    --tier-standard-text: #1e8a55;
+    --tier-alta-text: #9a6c06;
 
     /* Grounds. --ground is the page, --ground-tint the alternate sections,
        --ground-raised anything that sits on a tint (cards, fields). */
@@ -1392,19 +1399,6 @@ body.home {
     margin-left: auto;
 }
 
-.site-header__phone {
-    display: none;
-    margin-right: 14px;
-    font-family: var(--font-mono);
-    font-size: 0.88rem;
-    color: var(--text-dim);
-    white-space: nowrap;
-}
-
-.site-header__phone:hover {
-    color: var(--ink);
-}
-
 .site-header__actions .btn {
     display: none;
 }
@@ -1441,12 +1435,6 @@ body.home {
 
     .site-header .menu-toggle {
         display: none;
-    }
-}
-
-@media (min-width: 1100px) {
-    .site-header__phone {
-        display: inline;
     }
 }
 
@@ -1653,37 +1641,14 @@ body.home {
     border: 1px solid var(--line);
 }
 
-/* The vehicle stands on a pale platen split down the middle by a white
-   channel — the gap between the two blades of the mark. */
+/* The vehicle stands straight on the page, with only its own shadow. */
 .hero__stage {
     position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
     padding: 28px 20px;
-    background: var(--ground-tint);
     overflow: hidden;
-}
-
-.hero__stage::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 50%;
-    width: 12px;
-    transform: translateX(-50%);
-    background: var(--ground);
-}
-
-.hero__stage::after {
-    content: "";
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 24%;
-    height: 1px;
-    background: var(--border);
 }
 
 .hero__vehicle {
@@ -2021,10 +1986,12 @@ body.home {
 
 .tier--standard {
     --tier-color: var(--tier-standard);
+    --tier-text: var(--tier-standard-text);
 }
 
 .tier--alta {
     --tier-color: var(--tier-alta);
+    --tier-text: var(--tier-alta-text);
 }
 
 /* The recommended level is the one ink block in the row. */
@@ -2074,7 +2041,7 @@ body.home {
     font-weight: 500;
     font-size: 2.1rem;
     letter-spacing: -0.02em;
-    color: var(--tier-color);
+    color: var(--tier-text, var(--tier-color));
 }
 
 .tier__price span {
