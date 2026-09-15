@@ -892,7 +892,6 @@ svg {
 .car-view-3d__list-item-price {
     color: var(--ink);
     font-weight: 500;
-    font-variant-numeric: tabular-nums;
     white-space: nowrap;
 }
 
@@ -4977,6 +4976,75 @@ body.staff {
 .staff-intake__choice:focus-visible {
     outline: 2px solid var(--focus);
     outline-offset: 2px;
+}
+
+/* The walk-in form's quote, under the parts it prices: one row per finish,
+   discount already taken off, the picked one inked like the finish buttons
+   above. Built for reading a number out at the counter, so no subtotal, no
+   hint and no small print — the customer's wizard has those. */
+.intake-quote {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-strong);
+}
+
+.intake-quote__finishes {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.intake-quote__finish {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    min-height: 40px;
+    padding: 8px 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: 0;
+    background: var(--surface);
+    color: var(--text-dim);
+    font: inherit;
+    font-size: 0.85rem;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.15s var(--ease-out), border-color 0.15s var(--ease-out),
+        color 0.15s var(--ease-out);
+}
+
+.intake-quote__finish strong {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--ink);
+    white-space: nowrap;
+}
+
+.intake-quote__finish:hover {
+    border-color: var(--text-faint);
+}
+
+.intake-quote__finish[aria-pressed="true"] {
+    border-color: var(--brand);
+    background: var(--brand);
+    color: #fff;
+}
+
+.intake-quote__finish[aria-pressed="true"] strong {
+    color: #fff;
+}
+
+.intake-quote__finish:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+}
+
+.intake-quote__discount {
+    margin: 0;
+    font-size: 0.78rem;
+    color: var(--tier-standard-text);
 }
 
 /* The second card names what it is for, and says why it is asked at the

@@ -316,28 +316,12 @@
                                 <ul class="car-view-3d__list" id="intake3dList">
                                     <li class="car-view-3d__empty">Ninguna pieza seleccionada.</li>
                                 </ul>
-                                <p class="car-view-3d__nudge" id="intake3dNudge" hidden>
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-                                        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                        <path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z" />
-                                        <circle cx="8" cy="8" r="1.6" />
-                                    </svg>
-                                    <span id="intake3dNudgeText"></span>
-                                </p>
-                                <div class="car-view-3d__estimate" id="intake3dEstimate" hidden>
-                                    <p class="car-view-3d__estimate-row" id="intake3dSubtotalRow" hidden>
-                                        <span>Subtotal</span>
-                                        <span class="car-view-3d__estimate-amount" id="intake3dSubtotal"></span>
-                                    </p>
-                                    <p class="car-view-3d__estimate-row car-view-3d__estimate-row--discount" id="intake3dDiscountRow" hidden>
-                                        <span id="intake3dDiscountLabel"></span>
-                                        <span class="car-view-3d__estimate-amount" id="intake3dDiscount"></span>
-                                    </p>
-                                    <p class="car-view-3d__estimate-total" id="intake3dTotalRow" aria-live="polite">
-                                        <span>Total estimado</span>
-                                        <strong id="intake3dTotal"></strong>
-                                    </p>
-                                    <p class="car-view-3d__estimate-note" id="intake3dEstimateNote"></p>
+                                <!-- The counter's quote: every finish's total at once, discount
+                                     included, filled by renderIntakeQuote in src/staff.js. -->
+                                <div class="intake-quote" id="intakeQuote" hidden>
+                                    <div class="intake-quote__finishes" id="intakeQuoteFinishes" role="group"
+                                        aria-label="Total por acabado"></div>
+                                    <p class="intake-quote__discount" id="intakeQuoteDiscount"></p>
                                 </div>
                                 <button type="button" class="car-view-3d__clear" id="intake3dClear" disabled>Quitar todas</button>
                             </aside>
