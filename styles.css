@@ -1684,8 +1684,8 @@ body.home {
     position: absolute;
     inset: 0;
     pointer-events: none;
-    -webkit-mask-image: url("imgs/assets/suv-paint-mask.png");
-    mask-image: url("imgs/assets/suv-paint-mask.png");
+    -webkit-mask-image: url("imgs/assets/suv-paint-mask.webp");
+    mask-image: url("imgs/assets/suv-paint-mask.webp");
     -webkit-mask-size: 100% 100%;
     mask-size: 100% 100%;
     -webkit-mask-repeat: no-repeat;
@@ -1700,7 +1700,7 @@ body.home {
    El filtro va aquí y no sobre la foto entera, que es lo que hacía que el
    blanco perla y el negro onyx apagaran también los pilotos traseros. */
 .hero__vehicle-paint {
-    background-image: url("imgs/assets/suv.png");
+    background-image: url("imgs/assets/suv.webp");
     background-size: 100% 100%;
     background-repeat: no-repeat;
     filter: var(--vehicle-filter, none);

@@ -220,7 +220,7 @@ es guardarlas en una tabla en vez de en memoria.
 
 ## Brand
 
-The logo arrived as one JPEG, `imgs/logo.jpeg`. Everything the site uses is
+The logo arrived as one JPEG, now kept at `design/rebrand/logo-source.jpeg`. Everything the site uses is
 traced from it by `python3 tools/tracelogo.py` (Pillow only) into
 `imgs/brand/`:
 

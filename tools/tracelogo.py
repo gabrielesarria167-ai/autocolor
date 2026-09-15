@@ -1,4 +1,4 @@
-"""Trace the supplied logo raster (imgs/logo.jpeg) into SVG paths.
+"""Trace the supplied logo raster (design/rebrand/logo-source.jpeg) into SVG paths.
 
 The brand artwork only arrived as a 1000x1000 JPEG. The mark is fitted as
 two cubic curves (see MARK below); the wordmark and the tagline are traced
@@ -12,7 +12,7 @@ the favicon set and the two email logos (mail clients don't render SVG).
 import os
 from PIL import Image, ImageChops, ImageDraw
 
-SRC = 'imgs/logo.jpeg'
+SRC = 'design/rebrand/logo-source.jpeg'
 OUT = 'imgs/brand'
 INK = '#262D40'
 

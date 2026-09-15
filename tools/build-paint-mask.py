@@ -21,6 +21,10 @@ no escalones para que el borde salga suave y no dentado.
 
 Si se cambia la foto del hero hay que volver a ejecutar esto y mirar el
 resultado: los umbrales están puestos para este beige y este fondo.
+
+The page serves WebP copies of both files (suv.webp, suv-paint-mask.webp),
+which this script also writes: the photo lossy at quality 88 with exact
+alpha, the mask lossless. The PNGs stay as the sources.
 """
 
 import os
@@ -35,6 +39,8 @@ except ImportError:
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SOURCE = os.path.join(ROOT, "imgs", "assets", "suv.png")
 TARGET = os.path.join(ROOT, "imgs", "assets", "suv-paint-mask.png")
+TARGET_WEBP = os.path.join(ROOT, "imgs", "assets", "suv-paint-mask.webp")
+SOURCE_WEBP = os.path.join(ROOT, "imgs", "assets", "suv.webp")
 
 np.seterr(all="ignore")
 
@@ -90,6 +96,8 @@ def main():
     out[..., :3] = 255                            # el color da igual: solo se lee el alfa
     out[..., 3] = (mask * 255).astype(np.uint8)
     Image.fromarray(out, "RGBA").save(TARGET, optimize=True)
+    Image.fromarray(out, "RGBA").save(TARGET_WEBP, lossless=True, exact=True, method=6)
+    Image.open(SOURCE).save(SOURCE_WEBP, quality=88, alpha_quality=100, exact=True, method=6)
 
     share = 100 * mask.sum() / max(alpha.sum(), 1)
     print("%s escrito — la chapa es el %.1f%% del vehículo" % (os.path.relpath(TARGET, ROOT), share))
