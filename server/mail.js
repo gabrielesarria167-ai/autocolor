@@ -119,9 +119,10 @@ const SENDER = {
 const SITE_URL = (process.env.AUTOCOLOR_SITE_URL || process.env.RENDER_EXTERNAL_URL || '')
     .replace(/\/+$/, '');
 
-// El logotipo, servido desde el propio sitio. Son DOS: uno con la palabra
-// «AUTO» en negro, para fondo claro, y otro en blanco para fondo oscuro.
-// mailhtml.js enseña el que toque según el sistema de quien lee.
+// The logo, served from the site itself. There are TWO: the stacked lockup in
+// the logo's ink for light clients, and the same in white for dark ones.
+// mailhtml.js shows whichever fits the reader's system. Both are rendered by
+// tools/tracelogo.py.
 //
 // IBA PEGADO AL MENSAJE Y AHORA NO PUEDE. Un logotipo dentro del correo se
 // referencia por su identificador (cid:), y eso es una cabecera MIME que la
@@ -141,8 +142,8 @@ const SITE_URL = (process.env.AUTOCOLOR_SITE_URL || process.env.RENDER_EXTERNAL_
 // Si el cliente de correo no baja imágenes remotas, se ve el texto alternativo
 // y ya; y sin sitio conocido —la máquina de trabajo— no hay URL que poner, así
 // que mailhtml.js escribe el nombre del taller en su lugar.
-const LOGO_URL = SITE_URL ? `${SITE_URL}/imgs/logoEmail.png` : '';
-const LOGO_DARK_URL = SITE_URL ? `${SITE_URL}/imgs/logoEmailDark.png` : '';
+const LOGO_URL = SITE_URL ? `${SITE_URL}/imgs/brand/logo-email.png` : '';
+const LOGO_DARK_URL = SITE_URL ? `${SITE_URL}/imgs/brand/logo-email-white.png` : '';
 
 // Copia de src/staff.js. Son dos y no pueden leerse entre ellas —una corre en
 // el navegador y la otra aquí—, así que las dos tienen que decir lo mismo, del
