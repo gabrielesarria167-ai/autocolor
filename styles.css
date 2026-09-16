@@ -2519,10 +2519,16 @@ html:has(body.home) {
 }
 
 /* ===== Home: dentro del taller =====
-   Una hoja de contactos, no una cuadrícula: cada foto conserva su propia
-   proporción y las bases quedan desiguales a propósito. Recortarlas todas a
-   un mismo formato habría decapitado las dos verticales, que es justo donde
-   está el asunto -- la lijadora y el soporte de la cabina. */
+   Retícula modular. Las cuatro columnas y las dos filas son fijas, así que
+   cada canto cae sobre el módulo; las dos verticales ocupan la columna
+   entera en vez de recortarse a un formato apaisado, que es lo que salvaba
+   la hoja de contactos y lo único que aquélla hacía bien.
+
+   La altura de fila se calcula, no se adivina: ancho de columna entre 1.5
+   (la foto) más el alto fijo del pie. Una foto que ocupa dos filas mide
+   entonces dos filas más el filete, y la suya crece con ella porque es un
+   hijo flexible con object-fit. Sin ese cálculo las filas no cuadrarían con
+   las columnas al estrecharse la pantalla. */
 .taller {
     max-width: var(--shell);
     margin: 72px auto 0;
@@ -2542,29 +2548,18 @@ html:has(body.home) {
     font-size: 1rem;
 }
 
-/* Columnas y no cuadrícula: con `grid` cada fila la marcaba la foto más alta
-   y la otra dejaba debajo un hueco de hasta 393px. Fluyendo en columnas las
-   fotos se apilan sin huecos, y el corte cae solo: preparación y lectura del
-   color en la primera, mezcla y cabina en la segunda. */
+/* En el móvil no hay retícula que valga: una columna y cada foto con su
+   proporción de verdad, sin recorte ninguno. */
 .taller__grid {
-    column-count: 1;
-    column-gap: 32px;
-}
-
-@media (min-width: 760px) {
-    .taller__grid {
-        column-count: 2;
-    }
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 32px;
 }
 
 .taller figure {
-    margin: 0 0 40px;
-    /* Una foto no se parte entre el pie y la columna siguiente. */
-    break-inside: avoid;
-}
-
-.taller figure:last-child {
-    margin-bottom: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
 }
 
 .taller img {
@@ -2578,11 +2573,84 @@ html:has(body.home) {
 
 .home .taller figcaption {
     margin-top: 14px;
-    max-width: 42ch;
     color: var(--text-dim);
     font-size: 0.9rem;
     line-height: var(--lh-snug);
 }
+
+/* Paso intermedio: dos columnas parejas. Cuatro no caben sin dejar las fotos
+   del tamaño de un sello. */
+@media (min-width: 660px) {
+    .taller__grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1px;
+        background: var(--border);
+        border: 1px solid var(--border);
+    }
+
+    .taller figure {
+        background: var(--ground-raised);
+    }
+
+    .taller img {
+        aspect-ratio: 3 / 2;
+        height: auto;
+        object-fit: cover;
+    }
+
+    .home .taller figcaption {
+        margin-top: 0;
+        padding: 16px 18px 18px;
+    }
+}
+
+/* La retícula modular. `--taller-col` es el ancho real de una columna y de
+   él sale la altura de fila, así que módulo y foto siguen cuadrando mientras
+   la pantalla se estrecha. */
+@media (min-width: 1024px) {
+    .taller__grid {
+        --taller-col: calc((min(var(--shell), 100vw - 64px) - 3px) / 4);
+        --taller-cap: 96px;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-template-rows: repeat(2, calc(var(--taller-col) / 1.5 + var(--taller-cap)));
+    }
+
+    .taller figure {
+        height: 100%;
+    }
+
+    /* La foto se queda con lo que el pie no usa, en una fila o en dos. */
+    .taller img {
+        flex: 1;
+        min-height: 0;
+        aspect-ratio: auto;
+    }
+
+    .home .taller figcaption {
+        flex-shrink: 0;
+        height: var(--taller-cap);
+        box-sizing: border-box;
+        font-size: 0.85rem;
+        line-height: var(--lh-compact);
+    }
+
+    /* Las dos verticales toman la columna entera; las otras cuatro se reparten
+       las dos columnas que quedan. Leído por filas sale 1-2-3-5-4-6: el pie de
+       cada foto dice de qué etapa es, así que el sitio en la retícula no tiene
+       que cargar además con el orden. */
+    .taller figure:nth-child(1) { grid-column: 1; grid-row: 1; }
+    .taller figure:nth-child(2) { grid-column: 2; grid-row: 1 / 3; }
+    .taller figure:nth-child(3) { grid-column: 3; grid-row: 1; }
+    .taller figure:nth-child(4) { grid-column: 1; grid-row: 2; }
+    .taller figure:nth-child(5) { grid-column: 4; grid-row: 1 / 3; }
+    .taller figure:nth-child(6) { grid-column: 3; grid-row: 2; }
+}
+
+/* Dónde cae el recorte en cada foto: el asunto de cada una está en un sitio
+   distinto y el centro geométrico no sirve para ninguna de las tres. */
+.taller figure:nth-child(1) img { object-position: center 42%; }
+.taller figure:nth-child(2) img { object-position: center 40%; }
+.taller figure:nth-child(5) img { object-position: center 45%; }
 
 .taller figcaption strong {
     font-weight: 600;
