@@ -2518,6 +2518,77 @@ html:has(body.home) {
     color: var(--ink);
 }
 
+/* ===== Home: dentro del taller =====
+   Una hoja de contactos, no una cuadrícula: cada foto conserva su propia
+   proporción y las bases quedan desiguales a propósito. Recortarlas todas a
+   un mismo formato habría decapitado las dos verticales, que es justo donde
+   está el asunto -- la lijadora y el soporte de la cabina. */
+.taller {
+    max-width: var(--shell);
+    margin: 72px auto 0;
+    padding-top: 44px;
+    border-top: 1px solid var(--line);
+}
+
+.taller__title {
+    font-size: 1.5rem;
+}
+
+.home .taller__lede {
+    margin-top: 8px;
+    margin-bottom: 36px;
+    max-width: 46ch;
+    color: var(--text-dim);
+    font-size: 1rem;
+}
+
+/* Columnas y no cuadrícula: con `grid` cada fila la marcaba la foto más alta
+   y la otra dejaba debajo un hueco de hasta 393px. Fluyendo en columnas las
+   fotos se apilan sin huecos, y el corte cae solo: preparación y lectura del
+   color en la primera, mezcla y cabina en la segunda. */
+.taller__grid {
+    column-count: 1;
+    column-gap: 32px;
+}
+
+@media (min-width: 760px) {
+    .taller__grid {
+        column-count: 2;
+    }
+}
+
+.taller figure {
+    margin: 0 0 40px;
+    /* Una foto no se parte entre el pie y la columna siguiente. */
+    break-inside: avoid;
+}
+
+.taller figure:last-child {
+    margin-bottom: 0;
+}
+
+.taller img {
+    display: block;
+    width: 100%;
+    height: auto;
+    /* Reserva el hueco mientras carga, con el tono de los fondos alternos en
+       vez del blanco, para que el salto no sea un destello. */
+    background: var(--surface-tint);
+}
+
+.home .taller figcaption {
+    margin-top: 14px;
+    max-width: 42ch;
+    color: var(--text-dim);
+    font-size: 0.9rem;
+    line-height: var(--lh-snug);
+}
+
+.taller figcaption strong {
+    font-weight: 600;
+    color: var(--ink);
+}
+
 /* ===== Home: contact ===== */
 /* A page section like the others, not part of the footer: the details sit
    beside the pitch and the map runs the full width under both. */
