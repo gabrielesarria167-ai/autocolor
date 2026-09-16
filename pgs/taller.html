@@ -431,7 +431,15 @@
                     <table class="staff-table">
                         <thead>
                             <tr>
-                                <th scope="col">Código</th>
+                                <!-- The code is the boss's: a worker does not
+                                     need it to paint, and one column fewer
+                                     fits the workshop's screen better. It is
+                                     src/staff.js that hides it, by who signed
+                                     in, and the rows below are built with one
+                                     cell fewer. The search still finds by
+                                     code: it is what the customer reads out
+                                     when they call. -->
+                                <th scope="col" id="staffCodeHead" hidden>Código</th>
                                 <th scope="col">Placa</th>
                                 <th scope="col">Cliente</th>
                                 <th scope="col">Teléfono</th>
@@ -455,6 +463,62 @@
 
         <p class="form-error" id="staffError" role="alert" hidden></p>
     </main>
+
+    <!-- One request's parts, on the same 3D viewer they were chosen in. It
+         opens from the arrow in the «Piezas» column and closes with Escape,
+         with the ✕ or by tapping outside.
+
+         The viewer is not touched here: it turns by itself and the parts are
+         marked as whoever ordered the work left them (see `spin` and
+         `interactive` in src/carVisual.js). The workshop looks at what has to
+         be painted; changing it is not this screen's business.
+
+         It lives outside <main> and not inside the table: the table scrolls
+         sideways within its card and would clip the viewer. -->
+    <div class="parts-view" id="partsView" hidden>
+        <div class="parts-view__backdrop" id="partsViewBackdrop"></div>
+
+        <div class="parts-view__panel" role="dialog" aria-modal="true"
+            aria-labelledby="partsViewTitle" id="partsViewPanel">
+
+            <header class="parts-view__head">
+                <div>
+                    <h2 class="parts-view__title" id="partsViewTitle">Piezas a pintar</h2>
+                    <p class="parts-view__subtitle" id="partsViewSubtitle"></p>
+                </div>
+                <button type="button" class="parts-view__close" id="partsViewClose" aria-label="Cerrar">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M6 6l12 12M18 6L6 18" />
+                    </svg>
+                </button>
+            </header>
+
+            <div class="car-view-3d">
+                <div class="car-view-3d__stage">
+                    <div class="car-view-3d__canvas-wrap" id="partsViewCanvasWrap">
+                        <canvas id="partsViewCanvas" class="car-view-3d__canvas"></canvas>
+                        <div class="car-view-3d__overlay" id="partsViewOverlay">
+                            <div class="car-view-3d__progress-track">
+                                <div class="car-view-3d__progress-bar" id="partsViewProgressBar"></div>
+                            </div>
+                            <p class="car-view-3d__loading-label" id="partsViewLoadingLabel">Cargando modelo 3D…</p>
+                            <p class="car-view-3d__error" id="partsViewError" role="alert" hidden></p>
+                        </div>
+                    </div>
+                </div>
+
+                <aside class="car-view-3d__summary" aria-label="Piezas de la solicitud">
+                    <div class="car-view-3d__summary-head">
+                        <h2>Piezas</h2>
+                        <span class="car-view-3d__count" id="partsViewCount">0 piezas</span>
+                    </div>
+                    <ul class="car-view-3d__list" id="partsViewList"></ul>
+                </aside>
+            </div>
+
+        </div>
+    </div>
 
 </body>
 

@@ -72,12 +72,33 @@ CREATE TABLE IF NOT EXISTS requests (
                                               'cristales', 'finitura',
                                               'listo', 'entregado', 'cancelado')),
 
-    -- Qué trabajador tiene el vehículo en sus manos, con su código (AB12345), o
-    -- NULL si está disponible. Es lo que pinta la columna «Ocupado» del panel;
-    -- el nombre legible se deriva del código en server/names.js. Una vez
-    -- ocupado, solo ese trabajador puede soltarlo o cambiarle el estado, y eso
-    -- lo hacen cumplir las consultas de server/db.js, no el navegador.
-    occupied_by text        CHECK (occupied_by IS NULL OR occupied_by ~ '^[A-Z]{2}[0-9]{5}$'),
+    -- Which workers have the vehicle in their hands, by code (AB12345), or
+    -- empty when it is available. It is what the panel's «Ocupado» column
+    -- paints; the readable name is derived from the code in server/names.js.
+    -- Any of its holders can release it or change its status, and that is
+    -- enforced by the queries in server/db.js, not by the browser.
+    --
+    -- An array and not a text column because a vehicle is painted by a pair:
+    -- two people at a time at most, which is what the CHECK says and what
+    -- occupyRequest checks again before adding anybody (MAX_HOLDERS in
+    -- server/db.js). The ceiling lives here and not only in the server because
+    -- it is a rule of the workshop, not of one screen.
+    --
+    -- The CHECK on the shape of the codes reads the array joined by commas: a
+    -- subquery — an unnest() with bool_and — is not allowed inside a CHECK,
+    -- and with two elements at most the regular expression says the same
+    -- thing. `array_position(..., NULL)` keeps out a stray NULL, which
+    -- array_to_string would skip without a word, and comparing the two
+    -- elements stops one person from occupying the vehicle twice (two
+    -- entries, but a single person). That last comparison is only asked of an
+    -- array that HAS two: on an empty one both subscripts read NULL, and
+    -- `IS DISTINCT FROM` would call an available vehicle invalid.
+    occupied_by text[]      NOT NULL DEFAULT '{}'
+                            CHECK (cardinality(occupied_by) <= 2
+                                   AND array_position(occupied_by, NULL) IS NULL
+                                   AND (cardinality(occupied_by) < 2 OR occupied_by[1] <> occupied_by[2])
+                                   AND array_to_string(occupied_by, ',') ~
+                                       '^([A-Z]{2}[0-9]{5}(,[A-Z]{2}[0-9]{5})?)?$'),
 
     created_at  timestamptz NOT NULL DEFAULT now(),
     updated_at  timestamptz NOT NULL DEFAULT now()
@@ -98,8 +119,43 @@ ALTER TABLE requests ADD COLUMN IF NOT EXISTS plate      text
 ALTER TABLE requests ADD COLUMN IF NOT EXISTS mileage    integer
     CHECK (mileage >= 0);
 ALTER TABLE requests ADD COLUMN IF NOT EXISTS color_code text;
-ALTER TABLE requests ADD COLUMN IF NOT EXISTS occupied_by text
-    CHECK (occupied_by IS NULL OR occupied_by ~ '^[A-Z]{2}[0-9]{5}$');
+ALTER TABLE requests ADD COLUMN IF NOT EXISTS occupied_by text[] NOT NULL DEFAULT '{}';
+
+
+-- `occupied_by` used to be a single text column: a vehicle was held by one
+-- person or by nobody. Two of them paint it now, so it becomes an array and
+-- whatever it held turns into the array of one element.
+--
+-- It goes in a DO because ALTER COLUMN ... TYPE has no IF: applied twice, the
+-- USING below would wrap a text[] inside another one. The column's type is
+-- what says whether the conversion already happened.
+--
+-- The old CHECK is dropped before converting: it names `occupied_by ~ '…'`,
+-- and the ~ operator does not exist for an array, so the revalidation the
+-- ALTER itself runs would fail. The new one is added afterwards, outside the
+-- block, so a database that was already converted gets it too.
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'requests'
+                  AND column_name = 'occupied_by'
+                  AND data_type <> 'ARRAY') THEN
+        ALTER TABLE requests DROP CONSTRAINT IF EXISTS requests_occupied_by_check;
+        ALTER TABLE requests
+            ALTER COLUMN occupied_by TYPE text[]
+            USING CASE WHEN occupied_by IS NULL THEN '{}'::text[] ELSE ARRAY[occupied_by] END;
+        ALTER TABLE requests ALTER COLUMN occupied_by SET DEFAULT '{}';
+        ALTER TABLE requests ALTER COLUMN occupied_by SET NOT NULL;
+    END IF;
+END $$;
+
+ALTER TABLE requests DROP CONSTRAINT IF EXISTS requests_occupied_by_check;
+ALTER TABLE requests ADD CONSTRAINT requests_occupied_by_check
+    CHECK (cardinality(occupied_by) <= 2
+           AND array_position(occupied_by, NULL) IS NULL
+           AND (cardinality(occupied_by) < 2 OR occupied_by[1] <> occupied_by[2])
+           AND array_to_string(occupied_by, ',') ~
+               '^([A-Z]{2}[0-9]{5}(,[A-Z]{2}[0-9]{5})?)?$');
 
 
 -- Hubo una silueta 'suv' que pasó a llamarse 'pickup' cuando se separaron

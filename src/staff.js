@@ -83,6 +83,22 @@
     var intakeDoneHintEl = document.getElementById("intakeDoneHint");
     var intakeAgainEl = document.getElementById("intakeAgain");
     var intakeBackEl = document.getElementById("intakeBack");
+    var partsViewEl = document.getElementById("partsView");
+    var partsViewPanelEl = document.getElementById("partsViewPanel");
+    var partsViewBackdropEl = document.getElementById("partsViewBackdrop");
+    var partsViewCloseEl = document.getElementById("partsViewClose");
+    var partsViewSubtitleEl = document.getElementById("partsViewSubtitle");
+    var partsViewCanvasWrapEl = document.getElementById("partsViewCanvasWrap");
+    // Reassigned on every teardown, like the walk-in form's: a canvas whose
+    // WebGL context was dropped cannot be drawn into again.
+    var partsViewCanvasEl = document.getElementById("partsViewCanvas");
+    var partsViewOverlayEl = document.getElementById("partsViewOverlay");
+    var partsViewProgressBarEl = document.getElementById("partsViewProgressBar");
+    var partsViewLoadingLabelEl = document.getElementById("partsViewLoadingLabel");
+    var partsViewErrorEl = document.getElementById("partsViewError");
+    var partsViewListEl = document.getElementById("partsViewList");
+    var partsViewCountEl = document.getElementById("partsViewCount");
+    var codeHeadEl = document.getElementById("staffCodeHead");
     var monitorEl = document.getElementById("staffMonitor");
     var monitorListEl = document.getElementById("staffMonitorList");
     var monitorCountEl = document.getElementById("staffMonitorCount");
@@ -113,6 +129,83 @@
         premium: "Profesional",
         custom: "Alta gama"
     };
+
+    // Panel names and prices, shared with the customer's wizard so the two
+    // cannot name the same panel differently. The walk-in form needs the
+    // prices too; the parts viewer only needs the labels. Without the file
+    // both fall back to the raw ids, which still beats a blank list.
+    var PARTS = window.AUTOCOLOR_PARTS || null;
+    var partLabel = PARTS ? PARTS.label : function (id) { return id; };
+
+    // How many people can hold one vehicle at a time. The rule belongs to the
+    // database (the CHECK on `occupied_by`) and to the server (MAX_HOLDERS in
+    // server/db.js); this copy only decides whether the cell still offers a
+    // button, so that nobody is invited to press what would be refused.
+    var MAX_HOLDERS = 2;
+
+    /* ---------------------------------------------------------------------
+       The 3D viewer module
+
+       Two screens mount it — the walk-in form's part picker and the table's
+       parts viewer — and it is the same file for both: fetched once, with a
+       viewer built per screen. A retry needs a URL the browser has not
+       already written off (its module map remembers a failed fetch), hence
+       the query string, which is only ever added after a failure.
+    --------------------------------------------------------------------- */
+
+    var car3dModule = null;
+    var car3dRetries = 0;
+
+    function loadCar3d() {
+        if (!car3dModule) {
+            car3dModule = import("../src/carVisual.js" +
+                (car3dRetries ? "?reintento=" + car3dRetries : ""));
+        }
+        return car3dModule;
+    }
+
+    // Called when the import itself failed. Holding on to a rejected promise
+    // means the next attempt re-runs the failure handler without fetching
+    // anything, so it is dropped and the next URL is a fresh one.
+    function forgetCar3d() {
+        car3dModule = null;
+        car3dRetries++;
+    }
+
+    /* ---------------------------------------------------------------------
+       Who is holding a vehicle
+
+       Every request arrives with `holders`: one entry per person holding it,
+       with their code and their name (see withHolders in server/server.js).
+       Empty means available, and there are two at most.
+    --------------------------------------------------------------------- */
+
+    function holdersOf(request) {
+        return request.holders || [];
+    }
+
+    function holdsIt(request, workerId) {
+        return !!workerId && holdersOf(request).some(function (holder) {
+            return holder.workerId === workerId;
+        });
+    }
+
+    // The configured name, or the code when there is none (see
+    // server/names.js): naming the code says more than naming nobody.
+    function holderName(holder) {
+        return holder.name || holder.workerId;
+    }
+
+    // «Ana Bravo y Carlos Díaz», for the notices that name who is holding it.
+    function holderNames(holders) {
+        return holders.map(holderName).join(" y ");
+    }
+
+    // For comparing before and after without going by the identity of the
+    // array, which is a new one in every answer from the server.
+    function holderKey(holders) {
+        return holders.map(function (holder) { return holder.workerId; }).join(",");
+    }
 
     // Lo último que devolvió el servidor, ya filtrado por estado. El buscador
     // sí recorta sobre esto sin volver a preguntar: son como mucho 200 filas ya
@@ -387,11 +480,12 @@
             pill.disabled = true;
             pill.classList.add("staff-status__pill--locked");
             // Por qué no se puede: se entró solo a mirar, o —con la sesión
-            // iniciada— está libre y hay que tomarlo, o lo tiene otro.
+            // iniciada— está libre y hay que tomarlo, o lo tienen otros.
+            var holding = holdersOf(request);
             pill.title = readOnly
                 ? "Inicia sesión para cambiar el estado"
-                : request.occupiedBy
-                    ? "Lo tiene " + (request.occupiedName || "otro trabajador")
+                : holding.length
+                    ? (holding.length > 1 ? "Lo tienen " : "Lo tiene ") + holderNames(holding)
                     : "Toma el vehículo para cambiarle el estado";
         }
 
@@ -505,10 +599,12 @@
                         return;
                     }
                     // A finished status (entregado, cancelado) releases the
-                    // vehicle on the server, so the «Ocupado» cell has to follow.
-                    if (updated.occupiedBy !== request.occupiedBy) {
-                        request.occupiedBy = updated.occupiedBy;
-                        request.occupiedName = updated.occupiedName;
+                    // vehicle on the server — from both holders at once — so
+                    // the «Ocupado» cell has to follow. Compared by code and
+                    // not by identity: every answer brings a fresh array.
+                    var fresh = updated.holders || [];
+                    if (holderKey(fresh) !== holderKey(holdersOf(request))) {
+                        request.holders = fresh;
                         rebuildRow(request);
                     }
                 })
@@ -540,13 +636,251 @@
     }
 
     /* ---------------------------------------------------------------------
+       The «Piezas» column and the viewer behind it
+
+       The column has always carried the number of panels, which says how much
+       work a row is but not which work: «6 piezas» is a bonnet and a wing as
+       easily as two doors and both bumpers. The arrow beside the number opens
+       the vehicle itself — the very 3D model the parts were chosen on, turning
+       on its own, with those panels lit up, and their names listed beside it.
+
+       It is the wizard's viewer (mountCar3D in src/carVisual.js) mounted
+       read-only: nothing in the workshop's table changes what the customer
+       asked for. The same module the walk-in form uses, fetched once for both
+       (see loadCar3d).
+
+       One viewer at a time, and it lives exactly as long as the panel is open:
+       its model weighs tens of megabytes on the GPU and it draws every frame
+       while it turns, so opening another row's parts tears the first one down
+       and closing takes the WebGL context with it.
+    --------------------------------------------------------------------- */
+
+    function buildPartsCell(row, request) {
+        var td = document.createElement("td");
+        td.className = "staff-table__num";
+
+        var parts = request.parts || [];
+        // Nothing to draw: an old row saved before the wizard asked for
+        // panels, or one whose silhouette never arrived. The number stays —
+        // it is the column's data — and there is simply no arrow to press.
+        if (!request.vehicle || parts.length === 0) {
+            td.textContent = request.partCount;
+            row.appendChild(td);
+            return;
+        }
+
+        var open = document.createElement("button");
+        open.type = "button";
+        open.className = "staff-parts__open";
+        open.setAttribute("aria-haspopup", "dialog");
+        open.setAttribute("aria-expanded", "false");
+        open.setAttribute("aria-label", request.partCount === 1
+            ? "Ver en 3D la pieza de la solicitud " + request.id
+            : "Ver en 3D las " + request.partCount + " piezas de la solicitud " + request.id);
+
+        var count = document.createElement("span");
+        count.textContent = request.partCount;
+        open.appendChild(count);
+
+        var caret = document.createElement("span");
+        caret.className = "staff-parts__caret";
+        open.appendChild(caret);
+
+        open.addEventListener("click", function () { openPartsView(request, open); });
+        td.appendChild(open);
+        row.appendChild(td);
+    }
+
+    // The request being looked at, the arrow it was opened from — to give the
+    // focus back on closing — and the mounted viewer, if there is one.
+    var partsViewRequest = null;
+    var partsViewTrigger = null;
+    var partsView3d = null;
+    // Bumped on every open and every close: a mount still waiting on its
+    // import() checks this number before building anything, so a row opened
+    // and closed quickly leaves no viewer drawing onto a layer nobody sees.
+    var partsViewMountId = 0;
+
+    function openPartsView(request, trigger) {
+        var parts = request.parts || [];
+        if (!request.vehicle || parts.length === 0) return;
+        // Another row already open: it closes without giving the focus back,
+        // which is about to go to the ✕ of the one being opened.
+        if (partsViewRequest) closePartsView(false);
+
+        partsViewRequest = request;
+        partsViewTrigger = trigger || null;
+        if (partsViewTrigger) partsViewTrigger.setAttribute("aria-expanded", "true");
+
+        // Which car it is that is turning. Not the code: the column that
+        // carried it is the boss's, and the plate is what the car is known by
+        // out in the yard.
+        partsViewSubtitleEl.textContent = [
+            request.plate || "Sin placa",
+            [request.brand, request.model].filter(Boolean).join(" ")
+        ].filter(Boolean).join(" · ");
+
+        renderPartsViewList(parts);
+        show(partsViewEl, true);
+        resetPartsViewOverlay();
+        mountPartsView3d(request);
+        partsViewCloseEl.focus();
+    }
+
+    function renderPartsViewList(parts) {
+        partsViewListEl.textContent = "";
+        parts.forEach(function (id) {
+            var item = document.createElement("li");
+            item.className = "car-view-3d__list-item";
+            var name = document.createElement("span");
+            name.className = "car-view-3d__list-item-name";
+            name.textContent = partLabel(id);
+            item.appendChild(name);
+            partsViewListEl.appendChild(item);
+        });
+        partsViewCountEl.textContent = parts.length + (parts.length === 1 ? " pieza" : " piezas");
+    }
+
+    // A canvas is single-use: tearing the viewer down drops its WebGL context
+    // (see destroy() in src/carVisual.js), so the next row gets a fresh one.
+    // Same dance as in the counter's walk-in form.
+    function replacePartsViewCanvas() {
+        var fresh = document.createElement("canvas");
+        fresh.id = partsViewCanvasEl.id;
+        fresh.className = partsViewCanvasEl.className;
+        partsViewCanvasWrapEl.replaceChild(fresh, partsViewCanvasEl);
+        partsViewCanvasEl = fresh;
+    }
+
+    function resetPartsViewOverlay() {
+        partsViewOverlayEl.classList.remove("hidden");
+        partsViewProgressBarEl.style.width = "0%";
+        if (partsViewProgressBarEl.parentElement) partsViewProgressBarEl.parentElement.style.display = "";
+        partsViewLoadingLabelEl.hidden = false;
+        partsViewLoadingLabelEl.textContent = "Cargando modelo 3D…";
+        partsViewErrorEl.hidden = true;
+        partsViewErrorEl.textContent = "";
+    }
+
+    function showPartsViewError(message) {
+        partsViewOverlayEl.classList.remove("hidden");
+        partsViewLoadingLabelEl.hidden = true;
+        if (partsViewProgressBarEl.parentElement) partsViewProgressBarEl.parentElement.style.display = "none";
+        partsViewErrorEl.textContent = message;
+        partsViewErrorEl.hidden = false;
+    }
+
+    function mountPartsView3d(request) {
+        var parts = request.parts || [];
+        var mountId = ++partsViewMountId;
+        var canvasEl = partsViewCanvasEl;
+
+        // Two handlers and not a trailing .catch(), for the reason given at
+        // mountIntake3d: a module that failed to DOWNLOAD needs the cached
+        // promise thrown away, one that downloaded and failed to MOUNT does
+        // not, and a trailing .catch() would treat both as the first.
+        loadCar3d().then(function (mod) {
+            if (mountId !== partsViewMountId) return;
+            try {
+                partsView3d = mod.mountCar3D({
+                    vehicle: request.vehicle,
+                    canvasEl: canvasEl,
+                    canvasWrapEl: partsViewCanvasWrapEl,
+                    overlayEl: partsViewOverlayEl,
+                    progressBarEl: partsViewProgressBarEl,
+                    loadingLabelEl: partsViewLoadingLabelEl,
+                    errorEl: partsViewErrorEl,
+                    // No camera buttons: it turns by itself, and the five
+                    // views would fight the turntable for the camera.
+                    buttonsEl: null,
+                    isPartSelected: function (id) { return parts.indexOf(id) !== -1; },
+                    // Read-only: there is nothing here to toggle. `interactive`
+                    // is what keeps the click from ever arriving.
+                    onPartToggle: function () {},
+                    interactive: false,
+                    spin: true,
+                    // The wizard's wording sends you to a checklist below the
+                    // canvas; here the panels are named in the list beside it
+                    // and there is nothing to choose.
+                    loadErrorText: "No se pudo cargar el modelo 3D. Las piezas están en la lista."
+                });
+            } catch (err) {
+                console.error("[taller] Could not build the 3D viewer:", err);
+                showPartsViewError("No se pudo abrir el visor 3D. Cierra y vuelve a abrir para reintentar.");
+            }
+        }, function (err) {
+            if (mountId !== partsViewMountId) return;
+            forgetCar3d();
+            console.error("[taller] Could not load the 3D viewer module:", err);
+            showPartsViewError("No se pudo cargar el visor 3D. Cierra y vuelve a abrir para reintentar.");
+        });
+    }
+
+    // `restoreFocus` is false when the focus already has somewhere to go: on
+    // opening another row. The arrow may have gone in the meantime — the row is
+    // rebuilt on taking or releasing a vehicle — hence the check.
+    function closePartsView(restoreFocus) {
+        // First, and not only when there is a viewer to tear down: a mount
+        // still waiting on its import() has nothing for destroy() to reach,
+        // and without this it would go on to build its viewer — WebGL context,
+        // turntable and all — onto a layer nobody is looking at any more.
+        partsViewMountId++;
+        if (partsView3d) {
+            partsView3d.destroy();
+            partsView3d = null;
+            replacePartsViewCanvas();
+        }
+        show(partsViewEl, false);
+
+        var trigger = partsViewTrigger;
+        partsViewTrigger = null;
+        partsViewRequest = null;
+        if (!trigger) return;
+        trigger.setAttribute("aria-expanded", "false");
+        if (restoreFocus !== false && trigger.isConnected) trigger.focus();
+    }
+
+    partsViewCloseEl.addEventListener("click", function () { closePartsView(true); });
+    // Tapping outside closes, as on any layer of this kind. The backdrop is an
+    // element of its own and not the whole layer, so a click on the panel — on
+    // the canvas, on the list — never reaches this.
+    partsViewBackdropEl.addEventListener("click", function () { closePartsView(true); });
+
+    document.addEventListener("keydown", function (event) {
+        if (!partsViewRequest) return;
+        if (event.key === "Escape") {
+            event.preventDefault();
+            closePartsView(true);
+            return;
+        }
+        if (event.key !== "Tab") return;
+        // The focus does not leave the layer while it is open. Today the only
+        // thing inside is the ✕, so tabbing lands on it again; written over the
+        // list of focusables so it still holds if the panel gains a control.
+        var items = Array.prototype.filter.call(
+            partsViewPanelEl.querySelectorAll("button, [href], input, select, textarea, [tabindex]"),
+            function (el) { return !el.disabled && el.tabIndex !== -1 && el.offsetParent !== null; }
+        );
+        if (items.length === 0) return;
+        var first = items[0];
+        var last = items[items.length - 1];
+        var going = event.shiftKey ? first : last;
+        if (document.activeElement !== going && items.indexOf(document.activeElement) !== -1) return;
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+    });
+
+    /* ---------------------------------------------------------------------
        Ocupar un vehículo
 
-       La columna «Ocupado» dice quién tiene el vehículo entre manos. Un
-       vehículo disponible lo toma cualquiera con un clic y pasa a mostrar su
-       nombre; a partir de ahí, solo esa persona puede soltarlo (y solo esa
-       persona puede cambiarle el estado). Los demás lo ven como texto, sin
-       poder tocarlo. La regla la aplica el servidor; esto solo la refleja.
+       The «Ocupado» column says who has the vehicle in their hands, which can
+       be two people: a car is painted by a pair, and the ceiling lives in the
+       database and in the server (MAX_HOLDERS in server/db.js). While there is
+       room, anybody joins with a click and their name appears in the list;
+       from then on each one releases their own and leaves the other where they
+       were, and either of them can change the status. Whoever is not holding
+       it reads the names as text. The rule is enforced by the server; this
+       only reflects it.
     --------------------------------------------------------------------- */
 
     // Desplaza la tabla lo justo para que el «Liberar» de una píldora propia se
@@ -589,34 +923,52 @@
         td.classList.remove("is-peeking");
     }
 
+    // Somebody else's name, or every name at once in browse mode: plain text,
+    // because nothing here is for this viewer to press.
+    function holderText(text) {
+        var other = document.createElement("span");
+        other.className = "staff-occupied__other";
+        other.textContent = text;
+        return other;
+    }
+
     function buildOccupiedCell(row, request) {
         var td = document.createElement("td");
         td.className = "staff-occupied";
 
-        // A mirar y nada más: quién lo tiene, en texto. Un botón aquí
+        var holders = holdersOf(request);
+
+        // The cell is a list: up to two people, each bringing their own thing
+        // — my pill with «Liberar», the other person's name — plus the button
+        // to join while there is room.
+        var list = document.createElement("div");
+        list.className = "staff-occupied__holders";
+        td.appendChild(list);
+
+        // A mirar y nada más: quiénes lo tienen, en texto. Un botón aquí
         // prometería un cambio que este modo no hace.
         if (readOnly) {
-            var seen = document.createElement("span");
-            seen.className = "staff-occupied__other";
-            seen.textContent = request.occupiedBy
-                ? (request.occupiedName || request.occupiedBy)
-                : "Disponible";
-            td.appendChild(seen);
+            if (holders.length === 0) {
+                list.appendChild(holderText("Disponible"));
+            } else {
+                holders.forEach(function (holder) {
+                    list.appendChild(holderText(holderName(holder)));
+                });
+            }
             row.appendChild(td);
             return;
         }
 
-        if (!request.occupiedBy) {
-            // Disponible: un botón para tomarlo.
-            var claim = document.createElement("button");
-            claim.type = "button";
-            claim.className = "staff-occupied__claim";
-            claim.textContent = "Disponible";
-            claim.setAttribute("aria-label", "Tomar el vehículo de la solicitud " + request.id);
-            claim.addEventListener("click", function () { setOccupied(request, true); });
-            td.appendChild(claim);
-        } else if (request.occupiedBy === viewer.workerId) {
-            // Lo tengo yo: mi nombre, y al hacer clic lo suelto.
+        holders.forEach(function (holder) {
+            if (holder.workerId !== viewer.workerId) {
+                // Lo tiene otro: solo el nombre, sin tocar.
+                list.appendChild(holderText(holderName(holder)));
+                return;
+            }
+
+            // Lo tengo yo: mi nombre, y al hacer clic lo suelto. Releasing
+            // takes out my own hold and nothing else: where there were two of
+            // us, the other person keeps the vehicle.
             var mine = document.createElement("button");
             mine.type = "button";
             mine.className = "staff-occupied__mine";
@@ -625,7 +977,7 @@
             mine.setAttribute("aria-label", "Liberar el vehículo de la solicitud " + request.id);
 
             var name = document.createElement("span");
-            name.textContent = request.occupiedName || viewer.name || viewer.workerId;
+            name.textContent = holderName(holder) || viewer.name || viewer.workerId;
             mine.appendChild(name);
 
             var free = document.createElement("span");
@@ -634,7 +986,7 @@
             mine.appendChild(free);
 
             mine.addEventListener("click", function () { setOccupied(request, false); });
-            td.appendChild(mine);
+            list.appendChild(mine);
             // Al ser la última columna, el «Liberar» que sale al pasar por
             // encima puede quedar tapado por el borde derecho cuando la tabla no
             // cabe entera. Se desplaza la tabla a la derecha para enseñarlo y se
@@ -647,12 +999,30 @@
             td.addEventListener("mouseleave", function () { endPeek(td); });
             mine.addEventListener("focus", function () { startPeek(td, mine, free); });
             mine.addEventListener("blur", function () { endPeek(td); });
-        } else {
-            // Lo tiene otro: solo el nombre, sin tocar.
-            var other = document.createElement("span");
-            other.className = "staff-occupied__other";
-            other.textContent = request.occupiedName || request.occupiedBy;
-            td.appendChild(other);
+        });
+
+        // There is room and I am not in it: join. With nobody holding it the
+        // button reads «Disponible», which is the state of the vehicle; with
+        // one person already on it, «Acompañar», because what happens is not
+        // taking it but standing beside them. Full — two — has no button at
+        // all: the server would refuse it (409) and offering it would promise
+        // what is not there.
+        if (!holdsIt(request, viewer.workerId) && holders.length < MAX_HOLDERS) {
+            var claim = document.createElement("button");
+            claim.type = "button";
+            claim.className = "staff-occupied__claim";
+            if (holders.length === 0) {
+                claim.textContent = "Disponible";
+                claim.setAttribute("aria-label", "Tomar el vehículo de la solicitud " + request.id);
+            } else {
+                claim.classList.add("staff-occupied__claim--join");
+                claim.textContent = "Acompañar";
+                claim.setAttribute("aria-label",
+                    "Trabajar en el vehículo de la solicitud " + request.id +
+                    " junto a " + holderNames(holders));
+            }
+            claim.addEventListener("click", function () { setOccupied(request, true); });
+            list.appendChild(claim);
         }
 
         row.appendChild(td);
@@ -662,8 +1032,10 @@
         setError("");
         patchOccupancy(request.id, occupied)
             .then(function (updated) {
-                request.occupiedBy = updated.occupiedBy;
-                request.occupiedName = updated.occupiedName;
+                // Who holds it AFTER the change, which is not the same as
+                // who asked for it: releasing can leave the other person on
+                // the vehicle.
+                request.holders = updated.holders || [];
                 rebuildRow(request);
             })
             .catch(function (err) {
@@ -772,7 +1144,7 @@
         allRequests.forEach(function (request) {
             var visible = !term || request.searchText.indexOf(term) !== -1;
             if (visible && mineOnly) {
-                visible = !!viewer.workerId && request.occupiedBy === viewer.workerId;
+                visible = holdsIt(request, viewer.workerId);
             }
             if (request.row) request.row.hidden = !visible;
             if (visible) shown++;
@@ -791,17 +1163,22 @@
     }
 
     // Solo se le cambia el estado a un vehículo que uno mismo ocupa: ni a los
-    // libres (hay que tomarlos primero) ni a los de otro. Ocupar sí queda
-    // abierto: un vehículo disponible lo toma cualquiera desde la columna
+    // libres (hay que tomarlos primero) ni a los que solo tienen otros.
+    // Cualquiera de quienes lo tienen puede, que son dos como mucho. Ocupar sí
+    // queda abierto: mientras quede sitio, cualquiera se suma desde la columna
     // «Ocupado». El servidor aplica la misma regla (ver server/db.js).
     function canEditStatus(request) {
         if (readOnly) return false;
-        return !!viewer.workerId && request.occupiedBy === viewer.workerId;
+        return holdsIt(request, viewer.workerId);
     }
 
     function makeRow(request) {
         var row = document.createElement("tr");
-        cell(row, request.id, "staff-table__code");
+        // The code is the boss's column (see the header in pgs/taller.html):
+        // whoever is painting the car never has to read it out, and the row is
+        // built with one cell fewer rather than with a hidden one, so that the
+        // cells and the headers on screen stay in step.
+        if (viewer.isBoss) cell(row, request.id, "staff-table__code");
 
         var plateTd = document.createElement("td");
         if (request.plate) {
@@ -818,7 +1195,7 @@
         cell(row, request.phone, "staff-table__nowrap");
         cell(row, [request.brand, request.model].filter(Boolean).join(" "));
         cell(row, formatDate(request.createdAt), "staff-table__muted");
-        cell(row, request.partCount, "staff-table__num");
+        buildPartsCell(row, request);
         cell(row, QUALITY_LABELS[request.quality] || request.quality, "staff-table__nowrap");
         buildStatusCell(row, request, canEditStatus(request));
         buildOccupiedCell(row, request);
@@ -889,6 +1266,15 @@
         // Leaving the walk-in form takes the 3D viewer with it. Its model is
         // tens of megabytes on the GPU, and nothing off that screen can see it.
         if (view !== "intake") destroyIntake3d();
+        // And leaving the table takes the parts viewer, for the same reason
+        // and one more: that one turns, so it would go on drawing frame after
+        // frame behind a screen nobody is looking at.
+        if (view !== "panel") closePartsView(false);
+
+        // The header of the code column, which the rows either carry or do not
+        // (see makeRow). Both read the same `viewer.isBoss`, and both are
+        // repainted by the same answer from the server.
+        show(codeHeadEl, !!viewer.isBoss);
 
         show(readOnlyEl, view === "panel" && readOnly);
         // For the boss the table is for looking at and nothing else: there is no
@@ -1656,18 +2042,13 @@
        at.
     --------------------------------------------------------------------- */
 
-    var partLabel = window.AUTOCOLOR_PARTS
-        ? window.AUTOCOLOR_PARTS.label
-        : function (id) { return id; };
-    // Prices and the discount too, when parts.js arrived; without it the
-    // summary lists the panels and shows no money.
-    var PARTS = window.AUTOCOLOR_PARTS || null;
+    // The panel names and the prices are read from PARTS and partLabel, which
+    // are declared at the top of this file: the parts viewer in the table
+    // needs the labels too, and one lookup cannot disagree with itself.
 
     var intakeParts = [];
     var intake3d = null;         // the mounted viewer, if any
     var intake3dVehicle = null;  // which silhouette it is mounted for
-    var intake3dModule = null;   // cached import() of the viewer module
-    var intake3dRetries = 0;     // bumped per failed import, for a fresh URL
     var intake3dMountId = 0;     // guards a superseded mount finishing last
 
     function toggleIntakePart(id) {
@@ -1835,14 +2216,9 @@
         intake3dVehicle = vehicle;
         resetIntakeOverlay();
 
-        // The module is fetched once; only the viewer inside it is rebuilt per
-        // silhouette. A retry needs a URL the browser has not already written
-        // off — its module map remembers a failed fetch — hence the query
-        // string, which is only ever added after a failure.
-        if (!intake3dModule) {
-            intake3dModule = import("../src/carVisual.js" +
-                (intake3dRetries ? "?reintento=" + intake3dRetries : ""));
-        }
+        // The module is fetched once — by loadCar3d, shared with the parts
+        // viewer of the table — and only the viewer inside it is rebuilt per
+        // silhouette.
         var mountId = ++intake3dMountId;
         var canvasEl = intake3dCanvasEl;
 
@@ -1852,7 +2228,7 @@
         // then failed to MOUNT. They want opposite things — one needs the
         // cached promise thrown away, the other needs it kept — and a trailing
         // .catch() would catch both and treat them as the first.
-        intake3dModule.then(function (mod) {
+        loadCar3d().then(function (mod) {
             // A later choice already claimed the canvas while this import was
             // in flight, so this mount has nothing left to draw into.
             if (mountId !== intake3dMountId) return;
@@ -1881,11 +2257,9 @@
             }
         }, function (err) {
             if (mountId !== intake3dMountId) return;
-            // All of it cleared so the next choice retries the mount. The
-            // module promise too: holding a rejected one means the retry
-            // re-runs this handler without fetching anything.
-            intake3dModule = null;
-            intake3dRetries++;
+            // All of it cleared so the next choice retries the mount, the
+            // cached module promise included (see forgetCar3d).
+            forgetCar3d();
             intake3dVehicle = null;
             console.error("[taller] Could not load the 3D viewer module:", err);
             showIntake3dError("No se pudo cargar el visor 3D. Vuelve a elegir la silueta para reintentar.");

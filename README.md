@@ -510,7 +510,7 @@ Las del panel del taller, todas detrás de la contraseña compartida:
 | `GET /api/staff/workers` | Quién tiene qué vehículo, con la nota del jefe de cada uno. Solo el jefe |
 | `PUT /api/staff/workers/:code/note` | Escribe, reemplaza o quita la nota del jefe sobre un trabajador |
 | `PATCH /api/staff/requests/:id` | Cambia el estado de una solicitud |
-| `PATCH /api/staff/requests/:id/occupancy` | Toma o suelta un vehículo |
+| `PATCH /api/staff/requests/:id/occupancy` | Toma o suelta un vehículo. Hasta dos personas a la vez; la tercera recibe `409` |
 
 ## Los correos de cada solicitud
 
@@ -804,15 +804,61 @@ que es lo que se vería al reenviar una solicitud vieja.
 ## El día a día del taller
 
 Las solicitudes llegan a la tabla `requests` de la base `autocolor`, y el
-taller las trabaja desde **`/pgs/taller.html`**: la lista completa —código,
-placa, cliente, teléfono, vehículo, ingreso, piezas y acabado— con un
+taller las trabaja desde **`/pgs/taller.html`**: la lista completa —placa,
+cliente, teléfono, vehículo, ingreso, piezas y acabado— con un
 buscador, filtros por estado y una píldora de color por fila que despliega los
 seis estados para mover la solicitud.
+
+The ten-digit code is the boss's column and nobody else's: whoever is painting
+the car never has to read it out, and the screen in the workshop has one column
+fewer to fit. The search still finds by code — it is what the customer reads out
+when they call — and the rows are built with one cell fewer rather than with a
+hidden one, so the cells and the headings can never fall out of step.
 
 El buscador filtra en el navegador sobre lo que ya se trajo (placa, cliente,
 código, marca y teléfono); los filtros de estado, en cambio, se le piden al
 servidor, porque la consulta trae como mucho 200 filas y recortarlas en el
 navegador dejaría fuera las viejas.
+
+### Las piezas, en 3D
+
+The **«Piezas»** column carries the number of panels, which says how much work a
+row is but not which work: «6 piezas» is a bonnet and a wing as easily as two
+doors and both bumpers. The arrow beside the number opens the vehicle itself —
+the very 3D model the parts were chosen on, turning by itself, with those panels
+lit up in red, and their names listed beside it.
+
+It is the wizard's viewer (`mountCar3D` in `src/carVisual.js`) mounted
+read-only: `interactive: false` binds no pointer handlers at all, so nothing
+lights up under the cursor and no click can change what the customer asked for,
+and `spin: true` turns the car instead of waiting for a camera button, which is
+why that viewer carries none. Somebody whose system asks for reduced motion gets
+the front view, standing still.
+
+The panel is opened deliberately and torn down on closing — Escape, the ✕ or a
+tap outside — because its model weighs tens of megabytes on the GPU and the
+turntable draws every frame while it is up. Only one is ever alive: opening
+another row's parts destroys the first.
+
+A row with no panels, or one saved before the wizard asked for them, shows the
+number and no arrow: there is nothing to draw.
+
+### Un vehículo, dos personas
+
+A car is painted by a pair, so **«Ocupado» holds up to two people at a time**.
+While there is room, anybody joins from that column — the button reads
+«Disponible» on a free vehicle and «Acompañar» on one somebody is already on —
+and from then on each of them releases their own hold and leaves the other where
+they were. Either of the two can move the status along; the pair is on the same
+car, and asking which one of them may touch it would only mean the other one
+waiting. A third person is refused, and the column offers them no button rather
+than inviting a click that would come back as a `409`.
+
+The ceiling is the database's: `occupied_by` is a `text[]` with a CHECK that
+admits two distinct codes at most (`server/schema.sql`), and the queries in
+`server/db.js` count the holders inside the very statement that adds one, so two
+people asking for the last place at the same time cannot both get it. Finishing
+a job (entregado, cancelado) releases it from both at once.
 
 El panel solo existe si el servidor encuentra **las dos cosas**: la contraseña
 del taller y la lista de códigos de trabajador. Lo normal es dejarlas en el
@@ -889,7 +935,9 @@ every half minute while it is open, and a button asks for it sooner.
 It is not a record of shifts; the workshop keeps none. It is the table's
 «Ocupado» column read the other way round, by person instead of by vehicle, so
 it comes out of what the database already holds and not out of anything anybody
-has to start writing down.
+has to start writing down. A vehicle held by two appears on both their cards:
+the board answers «what is this person on», and leaving it off one of them would
+show somebody as free while their hands are on a car.
 
 From each card's **«…»** he can leave that worker a note. There is one note per
 person, so writing another replaces it, and only he clears it. The worker reads

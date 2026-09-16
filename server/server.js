@@ -759,14 +759,31 @@ const WORKER_NOTE_PATH = /^\/api\/staff\/workers\/([A-Za-z]{2}[0-9]{5})\/note$/;
 // that the card can show it whole. The column CHECKs the same number.
 const MAX_NOTE = 500;
 
-// Cada fila del panel lleva, además de su código, el nombre del trabajador que
-// la tiene ocupada. Se arma aquí y no en la base porque el nombre se inventa a
-// partir del código (ver server/names.js) y ese es el único sitio donde se
-// decide. `occupiedBy` viene de la base; `occupiedName` es cosa del servidor.
-function withOccupiedName(request) {
+// Every row of the panel carries, besides their codes, the names of the workers
+// holding it. It is put together here and not in the database because the name
+// is looked up from the code (see server/names.js) and that is the only place
+// where it is decided. `occupiedBy` comes from the database; `holders` is the
+// server's doing, and it is the shape the panel reads — one entry per person,
+// up to the two the vehicle admits (MAX_HOLDERS in server/db.js).
+function withHolders(request) {
+    const codes = request.occupiedBy || [];
     return Object.assign({}, request, {
-        occupiedName: request.occupiedBy ? names.nameFor(request.occupiedBy) : null,
+        holders: codes.map(function (workerId) {
+            return { workerId: workerId, name: names.nameFor(workerId) };
+        }),
     });
+}
+
+// «Ana Bravo y Carlos Díaz», for the refusals that have to say who is holding a
+// vehicle. A code with no configured name is shown as the code (see
+// server/names.js), because naming nobody says less than naming the code.
+function holderNames(codes) {
+    const named = (codes || []).map(function (workerId) {
+        return names.nameFor(workerId) || workerId;
+    });
+    if (named.length === 0) return '';
+    if (named.length === 1) return named[0];
+    return named.slice(0, -1).join(', ') + ' y ' + named[named.length - 1];
 }
 
 // Todas las rutas del panel pasan por aquí. Sin contraseña configurada no hay
@@ -895,7 +912,7 @@ async function handleStaff(req, res, pathname, ip) {
         requireStaff(req);
         const wanted = new URL(req.url, 'http://localhost').searchParams.get('status');
         if (wanted && !STATUSES.has(wanted)) throw new BadRequest('El estado no es válido.');
-        const requests = (await listRequests({ status: wanted })).map(withOccupiedName);
+        const requests = (await listRequests({ status: wanted })).map(withHolders);
         // Quién está mirando: el panel lo necesita para saber qué filas puede
         // tocar —una ocupada solo la mueve quien la tiene— sin volver a
         // preguntar por cada una.
@@ -965,18 +982,23 @@ async function handleStaff(req, res, pathname, ip) {
         for (const note of await listWorkerNotes()) notes.set(note.workerId, note);
 
         for (const row of await listOccupied()) {
-            // A code that is no longer on the roster — somebody who left with a
-            // vehicle still taken — goes in anyway: leaving it out would hide a
-            // vehicle that really is in somebody's hands.
-            if (!held.has(row.occupiedBy)) held.set(row.occupiedBy, []);
-            held.get(row.occupiedBy).push({
-                id: row.id,
-                plate: row.plate,
-                brand: row.brand,
-                model: row.model,
-                status: row.status,
-                createdAt: row.createdAt,
-            });
+            // A vehicle held by two people is on both their cards: the board
+            // answers «what is this person on», and leaving it off one of them
+            // would show somebody as free while their hands are on a car.
+            for (const workerId of row.occupiedBy) {
+                // A code that is no longer on the roster — somebody who left
+                // with a vehicle still taken — goes in anyway: leaving it out
+                // would hide a vehicle that really is in somebody's hands.
+                if (!held.has(workerId)) held.set(workerId, []);
+                held.get(workerId).push({
+                    id: row.id,
+                    plate: row.plate,
+                    brand: row.brand,
+                    model: row.model,
+                    status: row.status,
+                    createdAt: row.createdAt,
+                });
+            }
         }
 
         const workers = Array.from(held, function ([workerId, requests]) {
@@ -1051,22 +1073,23 @@ async function handleStaff(req, res, pathname, ip) {
                 return sendJson(res, 404, { error: 'No encontramos ninguna solicitud con ese código.' });
             }
             // Solo quien ocupa el vehículo le cambia el estado. Si estaba
-            // libre, el error dice que hay que tomarlo; si lo tenía otro, lo
+            // libre, el error dice que hay que tomarlo; si lo tienen otros, los
             // nombra para que quede claro a quién pedírselo.
             if (!result.ok) {
-                const holder = names.nameFor(result.occupiedBy);
-                const message = holder
-                    ? `${holder} tiene este vehículo. Solo esa persona puede cambiarle el estado.`
+                const holding = holderNames(result.occupiedBy);
+                const message = holding
+                    ? `${holding} ${result.occupiedBy.length > 1 ? 'tienen' : 'tiene'} este vehículo. Solo quien lo tiene puede cambiarle el estado.`
                     : 'Toma el vehículo (columna «Ocupado») antes de cambiarle el estado.';
                 return sendJson(res, 403, { error: message });
             }
             console.log(`[taller] ${result.id} -> ${result.status}`);
-            return sendJson(res, 200, withOccupiedName(result));
+            return sendJson(res, 200, withHolders(result));
         }
 
-        // Ocupar o liberar un vehículo. Uno disponible lo toma cualquiera; uno
-        // ocupado solo lo suelta quien lo tiene. Las dos reglas las hace cumplir
-        // la base (ver server/db.js), no este handler ni el navegador.
+        // Ocupar o liberar un vehículo. Mientras quede sitio —dos personas a la
+        // vez como mucho— lo toma cualquiera; soltarlo solo puede quien lo
+        // tiene, y suelta su parte y no la del otro. Las dos reglas las hace
+        // cumplir la base (ver server/db.js), no este handler ni el navegador.
         const occ = OCCUPANCY_PATH.exec(pathname);
         if (occ) {
             requireStaff(req);
@@ -1082,12 +1105,15 @@ async function handleStaff(req, res, pathname, ip) {
                 if (!result.ok && result.reason === 'not_found') {
                     return sendJson(res, 404, { error: 'No encontramos ninguna solicitud con ese código.' });
                 }
+                // Lleno: ya lo tienen dos, que es el tope. Se nombra a los dos
+                // —es a ellos a quienes hay que pedirles sitio— y el 409 es el
+                // mismo de antes: la solicitud choca con cómo está la fila.
                 if (!result.ok) {
-                    const holder = names.nameFor(result.occupiedBy) || 'otro trabajador';
-                    return sendJson(res, 409, { error: `${holder} ya tomó este vehículo.` });
+                    const holding = holderNames(result.occupiedBy) || 'otros trabajadores';
+                    return sendJson(res, 409, { error: `${holding} ya tienen este vehículo. Son dos personas como mucho.` });
                 }
                 console.log(`[taller] ${occ[1]} ocupado por ${viewerId}`);
-                return sendJson(res, 200, { id: occ[1], occupiedBy: viewerId, occupiedName: names.nameFor(viewerId) });
+                return sendJson(res, 200, withHolders({ id: occ[1], occupiedBy: result.occupiedBy }));
             }
 
             const result = await releaseRequest(occ[1], viewerId);
@@ -1095,11 +1121,11 @@ async function handleStaff(req, res, pathname, ip) {
                 return sendJson(res, 404, { error: 'No encontramos ninguna solicitud con ese código.' });
             }
             if (!result.ok) {
-                const holder = names.nameFor(result.occupiedBy) || 'otro trabajador';
-                return sendJson(res, 403, { error: `${holder} tiene este vehículo. Solo esa persona puede liberarlo.` });
+                const holding = holderNames(result.occupiedBy) || 'otro trabajador';
+                return sendJson(res, 403, { error: `${holding} ${result.occupiedBy.length > 1 ? 'tienen' : 'tiene'} este vehículo. Cada uno suelta el suyo.` });
             }
             console.log(`[taller] ${occ[1]} liberado por ${viewerId}`);
-            return sendJson(res, 200, { id: occ[1], occupiedBy: null, occupiedName: null });
+            return sendJson(res, 200, withHolders({ id: occ[1], occupiedBy: result.occupiedBy }));
         }
     }
 

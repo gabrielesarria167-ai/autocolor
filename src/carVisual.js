@@ -17,7 +17,9 @@
      - It exposes a small controller API (resize / refreshSelection /
        resetView / destroy / loadFailed) instead of wiring its own sidebar,
        which lives in the host page so it can match the site's styling.
-     - It draws on demand (see requestRender), not in a permanent loop.
+     - It draws on demand (see requestRender), not in a permanent loop —
+       except on the turntable of a read-only viewer (`spin`), which is the
+       one mode whose whole point is that the picture keeps changing.
 
    Import this lazily (`import('../src/carVisual.js')`) — only when a user
    actually reaches step 3 — so nobody pays for three.js or a 7–13 MB
@@ -241,6 +243,13 @@ const MS_PER_QUARTER_TURN = 620;
 const MIN_FLIGHT_MS = 420;
 const MAX_FLIGHT_MS = 1150;
 
+// The turntable of the read-only viewer (see the `spin` option): a full lap in
+// twenty seconds, seen from slightly above so the roof and the flanks are both
+// in the picture. Slow enough that every panel can be read as it goes past,
+// which is what the shop opens it for.
+const SPIN_MS_PER_TURN = 20000;
+const SPIN_TILT_DEG = 16;
+
 // Extent of a bounding-box size along one of the model's own axes. Every
 // axis in VEHICLE_MODELS is an axis-aligned unit vector, so picking the
 // matching component out of `size` is exact.
@@ -261,6 +270,21 @@ export function mountCar3D(options) {
     isPartSelected,  // fn(id) => bool — reads the host's shared state
     onPartToggle,    // fn(id) => void — mutates the host's shared state
     onLoadError,     // optional fn() — the GLB failed; the host can offer another way
+    // A viewer for looking at a selection somebody else already made — the
+    // panel's «Piezas» column (src/staff.js). `interactive: false` leaves the
+    // pointer alone, so nothing lights up under the cursor and no click can
+    // reach onPartToggle; `spin: true` turns the car instead of waiting for a
+    // camera button, since a page that only shows cannot ask anybody to press
+    // one. The two travel together — a turntable you could click would move
+    // the panel out from under the finger — and with `spin` the view buttons
+    // are not used: the host passes no buttonsEl.
+    interactive = true,
+    spin = false,
+    // What the overlay says when the GLB does not arrive. The default sends
+    // the customer to the no-3D checklist under the wizard's canvas; a host
+    // that has no such list (the panel's read-only viewer) says where its
+    // panels are instead.
+    loadErrorText = 'No se pudo cargar el modelo 3D. Elige las piezas en la lista de abajo.',
   } = options;
 
   const model = VEHICLE_MODELS[vehicle];
@@ -452,6 +476,9 @@ export function mountCar3D(options) {
   // model however each one happens to be oriented in its file.
   let lengthFB = 0, widthLR = 0, heightUD = 0;
   let presets = {};
+  // The one distance the turntable rides at, recomputed with the presets
+  // because it comes out of the same framing (see computePresets).
+  let spinRadius = 0;
 
   // Interpolates a unit direction along the great circle between two others.
   // Callers never pass a pair further apart than a quarter turn or so — any
@@ -501,6 +528,13 @@ export function mountCar3D(options) {
     const distFB  = fitDistance(widthLR, heightUD, FOV_DEG, aspect, CAMERA_PADDING) + lengthFB / 2;
     const distLR  = fitDistance(lengthFB, heightUD, FOV_DEG, aspect, CAMERA_PADDING) + widthLR / 2;
     const distTop = fitDistance(widthLR, lengthFB, FOV_DEG, aspect, CAMERA_PADDING) + heightUD / 2;
+
+    // The turntable keeps one distance the whole way round — the widest of
+    // the two it passes through — so a car that fits head-on cannot grow out
+    // of the frame as its flank comes round. Reframing per angle instead
+    // would breathe in and out once a lap, which reads as the car changing
+    // size rather than turning.
+    spinRadius = Math.max(distFB, distLR);
 
     presets = {
       front: center.clone().addScaledVector(FRONT_AXIS, distFB),
@@ -642,6 +676,63 @@ export function mountCar3D(options) {
   });
 
   /* -----------------------------------------------------------------------
+     The turntable (`spin`)
+
+     The one place this file draws in a permanent loop, and it is the point of
+     the mode: the car turns by itself for as long as the viewer is on screen.
+     It is affordable because such a viewer is opened deliberately, shows one
+     vehicle and is destroyed on closing (see the parts view in src/staff.js) —
+     the host must not leave one mounted behind a hidden panel.
+
+     Somebody who asked their system not to animate gets the front view and no
+     loop at all. The selection is what the viewer is for, and it reads just as
+     well standing still.
+  ----------------------------------------------------------------------- */
+  let spinFrame = null;
+  let spinning = false;
+
+  const spinBase = new THREE.Vector3();
+  const spinDir = new THREE.Vector3();
+  const spinPos = new THREE.Vector3();
+
+  function startSpin() {
+    // Called from the load handler, where the model's own size has already
+    // settled the framing: without a radius there is nothing to orbit at.
+    if (destroyed || spinning || !spinRadius) return;
+    if (prefersReducedMotion()) {
+      placeCamera(presets.front);
+      return;
+    }
+    // Where the lap starts and how high it rides: the nose, lifted towards the
+    // roof by the tilt, which is the angle the panels are told apart from.
+    const tilt = THREE.MathUtils.degToRad(SPIN_TILT_DEG);
+    spinBase.copy(FRONT_AXIS).multiplyScalar(Math.cos(tilt)).addScaledVector(UP_AXIS, Math.sin(tilt)).normalize();
+
+    spinning = true;
+    const startTime = performance.now();
+
+    function step(now) {
+      spinFrame = null;
+      if (destroyed || !spinning) return;
+      // Off the clock and not off a frame counter, so the lap takes twenty
+      // seconds on a screen that drops frames as much as on one that does not.
+      const angle = ((now - startTime) / SPIN_MS_PER_TURN) * Math.PI * 2;
+      spinDir.copy(spinBase).applyAxisAngle(UP_AXIS, angle);
+      spinPos.copy(center).addScaledVector(spinDir, spinRadius);
+      // placeCamera queues its own frame; this one asks for the next step.
+      placeCamera(spinPos);
+      spinFrame = requestAnimationFrame(step);
+    }
+    spinFrame = requestAnimationFrame(step);
+  }
+
+  function stopSpin() {
+    spinning = false;
+    if (spinFrame !== null) cancelAnimationFrame(spinFrame);
+    spinFrame = null;
+  }
+
+  /* -----------------------------------------------------------------------
      Loading
   ----------------------------------------------------------------------- */
   function formatBytes(n) {
@@ -748,6 +839,9 @@ export function mountCar3D(options) {
       currentView = 'front';
       syncViewButtons();
       requestRender();
+      // The turntable can only start once the model has been measured, which
+      // is what gives it a radius to ride at.
+      if (spin) startSpin();
 
       if (overlayEl) overlayEl.classList.add('hidden');
     },
@@ -765,7 +859,7 @@ export function mountCar3D(options) {
       if (destroyed) return;
       loadFailed = true;
       console.error('[car3d] GLTFLoader error:', err);
-      showError('No se pudo cargar el modelo 3D. Elige las piezas en la lista de abajo.');
+      showError(loadErrorText);
       if (typeof onLoadError === 'function') onLoadError();
     }
   );
@@ -861,11 +955,16 @@ export function mountCar3D(options) {
     if (event.pointerType !== 'mouse') clearHover();
   }
 
-  canvasEl.addEventListener('pointermove', onPointerMove);
-  canvasEl.addEventListener('click', onPointerClick);
-  canvasEl.addEventListener('pointerup', onPointerUp);
-  canvasEl.addEventListener('pointercancel', clearHover);
-  canvasEl.addEventListener('pointerleave', clearHover);
+  // Nothing is bound at all in a read-only viewer: a highlight following the
+  // cursor over a selection nobody can change reads as an invitation to change
+  // it, and the raycast behind it would run for nothing.
+  if (interactive) {
+    canvasEl.addEventListener('pointermove', onPointerMove);
+    canvasEl.addEventListener('click', onPointerClick);
+    canvasEl.addEventListener('pointerup', onPointerUp);
+    canvasEl.addEventListener('pointercancel', clearHover);
+    canvasEl.addEventListener('pointerleave', clearHover);
+  }
 
   /* -----------------------------------------------------------------------
      Sizing
@@ -877,6 +976,10 @@ export function mountCar3D(options) {
     // to be re-placed at the recomputed distance — otherwise the car stays
     // framed for the old container size until the next button press.
     computePresets();
+    // The turntable places the camera every frame from the radius that
+    // computePresets has just refreshed, so putting it on a view here would
+    // only be overwritten — after one frame of the car jumping.
+    if (spinning) return;
     const here = positionForView(currentView);
     if (here && !flying) placeCamera(here);
   }
@@ -927,10 +1030,13 @@ export function mountCar3D(options) {
     // swaps in a fresh one before mounting the next vehicle.
     destroy() {
       destroyed = true;
+      stopSpin();
       if (renderQueued !== null) cancelAnimationFrame(renderQueued);
       if (resizeObserver) resizeObserver.disconnect();
       else window.removeEventListener('resize', onResize);
       canvasEl.removeEventListener('webglcontextrestored', requestRender);
+      // Unbinding what was never bound is a no-op, so the read-only case needs
+      // no branch of its own here.
       canvasEl.removeEventListener('pointermove', onPointerMove);
       canvasEl.removeEventListener('click', onPointerClick);
       canvasEl.removeEventListener('pointerup', onPointerUp);

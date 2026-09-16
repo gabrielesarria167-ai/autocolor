@@ -4208,6 +4208,186 @@ body.staff {
     font-weight: 500;
 }
 
+/* Two people at most per vehicle, so the cell is a list and not a single
+   control: one's own pill, the other person's name and — while there is room
+   left — the button to join. Stacked, so that one long name cannot push the
+   other out of the column. */
+.staff-occupied__holders {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+}
+
+/* «Acompañar» rather than «Disponible»: somebody already has the vehicle and
+   what is on offer is joining them, not taking it. */
+.staff-occupied__claim--join {
+    font-size: 0.78rem;
+    padding: 4px 10px;
+}
+
+/* -----------------------------------------------------------------------------
+   The «Piezas» column: the arrow that opens the viewer
+
+   The number is still the column's data; the arrow says there is something
+   behind it to look at. It only appears when there are parts and a silhouette
+   to draw them on (see buildPartsCell in src/staff.js).
+   -------------------------------------------------------------------------- */
+
+.staff-parts__open {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    margin: -4px -8px;          /* the row does not grow for the button */
+    border: none;
+    border-radius: 0;
+    background: none;
+    color: var(--ink);
+    font: inherit;
+    font-size: 0.875rem;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+    transition: color 0.15s var(--ease-out), background 0.15s var(--ease-out);
+}
+
+.staff-parts__open:hover {
+    background: var(--surface-tint);
+    color: var(--brand);
+}
+
+.staff-parts__open:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 1px;
+}
+
+/* The tip turns when it opens, which is what ties the arrow to what came
+   out of it. */
+.staff-parts__caret {
+    flex: none;
+    width: 0;
+    height: 0;
+    border-top: 4px solid transparent;
+    border-bottom: 4px solid transparent;
+    border-left: 5px solid currentColor;
+    opacity: 0.55;
+    transition: transform 0.18s var(--ease-out), opacity 0.15s var(--ease-out);
+}
+
+.staff-parts__open:hover .staff-parts__caret {
+    opacity: 1;
+}
+
+.staff-parts__open[aria-expanded="true"] .staff-parts__caret {
+    transform: rotate(90deg);
+    opacity: 1;
+}
+
+/* -----------------------------------------------------------------------------
+   The parts viewer
+
+   A layer over the table: the vehicle turning on the left and the list of
+   parts on the right, which is the split .car-view-3d already has in the
+   wizard and in the counter's form. All this adds is the layer around it.
+   -------------------------------------------------------------------------- */
+
+.parts-view[hidden] {
+    display: none;
+}
+
+.parts-view {
+    position: fixed;
+    inset: 0;
+    /* Above the top bar and the status menus (40), which is everything else
+       this page has. */
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 16px;
+}
+
+.parts-view__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(27, 33, 48, 0.55);
+}
+
+.parts-view__panel {
+    position: relative;       /* over the darkened backdrop */
+    width: min(1040px, 100%);
+    /* Its height comes from what is inside it, with the window as the ceiling:
+       on a short screen the viewer and its list scroll instead of overflowing. */
+    max-height: calc(100vh - 48px);
+    overflow-y: auto;
+    padding: 22px 24px 18px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: 0 24px 60px rgba(27, 33, 48, 0.28);
+}
+
+.parts-view__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 18px;
+}
+
+.parts-view__title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--ink);
+}
+
+/* The plate and the vehicle: which car it is that is turning. */
+.parts-view__subtitle {
+    margin: 4px 0 0;
+    font-size: 0.85rem;
+    color: var(--text-dim);
+}
+
+.parts-view__close {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 0;
+    background: var(--surface);
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: border-color 0.15s var(--ease-out), color 0.15s var(--ease-out), background 0.15s var(--ease-out);
+}
+
+.parts-view__close svg {
+    width: 17px;
+    height: 17px;
+}
+
+.parts-view__close:hover {
+    border-color: var(--text-faint);
+    background: var(--surface-tint);
+    color: var(--ink);
+}
+
+.parts-view__close:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+}
+
+/* The viewer carries no camera buttons here — it turns by itself — so the gap
+   they left under the canvas is not needed. */
+.parts-view .car-view-3d {
+    margin: 0;
+}
+
 /* -----------------------------------------------------------------------------
    Estados de la página
    -------------------------------------------------------------------------- */

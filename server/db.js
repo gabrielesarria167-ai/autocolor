@@ -174,7 +174,7 @@ async function listRequests(options) {
     const status = (options || {}).status || null;
     const { rows } = await pool.query(
         `SELECT id, created_at, first_name, last_name, phone, brand, model,
-                plate, quality, status, occupied_by, cardinality(parts) AS part_count
+                plate, quality, status, occupied_by, vehicle, parts
            FROM requests
           WHERE ($1::text IS NULL OR status = $1)
             AND (status <> ALL($2::text[]) OR id IN (
@@ -197,11 +197,17 @@ async function listRequests(options) {
         plate: row.plate,
         quality: row.quality,
         status: row.status,
-        // El código del trabajador que la tiene, o null si está disponible. El
-        // nombre legible lo pone server.js con server/names.js; aquí va el
-        // código, que es con lo que se decide quién puede tocarla.
-        occupiedBy: row.occupied_by,
-        partCount: Number(row.part_count),
+        // The codes of the workers holding it, empty when it is available. The
+        // readable names are put on by server.js with server/names.js; the
+        // codes are what decides who may touch the row.
+        occupiedBy: row.occupied_by || [],
+        // The silhouette and its panels, which is what the panel's «Piezas»
+        // column needs to draw the vehicle with the chosen parts lit up. The
+        // count comes off the same array rather than out of a second
+        // `cardinality(parts)`: two numbers that could disagree over one list.
+        vehicle: row.vehicle,
+        parts: row.parts || [],
+        partCount: (row.parts || []).length,
     }));
 }
 
@@ -213,17 +219,19 @@ async function listRequests(options) {
  * usual listing covers the rest. Data that does not need showing does not need
  * fetching either.
  *
- * Ordering by `occupied_by` keeps each worker's rows together, which is how the
- * caller groups them. The LIMIT, as in listRequests, is a ceiling and not
- * pagination: today the occupied ones are a handful, but a vehicle nobody
- * releases stays occupied forever and the count only goes up.
+ * A row comes back once however many people hold it; the caller deals it onto
+ * each of its holders (see GET /api/staff/workers), so the newest-first order
+ * here is the order each worker's own list ends up in. The LIMIT, as in
+ * listRequests, is a ceiling and not pagination: today the occupied ones are a
+ * handful, but a vehicle nobody releases stays occupied forever and the count
+ * only goes up.
  */
 async function listOccupied() {
     const { rows } = await pool.query(
         `SELECT id, created_at, brand, model, plate, status, occupied_by
            FROM requests
-          WHERE occupied_by IS NOT NULL
-          ORDER BY occupied_by, created_at DESC
+          WHERE cardinality(occupied_by) > 0
+          ORDER BY created_at DESC
           LIMIT 500`
     );
     return rows.map((row) => ({
@@ -233,29 +241,34 @@ async function listOccupied() {
         model: row.model,
         plate: row.plate,
         status: row.status,
-        occupiedBy: row.occupied_by,
+        occupiedBy: row.occupied_by || [],
     }));
 }
 
 /**
- * Cambia el estado de una solicitud, pero solo si quien lo pide la tiene
- * ocupada: un trabajador únicamente mueve los vehículos en los que trabaja.
- * Uno disponible no se toca —hay que tomarlo primero—, y uno de otro, tampoco.
- * El filtro va en el propio WHERE para que la comprobación y el cambio sean un
- * solo paso y no haya hueco entre «miré quién la tiene» y «la cambié».
+ * Changes a request's status, but only for somebody who is holding it: a
+ * worker moves along the vehicles they are working on and no others. An
+ * available one is not touched — it has to be taken first — and neither is one
+ * held by other people. The test goes in the WHERE itself so that the check and
+ * the change are a single step, with no gap between "I looked at who holds it"
+ * and "I changed it".
  *
- * Devuelve { ok: true, ... } con la fila; o { ok: false, reason } —'not_found'
- * si el código no existe, 'forbidden' si no la tiene quien lo pide (con
- * `occupiedBy`: null si estaba libre, el código del otro si la tenía otro)—
- * para que server.js responda 404 o 403. `updated_at` lo pone el trigger.
+ * Returns { ok: true, ... } with the row; or { ok: false, reason } — 'not_found'
+ * when the code does not exist, 'forbidden' when the caller is not one of its
+ * holders (with `occupiedBy`: the array of who is holding it, empty when it was
+ * free) — so that server.js answers 404 or 403. `updated_at` is the trigger's.
  *
- * `viewerId` es el código de la sesión (ver server/auth.js); nunca llega del
- * cuerpo de la petición, así que no se puede falsear para tocar la de otro.
+ * `viewerId` is the session's code (see server/auth.js); it never arrives in
+ * the request body, so it cannot be faked to touch somebody else's vehicle.
  */
 //
-// Moving a job to a finished status also releases the vehicle. A delivered or
-// cancelled car is in nobody's hands, and leaving it occupied kept it on the
-// boss's monitor as «held» forever.
+// Either holder moves the work along: the two of them are on the same vehicle
+// and asking which one of the pair may touch the status would only mean the
+// other one waiting for them.
+//
+// Moving a job to a finished status also releases the vehicle — from both
+// holders at once. A delivered or cancelled car is in nobody's hands, and
+// leaving it occupied kept it on the boss's monitor as «held» forever.
 //
 // One statement with the check, the change and the reason for a refusal:
 // `cur` locks the row and reports who held it at that moment, so a refusal
@@ -268,34 +281,48 @@ async function updateRequestStatus(id, status, viewerId) {
          ), upd AS (
              UPDATE requests r
                 SET status = $2,
-                    occupied_by = CASE WHEN $2 = ANY($4::text[]) THEN NULL ELSE r.occupied_by END
+                    occupied_by = CASE WHEN $2 = ANY($4::text[]) THEN '{}'::text[]
+                                       ELSE r.occupied_by END
                FROM cur
-              WHERE r.id = cur.id AND cur.occupied_by = $3
+              WHERE r.id = cur.id AND cur.occupied_by @> ARRAY[$3::text]
           RETURNING r.id, r.status, r.occupied_by, r.updated_at
          )
-         SELECT cur.occupied_by AS holder, upd.id, upd.status, upd.occupied_by, upd.updated_at
+         SELECT cur.occupied_by AS holders, upd.id, upd.status, upd.occupied_by, upd.updated_at
            FROM cur LEFT JOIN upd ON true`,
         [id, status, viewerId, FINISHED]
     );
     if (rows.length === 0) return { ok: false, reason: 'not_found' };
     const row = rows[0];
-    if (!row.id) return { ok: false, reason: 'forbidden', occupiedBy: row.holder };
+    if (!row.id) return { ok: false, reason: 'forbidden', occupiedBy: row.holders || [] };
     return {
         ok: true,
         id: row.id.trim(),
         status: row.status,
-        occupiedBy: row.occupied_by,
+        occupiedBy: row.occupied_by || [],
         updatedAt: row.updated_at,
     };
 }
 
 /**
- * Ocupa una solicitud disponible en nombre de un trabajador. Solo prende si
- * `occupied_by` está en NULL, así que dos que la pidan a la vez no se pisan: el
- * segundo no cambia ninguna fila y se entera de que ya la tomaron.
+ * How many people can hold one vehicle at the same time. A car is painted by a
+ * pair at most: a third pair of hands on the same body is somebody standing
+ * around, and the panel would have nowhere left to say who is doing what.
  *
- * Devuelve { ok: true, occupiedBy } al lograrlo; { ok: false, reason } si no
- * ('not_found' o 'taken', esta última con el código de quien la tiene).
+ * The column CHECKs the same number (see server/schema.sql). This is where the
+ * refusal comes from — the CHECK is what makes the rule true even if a query
+ * here were to get it wrong.
+ */
+const MAX_HOLDERS = 2;
+
+/**
+ * Takes a request on a worker's behalf, if there is room left. The WHERE counts
+ * who already holds it inside the very statement that adds, so two people
+ * asking at once do not tread on each other: the second one sees it with one
+ * place fewer and, if that was the last, changes no row and is told it is full.
+ *
+ * Returns { ok: true, occupiedBy } — the whole array, not just whoever has come
+ * in — on success; { ok: false, reason } otherwise ('not_found' or 'full', the
+ * latter with the codes of the people holding it).
  */
 async function occupyRequest(id, workerId) {
     // Same single-statement shape as updateRequestStatus, for the same reason.
@@ -303,46 +330,56 @@ async function occupyRequest(id, workerId) {
         `WITH cur AS (
              SELECT id, occupied_by FROM requests WHERE id = $1 FOR UPDATE
          ), upd AS (
-             UPDATE requests r SET occupied_by = $2
+             UPDATE requests r SET occupied_by = r.occupied_by || $2::text
                FROM cur
-              WHERE r.id = cur.id AND cur.occupied_by IS NULL
-          RETURNING r.id
+              WHERE r.id = cur.id
+                AND NOT (cur.occupied_by @> ARRAY[$2::text])
+                AND cardinality(cur.occupied_by) < $3
+          RETURNING r.id, r.occupied_by
          )
-         SELECT cur.occupied_by AS holder, upd.id FROM cur LEFT JOIN upd ON true`,
-        [id, workerId]
+         SELECT cur.occupied_by AS holders, upd.id, upd.occupied_by AS taken
+           FROM cur LEFT JOIN upd ON true`,
+        [id, workerId, MAX_HOLDERS]
     );
     if (rows.length === 0) return { ok: false, reason: 'not_found' };
-    if (rows[0].id) return { ok: true, occupiedBy: workerId };
+    const row = rows[0];
+    if (row.id) return { ok: true, occupiedBy: row.taken || [] };
+    const holders = row.holders || [];
     // Si ya la tenía este mismo trabajador, no es un error: ocupar lo que uno ya
     // ocupa es idempotente y se responde éxito.
-    if (rows[0].holder === workerId) return { ok: true, occupiedBy: workerId };
-    return { ok: false, reason: 'taken', occupiedBy: rows[0].holder };
+    if (holders.indexOf(workerId) !== -1) return { ok: true, occupiedBy: holders };
+    return { ok: false, reason: 'full', occupiedBy: holders };
 }
 
 /**
- * Libera una solicitud, dejándola disponible otra vez. Solo la suelta el
- * trabajador que la tenía: el WHERE exige que `occupied_by` sea el suyo.
+ * Drops a request on a worker's behalf. Each one drops their own: the WHERE
+ * demands that their code be in `occupied_by`, and array_remove takes theirs
+ * out and leaves the other person where they were.
  *
- * Devuelve { ok: true } al liberarla o si ya estaba libre (idempotente);
- * { ok: false, reason } si no ('not_found', o 'forbidden' con el código de
- * quien la tiene).
+ * Returns { ok: true, occupiedBy } — who is still holding it — on releasing it
+ * or when it was already free (idempotent); { ok: false, reason } otherwise
+ * ('not_found', or 'forbidden' with the codes of the people holding it).
  */
 async function releaseRequest(id, workerId) {
     const { rows } = await pool.query(
         `WITH cur AS (
              SELECT id, occupied_by FROM requests WHERE id = $1 FOR UPDATE
          ), upd AS (
-             UPDATE requests r SET occupied_by = NULL
+             UPDATE requests r SET occupied_by = array_remove(r.occupied_by, $2::text)
                FROM cur
-              WHERE r.id = cur.id AND cur.occupied_by = $2
-          RETURNING r.id
+              WHERE r.id = cur.id AND cur.occupied_by @> ARRAY[$2::text]
+          RETURNING r.id, r.occupied_by
          )
-         SELECT cur.occupied_by AS holder, upd.id FROM cur LEFT JOIN upd ON true`,
+         SELECT cur.occupied_by AS holders, upd.id, upd.occupied_by AS left_with
+           FROM cur LEFT JOIN upd ON true`,
         [id, workerId]
     );
     if (rows.length === 0) return { ok: false, reason: 'not_found' };
-    if (rows[0].id || rows[0].holder === null) return { ok: true };
-    return { ok: false, reason: 'forbidden', occupiedBy: rows[0].holder };
+    const row = rows[0];
+    if (row.id) return { ok: true, occupiedBy: row.left_with || [] };
+    const holders = row.holders || [];
+    if (holders.length === 0) return { ok: true, occupiedBy: [] };
+    return { ok: false, reason: 'forbidden', occupiedBy: holders };
 }
 
 /* -----------------------------------------------------------------------------
