@@ -5442,8 +5442,38 @@ body.staff {
 }
 
 @media (max-width: 560px) {
+    /* Nothing in this row shrinks — the lockup has a fixed height, the clock
+       and the button are single words that do not break — so below about
+       510px the bar ran wider than the screen. That widened the page itself,
+       and with it the containing block of every fixed layer on it: the status
+       menu and the parts viewer were laid out at the width of the OVERFLOW,
+       with their left edge off screen. Wrapping is what makes that impossible
+       whatever the button ends up saying («Salir», «Terminar sesión»,
+       «Volver al perfil»), instead of a width that happens to fit today. */
     .staff-topbar {
         padding: 12px 16px;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    /* The lockup already says Autocolor. The rule and the «Taller» label are
+       there to keep it company across a wide bar, and on a phone that company
+       is exactly what pushes the button onto a second row. */
+    .staff-topbar__rule,
+    .staff-topbar__label {
+        display: none;
+    }
+
+    .staff-topbar__clock {
+        font-size: 0.85rem;
+    }
+
+    /* On the row it shares with the clock this only splits the free space
+       between the two; on the second row, where it lands on the narrowest
+       screens, it keeps the button against the right edge instead of under
+       the logo. */
+    .staff-topbar__logout {
+        margin-left: auto;
     }
 
     .staff-page {
