@@ -1,5 +1,5 @@
 /* Autocolor — home page behaviour.
-   Menu panel, colour preview swatches, scroll reveal, footer year.
+   Menu panel, colour preview swatches, footer year.
    Everything degrades gracefully: with the script blocked the page is still
    complete and readable. */
 (function () {
@@ -98,25 +98,6 @@
         });
     }
 
-    /* ===== Scroll reveal ===== */
-    var revealables = document.querySelectorAll(".reveal");
-
-    if (revealables.length && "IntersectionObserver" in window && !reduceMotion) {
-        document.body.classList.add("reveal-ready");
-
-        var observer = new IntersectionObserver(function (entries) {
-            entries.forEach(function (entry) {
-                if (!entry.isIntersecting) return;
-                entry.target.classList.add("is-visible");
-                observer.unobserve(entry.target);
-            });
-        }, { rootMargin: "0px 0px -8% 0px", threshold: 0.08 });
-
-        revealables.forEach(function (element) {
-            observer.observe(element);
-        });
-    }
-
     /* ===== Cifras de la empresa: cuenta atrás exponencial =====
        Cada figura arranca en cero y se acerca a su valor con decaimiento
        exponencial: la distancia que falta se reduce una fracción fija en cada
@@ -126,8 +107,13 @@
 
     if (figures.length && "IntersectionObserver" in window && !reduceMotion) {
         var DECAY = 3;          // cuanto más alto, más brusca la frenada
-        var DURATION = 2600;    // ms
-        var STAGGER = 170;      // ms entre una cifra y la siguiente
+        // Mientras la cuenta corre, la cifra que se lee es más baja que la de
+        // verdad, y la última de la lista pasaba más de tres segundos diciendo
+        // "0 años de garantía". Con el decaimiento exponencial la cifra real
+        // ya está puesta en la primera tercera parte del recorrido, así que
+        // acortarlo no le quita el gesto y sí quita el dato falso.
+        var DURATION = 1200;    // ms
+        var STAGGER = 90;       // ms entre una cifra y la siguiente
         var SETTLE = 1 - Math.exp(-DECAY);
 
         var countables = [];

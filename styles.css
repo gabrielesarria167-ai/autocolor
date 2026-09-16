@@ -5,17 +5,28 @@ html {
 body {
     background: var(--paper);
     font-family: var(--font-body);
+    line-height: var(--lh-body);
     margin: 0;
     min-height: 100dvh;
     width: 100%;
     color: var(--ink);
-    scrollbar-color: auto;
+    scrollbar-color: var(--border-strong) transparent;
+    scrollbar-width: thin;
     -webkit-font-smoothing: antialiased;
 }
 
 ::selection {
-    background: #262d40;
-    color: #ffffff;
+    background: var(--ink);
+    color: var(--paper);
+}
+
+/* The caret is the one piece of brand a customer sees while they are actually
+   typing their plate into the quote form. */
+input,
+textarea,
+select,
+[contenteditable] {
+    caret-color: var(--ink);
 }
 
 *,
@@ -73,6 +84,28 @@ svg {
     --font-body: 'Schibsted Grotesk', 'Helvetica Neue', Arial, sans-serif;
     --font-display: 'Jost', 'Futura', 'Century Gothic', 'Avenir Next', sans-serif;
     --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+    /* Type scale. Leading tightens as the type grows and tracking opens back
+       toward zero as it shrinks — a 74px line and a 22px line cannot share one
+       ratio without one of them being wrong, which is what a flat 1.06 /
+       -0.02em across every heading did here. Rules below pick a step from this
+       list; none of them invents a number. */
+    --lh-display: 0.97;
+    --lh-title: 1.05;
+    --lh-heading: 1.16;
+    --lh-subhead: 1.3;
+    --lh-compact: 1.45;
+    --lh-snug: 1.5;
+    --lh-body: 1.6;
+
+    /* Optical tracking. Jost sets loose at display sizes and closes up on its
+       own below ~24px, so the correction shrinks with the type instead of
+       staying proportional to it. */
+    --track-display: -0.032em;
+    --track-title: -0.022em;
+    --track-heading: -0.013em;
+    --track-subhead: -0.005em;
+    --track-label: 0.08em;
 
     /* Brand. The ink is the logo's; there is no second brand colour. The
        --accent*, --brand* and --ink* names are aliases for the same two inks
@@ -175,7 +208,7 @@ svg {
     border: 1px solid var(--border);
     border-radius: 0;
     padding: 6px;
-    box-shadow: 0 18px 40px rgba(27, 33, 48, 0.14);
+    box-shadow: 0 12px 20px -8px rgba(27, 33, 48, 0.28);
 
     opacity: 0;
     transform: translateY(-6px);
@@ -421,7 +454,7 @@ svg {
     font-family: var(--font-display);
     font-size: 1.05rem;
     font-weight: 600;
-    line-height: 1.25;
+    line-height: var(--lh-subhead);
 }
 
 .car-preview__type {
@@ -769,7 +802,7 @@ svg {
     text-align: center;
     font-size: 0.85rem;
     color: var(--paint-red);
-    line-height: 1.5;
+    line-height: var(--lh-snug);
 }
 
 .car-view-3d__buttons {
@@ -937,7 +970,7 @@ svg {
     padding: 9px 10px;
     border: 1px dashed var(--border-strong);
     font-size: 0.8rem;
-    line-height: 1.35;
+    line-height: var(--lh-compact);
     color: var(--text-dim);
 }
 
@@ -975,14 +1008,14 @@ svg {
 .car-view-3d__estimate-note {
     margin: 0;
     font-size: 0.78rem;
-    line-height: 1.45;
+    line-height: var(--lh-compact);
     color: var(--text-dim);
 }
 
 .car-view-3d__empty {
     color: var(--text-faint);
     font-size: 0.85rem;
-    line-height: 1.5;
+    line-height: var(--lh-snug);
     padding: 4px 2px;
 }
 
@@ -1313,10 +1346,24 @@ html:has(body.home) {
 .home h3 {
     font-family: var(--font-display);
     font-weight: 500;
-    line-height: 1.06;
-    letter-spacing: -0.02em;
     text-wrap: balance;
     margin: 0;
+}
+
+/* Section headings run 32-48px: the tightest leading on the page after the
+   hero, and enough negative tracking to close the gaps Jost leaves between
+   its round caps at that size. */
+.home h2 {
+    line-height: var(--lh-title);
+    letter-spacing: var(--track-title);
+}
+
+/* Card, step and tier headings sit at 20-26px. At 1.06 the two-line ones
+   ("Planchado y desabolladura") nearly collided, and -0.02em had started to
+   eat the counters. */
+.home h3 {
+    line-height: var(--lh-subhead);
+    letter-spacing: var(--track-subhead);
 }
 
 .home p {
@@ -1548,33 +1595,6 @@ html:has(body.home) {
     margin: 0 auto;
 }
 
-/* The section label: small monospaced caps, like the label on a sample card.
-   It names the section; it doesn't decorate it. */
-.eyebrow {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 18px;
-    color: var(--text-dim);
-    font-family: var(--font-mono);
-    font-size: 0.75rem;
-    font-weight: 500;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-}
-
-/* The hero's label opens with the mark itself. */
-.eyebrow--mark {
-    color: var(--ink);
-}
-
-.eyebrow--mark::before {
-    content: "";
-    width: 15px;
-    height: 16px;
-    flex-shrink: 0;
-    background: url("imgs/brand/mark.svg") center / contain no-repeat;
-}
 
 /* Heading on the left, lede on the right, both on the same bottom line: the
    lede answers the heading instead of trailing under it. */
@@ -1590,22 +1610,12 @@ html:has(body.home) {
     font-size: clamp(2rem, 1.5rem + 2vw, 3rem);
 }
 
-/* .home p { margin: 0 } outranks .eyebrow here, which left these two labels
-   flush against their headings. */
-.split__copy .eyebrow,
-.contact__copy .eyebrow {
-    margin-bottom: 18px;
-}
-
-.section__head .eyebrow {
-    margin-bottom: 2px;
-}
 
 .section__lede {
     max-width: 52ch;
     color: var(--text-dim);
     font-size: 1.06rem;
-    line-height: 1.62;
+    line-height: var(--lh-body);
     text-wrap: pretty;
 }
 
@@ -1620,14 +1630,13 @@ html:has(body.home) {
         align-items: end;
     }
 
-    .section__head .eyebrow,
     .section__head h2 {
         grid-column: 1;
     }
 
     .section__head .section__lede {
         grid-column: 2;
-        grid-row: 1 / span 2;
+        grid-row: 1;
         align-self: end;
         font-size: 1.12rem;
     }
@@ -1664,13 +1673,11 @@ html:has(body.home) {
     padding-bottom: 56px;
 }
 
-.hero__copy .eyebrow {
-    margin-bottom: 22px;
-}
 
 .hero__title {
     font-size: clamp(2.6rem, 1.6rem + 4vw, 4.6rem);
-    line-height: 1.02;
+    line-height: var(--lh-display);
+    letter-spacing: var(--track-display);
 }
 
 /* The old page coloured "de fábrica" red; on a one-ink page the phrase just
@@ -1684,7 +1691,7 @@ html:has(body.home) {
     margin-top: 24px !important;
     color: var(--text-dim);
     font-size: 1.1rem;
-    line-height: 1.62;
+    line-height: var(--lh-body);
     text-wrap: pretty;
 }
 
@@ -1709,7 +1716,7 @@ html:has(body.home) {
     align-items: flex-start;
     gap: 10px;
     font-size: 0.9rem;
-    line-height: 1.45;
+    line-height: var(--lh-compact);
     color: var(--text-dim);
 }
 
@@ -1848,7 +1855,7 @@ html:has(body.home) {
     background: none;
     color: var(--text-dim);
     font-size: 0.8rem;
-    line-height: 1.25;
+    line-height: var(--lh-subhead);
     text-align: left;
     cursor: pointer;
 }
@@ -1891,9 +1898,10 @@ html:has(body.home) {
 }
 
 .swatches__note {
+    max-width: 44ch;
     color: var(--text-faint);
     font-size: 0.78rem;
-    line-height: 1.5;
+    line-height: var(--lh-snug);
 }
 
 @media (max-width: 479px) {
@@ -1980,7 +1988,7 @@ html:has(body.home) {
 .card p {
     color: var(--text-dim);
     font-size: 0.95rem;
-    line-height: 1.6;
+    line-height: var(--lh-body);
 }
 
 /* ===== Home: process steps ===== */
@@ -2047,7 +2055,7 @@ html:has(body.home) {
     max-width: 34ch;
     color: var(--text-dim);
     font-size: 0.95rem;
-    line-height: 1.6;
+    line-height: var(--lh-body);
 }
 
 /* ===== Home: finish tiers ===== */
@@ -2071,7 +2079,7 @@ html:has(body.home) {
     position: relative;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 0;
     padding: 32px 28px 28px;
     background: var(--ground-raised);
     border: 1px solid var(--border);
@@ -2115,6 +2123,7 @@ html:has(body.home) {
     display: flex;
     align-items: center;
     gap: 10px;
+    margin-bottom: 10px;
     font-size: 1.65rem;
 }
 
@@ -2134,7 +2143,11 @@ html:has(body.home) {
     font-family: var(--font-display);
     font-weight: 500;
     font-size: 2.1rem;
-    letter-spacing: -0.02em;
+    line-height: 1.1;
+    letter-spacing: var(--track-title);
+    /* Prices are read down the row of three cards, so the digits are
+       equal-width and the columns line up. */
+    font-variant-numeric: tabular-nums;
     color: var(--tier-text, var(--tier-color));
 }
 
@@ -2147,6 +2160,10 @@ html:has(body.home) {
     color: var(--text-faint);
 }
 
+.home .tier__price {
+    margin-bottom: 14px;
+}
+
 .tier__desc {
     color: var(--text-dim);
     font-size: 0.95rem;
@@ -2156,8 +2173,8 @@ html:has(body.home) {
     display: flex;
     flex-direction: column;
     gap: 11px;
-    margin: 6px 0 24px;
-    padding-top: 18px;
+    margin: 22px 0 26px;
+    padding-top: 20px;
     border-top: 1px solid var(--line);
 }
 
@@ -2166,7 +2183,7 @@ html:has(body.home) {
     padding-left: 24px;
     color: var(--text-dim);
     font-size: 0.9rem;
-    line-height: 1.5;
+    line-height: var(--lh-snug);
 }
 
 /* The lead of each line names what it is; the sentence after it explains. */
@@ -2254,7 +2271,7 @@ html:has(body.home) {
     margin: 0;
     color: var(--text-dim);
     font-size: 0.95rem;
-    line-height: 1.55;
+    line-height: var(--lh-snug);
 }
 
 .discount__steps {
@@ -2302,9 +2319,10 @@ html:has(body.home) {
 
 .tiers__note {
     margin-top: 22px !important;
+    max-width: 62ch;
     color: var(--text-faint);
     font-size: 0.86rem;
-    line-height: 1.6;
+    line-height: var(--lh-body);
 }
 
 /* ===== Home: why us ===== */
@@ -2326,7 +2344,7 @@ html:has(body.home) {
 
 .split__copy .section__lede {
     margin-top: 18px;
-    max-width: none;
+    max-width: 46ch;
 }
 
 .facts {
@@ -2343,7 +2361,8 @@ html:has(body.home) {
     font-family: var(--font-display);
     font-size: 1.22rem;
     font-weight: 500;
-    letter-spacing: -0.01em;
+    line-height: var(--lh-subhead);
+    letter-spacing: var(--track-subhead);
     color: var(--ink);
 }
 
@@ -2351,7 +2370,7 @@ html:has(body.home) {
     margin: 0;
     color: var(--text-dim);
     font-size: 0.95rem;
-    line-height: 1.6;
+    line-height: var(--lh-body);
 }
 
 /* Links reset to plain text site-wide, so one inside running copy needs its
@@ -2395,7 +2414,7 @@ html:has(body.home) {
     font-size: clamp(2.6rem, 2rem + 2vw, 3.6rem);
     font-weight: 500;
     line-height: 1;
-    letter-spacing: -0.02em;
+    letter-spacing: var(--track-title);
     color: var(--ink);
     white-space: nowrap;
     /* while the figure counts up the digits change every frame; equal-width
@@ -2405,7 +2424,7 @@ html:has(body.home) {
 
 .stats span {
     font-size: 0.95rem;
-    line-height: 1.45;
+    line-height: var(--lh-compact);
     color: var(--text-dim);
 }
 
@@ -2454,8 +2473,8 @@ html:has(body.home) {
     font-family: var(--font-display);
     font-weight: 500;
     font-size: 1.25rem;
-    letter-spacing: -0.01em;
-    line-height: 1.3;
+    letter-spacing: var(--track-subhead);
+    line-height: var(--lh-subhead);
     cursor: pointer;
     list-style: none;
 }
@@ -2489,10 +2508,10 @@ html:has(body.home) {
     flex-direction: column;
     gap: 12px;
     padding: 0 2px 24px;
-    max-width: 68ch;
+    max-width: 58ch;
     color: var(--text-dim);
     font-size: 0.98rem;
-    line-height: 1.65;
+    line-height: var(--lh-body);
 }
 
 .faq__body strong {
@@ -2553,11 +2572,21 @@ html:has(body.home) {
 
 .contact__value {
     font-size: 1.04rem;
-    line-height: 1.5;
+    line-height: var(--lh-snug);
     color: var(--ink);
     /* the address and the mail have no spaces to break at, and the cells are
        narrow — without this they run out over the rule on the right */
     overflow-wrap: anywhere;
+}
+
+/* The phone number and the mail are what a customer reaches for on a phone,
+   and both were 25px of hit area inside a 61px row. The padding fills the row
+   and the negative margin gives the space back, so nothing moves and the
+   baseline alignment beside the label survives. */
+a.contact__value {
+    display: block;
+    padding-block: 10px;
+    margin-block: -10px;
 }
 
 a.contact__value:hover {
@@ -2646,7 +2675,7 @@ a.contact__value:hover {
 .site-footer__nav {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 2px;
 }
 
 .site-footer__nav h2 {
@@ -2660,6 +2689,9 @@ a.contact__value:hover {
 }
 
 .site-footer__nav a {
+    display: flex;
+    align-items: center;
+    min-height: 40px;
     font-size: 0.95rem;
     color: #c3c8d4;
     transition: color 0.18s var(--ease-out);
@@ -2678,7 +2710,7 @@ a.contact__value:hover {
     padding-block: 22px 28px;
     border-top: 1px solid rgba(255, 255, 255, 0.12);
     font-size: 0.84rem;
-    line-height: 1.5;
+    line-height: var(--lh-snug);
     color: #8e96a8;
 }
 
@@ -2715,27 +2747,53 @@ a.contact__value:hover {
     transform: translateY(-2px);
 }
 
-/* ===== Home: scroll reveal =====
-   `.reveal` is visible by default and only armed once JS is running, so a
-   failed or blocked script can never leave the page blank. */
-.reveal-ready .reveal {
-    opacity: 0;
-    transform: translateY(16px);
-    transition: opacity 0.6s var(--ease-out), transform 0.6s var(--ease-out);
+/* ===== Home: the one authored moment =====
+   The page used to fade in every card, header and tier on scroll, which meant
+   thirty identical entrances and copy that read half-grey the whole way down.
+   The motion now happens once, on arrival, in the hero, and the rest of the
+   page is simply there when you reach it.
+
+   `backwards` is what makes this safe: the resting state is the finished one,
+   so the keyframes only ever pull the element back during the animation. If
+   animations never run, nothing is hidden. */
+@keyframes hero-in {
+    from {
+        opacity: 0;
+        transform: translateY(14px);
+    }
 }
 
-.reveal-ready .reveal.is-visible {
-    opacity: 1;
-    transform: none;
+.hero__copy > * {
+    animation: hero-in 0.7s var(--ease-out) backwards;
+}
+
+.hero__title {
+    animation-delay: 0.04s;
+}
+
+.hero__lede {
+    animation-delay: 0.1s;
+}
+
+.hero__actions {
+    animation-delay: 0.16s;
+}
+
+.hero__trust {
+    animation-delay: 0.22s;
+}
+
+/* The car arrives a beat after the sentence that describes it, and travels a
+   little further, so the hero reads left to right rather than all at once. */
+.hero__visual {
+    animation: hero-in 0.9s var(--ease-out) 0.14s backwards;
 }
 
 @media (prefers-reduced-motion: reduce) {
 
-    .reveal-ready .reveal,
-    .reveal-ready .reveal.is-visible {
-        opacity: 1;
-        transform: none;
-        transition: none;
+    .hero__copy > *,
+    .hero__visual {
+        animation: none;
     }
 }
 
@@ -2938,8 +2996,8 @@ body.wizard {
 .wizard .step h1 {
     font-size: clamp(1.8rem, 1.4rem + 1.6vw, 2.4rem);
     font-weight: 500;
-    line-height: 1.08;
-    letter-spacing: -0.02em;
+    line-height: var(--lh-heading);
+    letter-spacing: var(--track-heading);
     text-wrap: balance;
     margin: 0 0 10px;
 }
@@ -2948,7 +3006,7 @@ body.wizard {
     max-width: 46ch;
     margin: 0 auto 26px;
     font-size: 1rem;
-    line-height: 1.6;
+    line-height: var(--lh-body);
     color: var(--text-dim);
 }
 
@@ -3231,7 +3289,7 @@ body.wizard {
     margin: 0;
     max-width: 30ch;
     font-size: 0.85rem;
-    line-height: 1.4;
+    line-height: var(--lh-compact);
     text-align: right;
     color: var(--paint-red);
 }
@@ -3273,8 +3331,8 @@ body.wizard {
 .wizard .success h1 {
     font-size: clamp(1.8rem, 1.4rem + 1.6vw, 2.4rem);
     font-weight: 500;
-    line-height: 1.08;
-    letter-spacing: -0.02em;
+    line-height: var(--lh-heading);
+    letter-spacing: var(--track-heading);
 }
 
 .wizard .success__reset {
@@ -3297,7 +3355,7 @@ body.wizard {
     padding: 0 20px;
     text-align: center;
     font-size: 0.85rem;
-    line-height: 1.6;
+    line-height: var(--lh-body);
     color: var(--text-faint);
 }
 
@@ -3327,7 +3385,7 @@ body.wizard {
     background: rgba(201, 48, 42, 0.06);
     color: #a5241d;
     font-size: 0.88rem;
-    line-height: 1.5;
+    line-height: var(--lh-snug);
     text-align: left;
 }
 
@@ -3403,7 +3461,7 @@ body.wizard {
 .tracking-code__hint {
     margin: 0;
     font-size: 0.82rem;
-    line-height: 1.55;
+    line-height: var(--lh-snug);
     color: var(--text-dim);
 }
 
@@ -3445,7 +3503,7 @@ body.wizard {
 .lookup__head p {
     margin: 0 0 18px;
     font-size: 0.92rem;
-    line-height: 1.6;
+    line-height: var(--lh-body);
     color: var(--text-dim);
     max-width: 46ch;
 }
@@ -3736,8 +3794,8 @@ body.staff {
     font-family: var(--font-display);
     font-size: clamp(1.9rem, 1.4rem + 1.8vw, 2.5rem);
     font-weight: 500;
-    line-height: 1.08;
-    letter-spacing: -0.02em;
+    line-height: var(--lh-heading);
+    letter-spacing: var(--track-heading);
     color: var(--ink);
 }
 
@@ -4516,7 +4574,7 @@ body.staff {
     color: var(--ink);
     font-family: inherit;
     font-size: 0.95rem;
-    line-height: 1.6;
+    line-height: var(--lh-body);
     field-sizing: content;
     min-block-size: 6lh;
     /* Crece con lo escrito hasta aquí, y de ahí en adelante se desplaza por
@@ -4834,10 +4892,9 @@ body.staff {
 .staff-boss-note {
     margin-top: 18px;
     padding: 14px 16px;
-    border: 1px solid var(--border);
-    border-left: 3px solid var(--brand);
+    border: 1px solid var(--brand-line);
     border-radius: var(--radius-sm);
-    background: var(--surface);
+    background: var(--brand-soft);
 }
 
 .staff-boss-note__title {
@@ -4860,7 +4917,7 @@ body.staff {
 .staff-boss-note__text {
     margin: 0;
     font-size: 0.98rem;
-    line-height: 1.5;
+    line-height: var(--lh-snug);
     color: var(--ink);
     /* The boss types line breaks and means them. */
     white-space: pre-wrap;
@@ -4972,10 +5029,8 @@ body.staff {
     margin: 2px 0 0;
     padding-top: 10px;
     border-top: 1px solid var(--border);
-    border-left: 3px solid var(--brand);
-    padding-left: 12px;
     font-size: 0.88rem;
-    line-height: 1.45;
+    line-height: var(--lh-compact);
     color: var(--text-dim);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
@@ -5013,7 +5068,7 @@ body.staff {
     color: var(--ink);
     font: inherit;
     font-size: 0.92rem;
-    line-height: 1.5;
+    line-height: var(--lh-snug);
     resize: vertical;
 }
 
