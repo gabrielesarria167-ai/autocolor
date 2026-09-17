@@ -2518,143 +2518,84 @@ html:has(body.home) {
     color: var(--ink);
 }
 
-/* ===== Home: dentro del taller =====
-   Retícula modular. Las cuatro columnas y las dos filas son fijas, así que
-   cada canto cae sobre el módulo; las dos verticales ocupan la columna
-   entera en vez de recortarse a un formato apaisado, que es lo que salvaba
-   la hoja de contactos y lo único que aquélla hacía bien.
+/* ===== Home: las pruebas =====
+   Una foto sola, pegada a lo que demuestra. Agrupadas volvían a leerse como
+   una galería: un cajón de cosas sueltas que no demostraba ninguna. Por eso
+   esto no tiene ni título ni marco propio -- no es un bloque, es parte de la
+   sección donde cae, y cada sección se queda con una.
 
-   La altura de fila se calcula, no se adivina: ancho de columna entre 1.5
-   (la foto) más el alto fijo del pie. Una foto que ocupa dos filas mide
-   entonces dos filas más el filete, y la suya crece con ella porque es un
-   hijo flexible con object-fit. Sin ese cálculo las filas no cuadrarían con
-   las columnas al estrecharse la pantalla. */
-.taller {
+   La de "por qué Autocolor" lleva dos, porque son las dos únicas pruebas que
+   existen de lo que esa sección afirma: el color medido y el color
+   comprobado. Van con más aire entre ellas que contra el texto. */
+.proof {
     max-width: var(--shell);
-    margin: 72px auto 0;
-    padding-top: 44px;
-    border-top: 1px solid var(--line);
+    margin: 56px auto 0;
 }
 
-.taller__title {
-    font-size: 1.5rem;
+/* Dos seguidas necesitan separarse más entre sí que del texto que las rodea,
+   o vuelven a leerse como pareja en vez de como dos afirmaciones. */
+.proof + .proof {
+    margin-top: 88px;
 }
 
-.home .taller__lede {
-    margin-top: 8px;
-    margin-bottom: 36px;
-    max-width: 46ch;
-    color: var(--text-dim);
-    font-size: 1rem;
-}
-
-/* En el móvil no hay retícula que valga: una columna y cada foto con su
-   proporción de verdad, sin recorte ninguno. */
-.taller__grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 32px;
-}
-
-.taller figure {
-    margin: 0;
-    display: flex;
-    flex-direction: column;
-}
-
-.taller img {
+.proof img {
     display: block;
     width: 100%;
     height: auto;
-    /* Reserva el hueco mientras carga, con el tono de los fondos alternos en
-       vez del blanco, para que el salto no sea un destello. */
+    /* El hueco reservado con el tono de los fondos alternos: al cargar no da
+       un fogonazo blanco. */
     background: var(--surface-tint);
 }
 
-.home .taller figcaption {
-    margin-top: 14px;
+.home .proof figcaption {
+    margin-top: 16px;
+    max-width: 58ch;
     color: var(--text-dim);
-    font-size: 0.9rem;
-    line-height: var(--lh-snug);
+    font-size: 0.95rem;
+    line-height: var(--lh-body);
 }
 
-/* Paso intermedio: dos columnas parejas. Cuatro no caben sin dejar las fotos
-   del tamaño de un sello. */
-@media (min-width: 660px) {
-    .taller__grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 1px;
-        background: var(--border);
-        border: 1px solid var(--border);
-    }
-
-    .taller figure {
-        background: var(--ground-raised);
-    }
-
-    .taller img {
-        aspect-ratio: 3 / 2;
-        height: auto;
-        object-fit: cover;
-    }
-
-    .home .taller figcaption {
-        margin-top: 0;
-        padding: 16px 18px 18px;
-    }
-}
-
-/* La retícula modular. `--taller-col` es el ancho real de una columna y de
-   él sale la altura de fila, así que módulo y foto siguen cuadrando mientras
-   la pantalla se estrecha. */
-@media (min-width: 1024px) {
-    .taller__grid {
-        --taller-col: calc((min(var(--shell), 100vw - 64px) - 3px) / 4);
-        --taller-cap: 96px;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        grid-template-rows: repeat(2, calc(var(--taller-col) / 1.5 + var(--taller-cap)));
-    }
-
-    .taller figure {
-        height: 100%;
-    }
-
-    /* La foto se queda con lo que el pie no usa, en una fila o en dos. */
-    .taller img {
-        flex: 1;
-        min-height: 0;
-        aspect-ratio: auto;
-    }
-
-    .home .taller figcaption {
-        flex-shrink: 0;
-        height: var(--taller-cap);
-        box-sizing: border-box;
-        font-size: 0.85rem;
-        line-height: var(--lh-compact);
-    }
-
-    /* Las dos verticales toman la columna entera; las otras cuatro se reparten
-       las dos columnas que quedan. Leído por filas sale 1-2-3-5-4-6: el pie de
-       cada foto dice de qué etapa es, así que el sitio en la retícula no tiene
-       que cargar además con el orden. */
-    .taller figure:nth-child(1) { grid-column: 1; grid-row: 1; }
-    .taller figure:nth-child(2) { grid-column: 2; grid-row: 1 / 3; }
-    .taller figure:nth-child(3) { grid-column: 3; grid-row: 1; }
-    .taller figure:nth-child(4) { grid-column: 1; grid-row: 2; }
-    .taller figure:nth-child(5) { grid-column: 4; grid-row: 1 / 3; }
-    .taller figure:nth-child(6) { grid-column: 3; grid-row: 2; }
-}
-
-/* Dónde cae el recorte en cada foto: el asunto de cada una está en un sitio
-   distinto y el centro geométrico no sirve para ninguna de las tres. */
-.taller figure:nth-child(1) img { object-position: center 42%; }
-.taller figure:nth-child(2) img { object-position: center 40%; }
-.taller figure:nth-child(5) img { object-position: center 45%; }
-
-.taller figcaption strong {
+.proof figcaption strong {
     font-weight: 600;
     color: var(--ink);
+}
+
+/* La forma de la foto decide el trato, y no el sitio donde cae: apaisada de
+   verdad (más de 1.7) ocupa el shell entero; el resto se pone al lado de su
+   texto. A lo ancho del shell, una foto casi cuadrada mide 1112px de alto y
+   se convierte en un muro. */
+.proof--split {
+    display: grid;
+    grid-template-columns: 1fr;
+    /* En una columna el pie ya trae su propio margen: con `gap` encima se
+       separaba 40px, contra los 16 de la foto que ocupa el shell entero. */
+    gap: 0;
+}
+
+@media (min-width: 860px) {
+    .proof--split {
+        grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+        gap: 56px;
+        /* Abajo, como la entradilla contra su titular en .section__head. En el
+           centro el pie quedaba flotando en mitad de 700px de blanco. */
+        align-items: end;
+    }
+
+    /* La vertical al revés: a lo ancho saldría de tres pantallas de alto, así
+       que es ella la que toma la columna estrecha. */
+    .proof--tall {
+        grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    }
+
+    .home .proof--split figcaption {
+        margin-top: 0;
+    }
+}
+
+/* Junto al mapa, el aire de arriba ya lo pone la lista de datos. */
+.proof--tight {
+    margin-top: 40px;
+    margin-bottom: 32px;
 }
 
 /* ===== Home: contact ===== */
