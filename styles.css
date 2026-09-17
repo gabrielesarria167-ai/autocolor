@@ -2522,11 +2522,15 @@ html:has(body.home) {
    Una foto sola, pegada a lo que demuestra. Agrupadas volvían a leerse como
    una galería: un cajón de cosas sueltas que no demostraba ninguna. Por eso
    esto no tiene ni título ni marco propio -- no es un bloque, es parte de la
-   sección donde cae, y cada sección se queda con una.
+   sección donde cae.
 
-   La de "por qué Autocolor" lleva dos, porque son las dos únicas pruebas que
-   existen de lo que esa sección afirma: el color medido y el color
-   comprobado. Van con más aire entre ellas que contra el texto. */
+   Y sin pie, salvo una. Cuatro de los cinco repetían lo que ya dice el texto
+   de al lado: la tarjeta de Servicios describe el planchado, los acabados
+   describen los materiales, la ficha de Colorimetría describe el
+   espectrofotómetro y la dirección dice dónde está el taller. Con el pie
+   fuera, la foto se queda con el ancho entero en vez del 56% que le dejaba
+   la columna del texto -- y desaparecen los 400-600px de columna muerta que
+   había al lado de cada una. */
 .proof {
     max-width: var(--shell);
     margin: 56px auto 0;
@@ -2547,6 +2551,25 @@ html:has(body.home) {
     background: var(--surface-tint);
 }
 
+/* A partir del ancho de dos columnas la foto es una banda: a lo ancho del
+   shell, una de 4:3 mediría 885px de alto y taparía la pantalla entera. El
+   2:1 la deja alta de verdad sin convertirla en un muro, y es el mismo alto
+   para todas, así que la página coge un pulso horizontal en vez de subir y
+   bajar con la proporción de cada foto. */
+@media (min-width: 900px) {
+    .proof img {
+        aspect-ratio: 2 / 1;
+        height: auto;
+        object-fit: cover;
+    }
+}
+
+/* Dónde cae el recorte: el asunto de cada foto está a una altura distinta y
+   el centro geométrico no sirve para ninguna de las tres. */
+.proof img[src*="planchado"] { object-position: center 42%; }
+.proof img[src*="matizado"] { object-position: center 45%; }
+.proof img[src*="instalaciones"] { object-position: center 54%; }
+
 .home .proof figcaption {
     margin-top: 16px;
     max-width: 58ch;
@@ -2560,35 +2583,28 @@ html:has(body.home) {
     color: var(--ink);
 }
 
-/* La forma de la foto decide el trato, y no el sitio donde cae: apaisada de
-   verdad (más de 1.7) ocupa el shell entero; el resto se pone al lado de su
-   texto. A lo ancho del shell, una foto casi cuadrada mide 1112px de alto y
-   se convierte en un muro. */
-.proof--split {
-    display: grid;
-    grid-template-columns: 1fr;
-    /* En una columna el pie ya trae su propio margen: con `gap` encima se
-       separaba 40px, contra los 16 de la foto que ocupa el shell entero. */
-    gap: 0;
-}
+/* La vertical también es banda, y su pie va debajo y no al lado. Puesta de
+   canto ocupaba 468px de los 1180 y dejaba 594px de columna muerta en el
+   cuadrante de arriba a la derecha: en una pantalla ancha era el peor momento
+   de la página. Un vertical no tiene arreglo a este ancho -- agrandarlo sólo
+   lo hace más alto -- así que entra en el sistema de bandas como las demás.
 
-@media (min-width: 860px) {
-    .proof--split {
-        grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
-        gap: 56px;
-        /* Abajo, como la entradilla contra su titular en .section__head. En el
-           centro el pie quedaba flotando en mitad de 700px de blanco. */
-        align-items: end;
+   16:9 y no 2:1 porque es la foto que más peso carga y la única con pie: un
+   poco más de alto le deja la pieza entera y la mano que la sostiene. El
+   recorte se centra al 45%, que es donde está la pieza contra la carrocería;
+   lo que se pierde es el guante de abajo. */
+@media (min-width: 900px) {
+    .proof--lead img {
+        aspect-ratio: 16 / 9;
+        object-position: center 45%;
     }
 
-    /* La vertical al revés: a lo ancho saldría de tres pantallas de alto, así
-       que es ella la que toma la columna estrecha. */
-    .proof--tall {
-        grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-    }
-
-    .home .proof--split figcaption {
-        margin-top: 0;
+    .home .proof--lead figcaption {
+        /* 54 y no 62: el `ch` mide el ancho del cero, que en Schibsted
+           Grotesk va un 23% por encima de la letra media, así que 62ch
+           ponía 76 caracteres en la línea. */
+        max-width: 54ch;
+        font-size: 1.06rem;
     }
 }
 
