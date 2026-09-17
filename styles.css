@@ -3744,6 +3744,624 @@ body.wizard {
 }
 
 /* =============================================================================
+   VENTA DE MATIZADO (pgs/paintings.html)
+
+   Reaprovecha la carcasa del asistente de cotización —la tarjeta, la barra de
+   pasos, el pie, los campos— y añade solo lo que esta página tiene y la otra
+   no: las tres formas de identificar un color, la ficha del color encontrado,
+   los seis envases y el resumen previo a confirmar.
+
+   Todo va bajo .wizard--paints para no tocar nada de repair.html.
+   ========================================================================== */
+
+/* El paso de los envases pide seis tarjetas en fila; el resumen, algo más de
+   ancho que un formulario. El resto se queda en la anchura base del asistente
+   (ver `.wizard .repair` arriba). */
+.wizard--paints .repair:has(.step[data-step="2"].active) {
+    max-width: 1000px;
+}
+
+.wizard--paints .repair:has(.step[data-step="4"].active) {
+    max-width: 780px;
+}
+
+/* El paso que no aplica: ni hecho ni pendiente. Se queda escrito en la barra,
+   tachado, porque desaparecer haría que la barra cambiara de forma al elegir
+   una opción, y eso se lee como un fallo. */
+.wizard--paints .progress-dot.is-skipped {
+    background: var(--surface-tint);
+    border-style: dashed;
+    color: var(--text-faint);
+}
+
+.wizard--paints .progress-dot.is-skipped::before {
+    content: "–";
+}
+
+.wizard--paints .progress-dot.is-skipped::after {
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+    color: var(--text-faint);
+}
+
+/* ===== Paso 1: los tres caminos ===== */
+.method-tabs {
+    margin: 0 0 22px;
+}
+
+.method-panel[hidden] {
+    display: none;
+}
+
+.method-panel:focus-visible {
+    outline: none;
+}
+
+.method-hint {
+    margin: -4px 0 16px;
+}
+
+/* La línea bajo cada camino: qué hacer cuando ese camino no sirve. Es la que
+   convierte un callejón sin salida en una puerta a los otros dos. */
+.method-note {
+    margin: 14px 0 0;
+    padding-left: 14px;
+    border-left: 2px solid var(--border);
+    font-size: 0.88rem;
+    line-height: var(--lh-snug);
+    color: var(--text-dim);
+}
+
+/* Campo y botón pegados, con el botón dentro del mismo borde: es un solo
+   gesto —escribir el código y buscarlo— y se ve como uno. */
+.code-search {
+    display: flex;
+    align-items: stretch;
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    transition: border-color 0.2s var(--ease-out);
+}
+
+.code-search:hover {
+    border-color: var(--text-faint);
+}
+
+.code-search:focus-within {
+    border-color: var(--focus);
+}
+
+.code-search input {
+    flex: 1;
+    min-width: 0;
+    width: auto;
+    border: none;
+    background: none;
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+}
+
+.code-search input::placeholder {
+    font-family: var(--font-body);
+    text-transform: none;
+}
+
+.code-search input:focus-visible {
+    outline: none;
+    background: none;
+}
+
+.code-search__submit,
+.reading-submit {
+    flex: none;
+    padding: 0 18px;
+    border: none;
+    background: var(--ink);
+    color: #fff;
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s var(--ease-out);
+}
+
+.code-search__submit:hover,
+.reading-submit:hover {
+    background: var(--ink-deep);
+}
+
+.reading-submit {
+    width: 100%;
+    padding: 12px 18px;
+}
+
+/* Los tres pasos de la visita al taller. Numerados porque son un orden, no
+   una lista de ventajas. */
+.shop-steps {
+    display: grid;
+    gap: 14px;
+    margin: 0 0 16px;
+}
+
+.shop-steps li {
+    display: grid;
+    grid-template-columns: 26px 1fr;
+    gap: 12px;
+    align-items: start;
+    font-size: 0.95rem;
+    line-height: var(--lh-snug);
+    color: var(--text-dim);
+}
+
+.shop-steps__n {
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    background: var(--brand-soft);
+    color: var(--brand);
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+.shop-card__note {
+    margin: 0 0 16px;
+    padding: 12px 14px;
+    background: var(--surface-tint);
+    font-size: 0.88rem;
+    line-height: var(--lh-snug);
+    color: var(--text-dim);
+}
+
+/* ===== La ficha del color encontrado ===== */
+.colour-card {
+    display: grid;
+    grid-template-columns: 96px 1fr;
+    gap: 16px;
+    margin: 18px 0 0;
+    padding: 16px;
+    background: var(--surface);
+    border: 1px solid var(--brand-line);
+    box-shadow: 0 10px 24px rgba(27, 33, 48, 0.08);
+    animation: step-in 0.35s var(--ease-out);
+}
+
+.colour-card[hidden] {
+    display: none;
+}
+
+/* La muestra. El borde interior en dos tonos evita que un blanco de fábrica
+   se pierda contra la tarjeta y que un negro se coma su propio recuadro. */
+.colour-card__swatch {
+    min-height: 96px;
+    border: 1px solid var(--border);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+}
+
+.colour-card__body {
+    min-width: 0;
+}
+
+.colour-card__status {
+    display: inline-block;
+    margin-bottom: 6px;
+    padding: 3px 8px;
+    background: var(--brand-soft);
+    color: var(--brand);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: var(--track-label);
+    text-transform: uppercase;
+}
+
+/* Lo cerca que quedó una lectura digital. Exacta y muy cercana se aprueban
+   solas; de ahí en adelante el color se ajusta a mano, y el color del sello
+   lo dice antes de que nadie lea el ΔE. */
+.colour-card__status.is-exact,
+.colour-card__status.is-close {
+    background: rgba(31, 138, 76, 0.1);
+    color: #1a6d3c;
+}
+
+.colour-card__status.is-near {
+    background: rgba(244, 180, 0, 0.14);
+    color: var(--tier-alta-text);
+}
+
+.colour-card__status.is-far {
+    background: rgba(201, 48, 42, 0.08);
+    color: #a5241d;
+}
+
+.colour-card__name {
+    display: block;
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    font-weight: 600;
+    line-height: var(--lh-subhead);
+}
+
+.colour-card__facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 20px;
+    margin: 10px 0 0;
+}
+
+.colour-card__facts dt {
+    font-size: 0.72rem;
+    letter-spacing: var(--track-label);
+    text-transform: uppercase;
+    color: var(--text-faint);
+}
+
+.colour-card__facts dd {
+    margin: 2px 0 0;
+    font-size: 0.95rem;
+    font-weight: 500;
+}
+
+.colour-card__code {
+    font-family: var(--font-mono);
+    letter-spacing: 0.04em;
+}
+
+.colour-card__note {
+    margin: 12px 0 0;
+    font-size: 0.85rem;
+    line-height: var(--lh-snug);
+    color: var(--text-faint);
+}
+
+/* El código que no está en el catálogo. No es un error del cliente, así que
+   no se pinta de rojo: es una nota que además ofrece los otros dos caminos. */
+.colour-miss {
+    margin: 18px 0 0;
+    padding: 14px 16px;
+    background: var(--surface-tint);
+    border-left: 2px solid var(--border-strong);
+    font-size: 0.9rem;
+    line-height: var(--lh-snug);
+    color: var(--text-dim);
+}
+
+.colour-miss[hidden] {
+    display: none;
+}
+
+@media (max-width: 520px) {
+    .colour-card {
+        grid-template-columns: 1fr;
+    }
+
+    .colour-card__swatch {
+        min-height: 72px;
+    }
+}
+
+/* ===== Paso 2: los seis envases ===== */
+.size-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+    gap: 12px;
+    margin: 0 0 20px;
+}
+
+.size-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 16px 12px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s var(--ease-out), background 0.2s var(--ease-out),
+        box-shadow 0.2s var(--ease-out);
+}
+
+.size-card:hover {
+    border-color: var(--border-strong);
+}
+
+.size-card.is-selected {
+    border-color: var(--ink);
+    box-shadow: inset 0 0 0 1px var(--ink);
+}
+
+/* El envase, dibujado. Seis botes del mismo dibujo a distintos tamaños dicen
+   «este es el doble de aquel» más rápido que seis fracciones, y no hace falta
+   ninguna foto. El lado sale de la raíz cúbica del volumen (ver
+   renderSizeCards en src/paintings.js), así que la comparación es la de dos
+   recipientes de verdad y no la de dos números.
+
+   La plataforma es lo que mantiene alineadas las seis tarjetas: los botes se
+   apoyan en su borde inferior y las etiquetas empiezan todas a la misma
+   altura, aunque el bote de un galón mida el doble que el de 1/32. */
+.size-card__stage {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    height: 60px;
+    margin-bottom: 10px;
+}
+
+.size-card__jar {
+    display: block;
+    width: calc(16px + var(--fill) * 22px);
+    height: calc(18px + var(--fill) * 40px);
+    background: var(--surface-tint);
+    border: 1px solid var(--border-strong);
+    /* La tapa: el mismo borde, más grueso arriba. */
+    border-top-width: 3px;
+    transition: background 0.2s var(--ease-out), border-color 0.2s var(--ease-out);
+}
+
+.size-card:hover .size-card__jar {
+    border-color: var(--text-faint);
+}
+
+.size-card.is-selected .size-card__jar {
+    background: var(--brand-soft);
+    border-color: var(--ink);
+}
+
+.size-card__fraction {
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    font-weight: 600;
+}
+
+.size-card__volume {
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    color: var(--text-dim);
+}
+
+.size-card__use {
+    margin-top: 6px;
+    font-size: 0.78rem;
+    line-height: var(--lh-compact);
+    color: var(--text-faint);
+    text-wrap: balance;
+}
+
+.size-card__price {
+    margin-top: 8px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--ink);
+}
+
+/* La barra de abajo: cuántos envases y cuánto suma. Aparece al elegir uno. */
+.order-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 16px;
+    background: var(--surface-tint);
+    border: 1px solid var(--border);
+}
+
+.order-bar[hidden] {
+    display: none;
+}
+
+.order-bar__units {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.order-bar__label {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-dim);
+}
+
+.units-stepper {
+    display: flex;
+    align-items: stretch;
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+}
+
+.units-stepper__btn {
+    width: 36px;
+    border: none;
+    background: none;
+    color: var(--ink);
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.2s var(--ease-out);
+}
+
+.units-stepper__btn:hover:not(:disabled) {
+    background: var(--surface-tint);
+}
+
+.units-stepper__btn:disabled {
+    color: var(--border-strong);
+    cursor: not-allowed;
+}
+
+.units-stepper__value {
+    display: grid;
+    place-items: center;
+    min-width: 44px;
+    padding: 8px 0;
+    border-inline: 1px solid var(--border-strong);
+    font-family: var(--font-mono);
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+
+.order-bar__total {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--text-dim);
+}
+
+.order-bar__total strong {
+    font-family: var(--font-display);
+    font-size: 1.45rem;
+    font-weight: 600;
+    color: var(--ink);
+}
+
+.order-note {
+    margin: 12px 0 0;
+    font-size: 0.85rem;
+    line-height: var(--lh-snug);
+    color: var(--text-faint);
+}
+
+.order-note[hidden] {
+    display: none;
+}
+
+/* ===== Paso 3: los dos bloques de datos ===== */
+.company-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* ===== Paso 4: el resumen ===== */
+.summary {
+    display: grid;
+    gap: 14px;
+    margin: 0 0 18px;
+}
+
+.summary__block {
+    padding: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+}
+
+.summary__head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.summary__head h2 {
+    margin: 0;
+    margin-right: auto;
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    font-weight: 600;
+}
+
+/* El atajo al paso donde se cambia. Discreto, pero presente en cada bloque:
+   es la pantalla en la que uno descubre que se equivocó de envase. */
+.summary__edit {
+    padding: 4px 2px;
+    border: none;
+    background: none;
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+}
+
+.summary__edit:hover {
+    color: var(--ink);
+}
+
+.summary__swatch {
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--border);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+}
+
+.summary__rows {
+    display: grid;
+    gap: 8px;
+    margin: 0;
+}
+
+.summary__rows > div {
+    display: grid;
+    grid-template-columns: 132px 1fr;
+    gap: 12px;
+    align-items: baseline;
+}
+
+.summary__rows dt {
+    font-size: 0.85rem;
+    color: var(--text-faint);
+}
+
+.summary__rows dd {
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: var(--lh-snug);
+    overflow-wrap: anywhere;
+}
+
+.summary__mono {
+    font-family: var(--font-mono);
+    letter-spacing: 0.02em;
+}
+
+.summary__pending {
+    margin: 0;
+    padding: 12px 14px;
+    background: var(--surface-tint);
+    font-size: 0.9rem;
+    line-height: var(--lh-snug);
+    color: var(--text-dim);
+}
+
+@media (max-width: 480px) {
+    .summary__rows > div {
+        grid-template-columns: 1fr;
+        gap: 2px;
+    }
+}
+
+.summary__price {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 0 0 12px;
+    padding: 16px;
+    background: var(--ink);
+    color: #fff;
+    font-size: 0.9rem;
+}
+
+.summary__price[hidden] {
+    display: none;
+}
+
+.summary__price strong {
+    font-family: var(--font-display);
+    font-size: 1.6rem;
+    font-weight: 600;
+}
+
+.summary__legal {
+    margin: 0 0 4px;
+    font-size: 0.85rem;
+    line-height: var(--lh-snug);
+    color: var(--text-faint);
+}
+
+/* =============================================================================
    Panel del taller (pgs/taller.html)
 
    Es una herramienta interna, no una página del sitio: no lleva la cabecera ni

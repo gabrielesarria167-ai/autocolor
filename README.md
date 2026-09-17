@@ -5,6 +5,11 @@ Sitio y asistente de cotización de pintura automotriz. El asistente
 visor 3D y datos de contacto—, guarda la solicitud en Postgres y le entrega
 al cliente un código de 10 dígitos con el que puede consultar su estado.
 
+La página de venta de matizado (`pgs/paintings.html`) es el otro formulario:
+vende pintura ya matizada a talleres y empresas en cuatro pasos —color,
+envase, empresa y resumen—, guarda el pedido en su propia tabla y entrega otro
+código de 10 dígitos.
+
 ## Puesta en marcha
 
 Hace falta Node 18 o más nuevo y los binarios de Postgres instalados
@@ -76,6 +81,8 @@ lo abre a propósito, por ejemplo para probar el sitio desde el móvil.
 | `src/carVisual.js` | Visor 3D de piezas (three.js, un modelo por silueta). Lo montan el asistente y el panel |
 | `src/parts.js` | El nombre de cada pieza de carrocería y la lista de piezas de cada silueta, compartidos por los dos formularios, la lista sin 3D del paso 3 y los correos |
 | `vendor/three@0.169.0/` | The four three.js files the viewer imports, self-hosted (MIT licence alongside) |
+| `pgs/paintings.html`, `src/paintings.js` | Venta de matizado a otras empresas |
+| `src/paints.js` | El catálogo de colores por marca, los seis envases y sus precios; lo leen la página y los correos del pedido |
 | `src/lookup.js` | Consulta de una solicitud por su código |
 | `pgs/taller.html`, `src/staff.js` | Panel del taller: la cola de trabajo, el monitor del jefe y el registro de vehículos del local |
 | `src/cities.js` | Departamentos y provincias del Perú |
@@ -84,14 +91,14 @@ lo abre a propósito, por ejemplo para probar el sitio desde el móvil.
 | `src/config.js` | A qué servidor le habla el sitio |
 | `server/db.js` | Acceso a Postgres |
 | `server/auth.js` | La contraseña, los códigos y las sesiones del panel del taller |
-| `server/mail.js` | Los dos correos de cada solicitud nueva (API de Brevo) |
-| `server/mailhtml.js` | La maqueta en HTML de esos dos correos |
+| `server/mail.js` | Los dos correos de cada solicitud y de cada pedido de matizado (API de Brevo) |
+| `server/mailhtml.js` | La maqueta en HTML de esos correos |
 | `server/netcheck.js` | A dónde llega el alojamiento, cuando el correo falla |
 | `NEXT-STEPS.md` | Lo que queda por hacer del correo y los hallazgos de la revisión |
 | `server/env.js` | Lee el `.env` de la raíz al arrancar |
 | `render.yaml`, `.nvmrc` | El despliegue en Render |
 | `server/pgserver.sh` | Crea y controla el servidor Postgres propio |
-| `server/schema.sql` | Tabla `requests` + consultas útiles para el taller |
+| `server/schema.sql` | Tablas `requests` y `paint_orders` + consultas útiles para el taller |
 | `server/migrate.js` | Aplica `schema.sql` a la base local o a la alojada |
 | `imgs/assets/3d-visuals/` | Modelos `.glb` servidos |
 
@@ -487,12 +494,52 @@ la máscara que sale y retocarla a mano: los umbrales están puestos para este
 beige y este fondo, y el script solo avisa si la cobertura se va de lo
 razonable.
 
+## La venta de matizado
+
+`pgs/paintings.html` le vende pintura matizada a otros talleres y empresas.
+Son cuatro pasos y un camino que termina antes:
+
+1. **El color**, de tres maneras. Por **código de fábrica**, buscándolo en el
+   catálogo de `src/paints.js` dentro de su marca —el mismo «040» es un blanco
+   en Toyota y un negro en Mercedes-Benz, así que el código nunca se busca
+   suelto—. Por **lectura digital**, escribiendo los tres valores CIELAB que
+   entrega el espectrofotómetro del cliente: la página los compara con el
+   catálogo por ΔE\*ab y enseña el más cercano con su diferencia. Y **en el
+   taller**, que es cuando el vehículo ya fue repintado y su etiqueta no
+   describe lo que tiene encima.
+2. **El envase**: seis fracciones de galón estadounidense, de 1/32 (118 ml) a
+   1 galón (3.79 L), cada una con su volumen y con lo que cuesta según el
+   acabado del color (un sólido, un metálico, un perlado y un tricapa no
+   cuestan lo mismo). Se piden hasta 20 unidades iguales.
+3. **La empresa**: razón social y RUC —es lo que va en la factura—, la persona
+   de contacto y su zona.
+4. **El resumen**, con todo junto y el total, y cada bloque con su atajo al
+   paso donde se cambia.
+
+**El camino corto.** Quien elige resolver el color en el taller salta el paso
+2 entero, ida y vuelta: sin fórmula no hay cuánta pintura ni cuánto cuesta.
+Ese pedido llega a la base con `method = 'in_person'` y sin color, sin envase
+y sin precio, y lo que se confirma es una visita — así lo dicen el resumen, la
+pantalla de éxito y el correo.
+
+**Los precios y el catálogo de colores son un punto de partida, no un
+inventario.** Viven en `src/paints.js`, con sus códigos, sus nombres y un hex
+de muestra por color; completarlos es agregar filas. La página llama
+referencial a todo importe y repite que el color se aprueba con plancha de
+prueba, porque una muestra en pantalla no reproduce un metálico y un precio
+cerrado sin matizar no es un precio.
+
+Cada pedido deja una fila en `paint_orders` (ver `server/schema.sql`) y
+dispara los mismos dos correos que una solicitud: el código al cliente y la
+ficha al taller.
+
 ## API
 
 | Ruta | Qué hace |
 | --- | --- |
 | `POST /api/requests` | Guarda una solicitud y devuelve `{ id, status, createdAt }`. Requires `Content-Type: application/json` (415 otherwise) and, from a browser, this site's `Origin` (403 otherwise); 10 a minute per IPv4 address or IPv6 /64 |
 | `GET /api/requests/:id` | Devuelve `{ id, brand, model, vehicle, firstName, lastName, status }` |
+| `POST /api/paint-orders` | Guarda un pedido de matizado y devuelve `{ id, status, createdAt }`. Mismas tres puertas que `POST /api/requests`: JSON, `Origin` propio y 10 al minuto por IP |
 
 La consulta devuelve solo eso: el código circula en mensajes y papeles, así
 que no debería alcanzar para sacar el teléfono, el correo ni las notas de un

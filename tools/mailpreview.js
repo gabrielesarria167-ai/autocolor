@@ -126,12 +126,83 @@ const shopLegacy = mail.shopMessage(CREATED, LEGACY);
 const walkInCustomer = mail.customerMessage(CREATED, WALK_IN, true);
 const walkInShop = mail.shopMessage(CREATED, WALK_IN, true);
 
+// Los dos correos de un pedido de matizado (pgs/paintings.html), tal como
+// salen de validatePaintOrder(). Dos casos, que son los dos que existen: un
+// pedido con su color y su envase, y una visita al taller, que llega sin
+// ninguna de las dos cosas y por eso tiene su propia redacción.
+const PAINT_ORDER = {
+    method: 'code',
+    brand: 'Toyota',
+    colorCode: '1F7',
+    colorName: 'Plata Metálico',
+    finish: 'metalico',
+    reading: null,
+    size: '1_4',
+    units: 2,
+    price: 272,
+    company: 'Taller Los Andes S.A.C.',
+    ruc: '20123456789',
+    firstName: 'Gabriela',
+    lastName: 'Quispe',
+    department: 'Ayacucho',
+    province: 'Huamanga',
+    phone: '+51935646304',
+    email: 'compras@ejemplo.com',
+    notes: 'Necesitamos la entrega el viernes por la mañana.',
+};
+
+const PAINT_VISIT = {
+    method: 'in_person',
+    brand: null,
+    colorCode: null,
+    colorName: null,
+    finish: null,
+    reading: null,
+    size: null,
+    units: null,
+    price: null,
+    company: 'Concesionaria Sur E.I.R.L.',
+    ruc: '20456789123',
+    firstName: 'Luis',
+    lastName: 'Mendoza',
+    department: 'Lima',
+    province: 'Lima',
+    phone: '+51912345678',
+    email: 'taller@ejemplo.com',
+    notes: null,
+};
+
+// Una lectura del espectrofotómetro del cliente: el caso que prueba que los
+// tres valores CIELAB llegan al correo del taller, que es quien los usa.
+const PAINT_READING = {
+    ...PAINT_ORDER,
+    method: 'reading',
+    brand: 'Jeep',
+    colorCode: 'PAU',
+    colorName: 'Gris Granite',
+    finish: 'perlado',
+    reading: { L: 35.2, a: 12.8, b: -4.1 },
+    size: '1_8',
+    units: 3,
+    price: 291,
+    notes: null,
+};
+
+const paintCustomer = mail.paintCustomerMessage(CREATED, PAINT_ORDER);
+const paintShop = mail.paintShopMessage(CREATED, PAINT_ORDER);
+const paintVisitCustomer = mail.paintCustomerMessage(CREATED, PAINT_VISIT);
+const paintReadingShop = mail.paintShopMessage(CREATED, PAINT_READING);
+
 show('AL CLIENTE — solicitud completa', customer);
 show('AL TALLER — solicitud completa', shop);
 show('AL TALLER — sin los datos opcionales', shopMinimal);
 show('AL TALLER — fila antigua, sin correo ni zona', shopLegacy);
 show('AL CLIENTE — vehículo registrado en el local', walkInCustomer);
 show('AL TALLER — vehículo registrado en el local', walkInShop);
+show('AL CLIENTE — pedido de matizado', paintCustomer);
+show('AL TALLER — pedido de matizado', paintShop);
+show('AL CLIENTE — visita para medir el color', paintVisitCustomer);
+show('AL TALLER — matizado con lectura del cliente', paintReadingShop);
 
 const written = [
     ['cliente', writeHtml('autocolor-cliente.html', customer)],
@@ -140,6 +211,10 @@ const written = [
     ['taller (antiguo)', writeHtml('autocolor-taller-legacy.html', shopLegacy)],
     ['cliente (local)', writeHtml('autocolor-cliente-local.html', walkInCustomer)],
     ['taller (local)', writeHtml('autocolor-taller-local.html', walkInShop)],
+    ['cliente (matizado)', writeHtml('autocolor-cliente-matizado.html', paintCustomer)],
+    ['taller (matizado)', writeHtml('autocolor-taller-matizado.html', paintShop)],
+    ['cliente (visita)', writeHtml('autocolor-cliente-visita.html', paintVisitCustomer)],
+    ['taller (lectura)', writeHtml('autocolor-taller-lectura.html', paintReadingShop)],
 ].filter(([, file]) => file);
 if (written.length) {
     console.log(`\n${'='.repeat(72)}\nHTML para mirar en el navegador\n${'='.repeat(72)}`);

@@ -153,6 +153,68 @@ async function findRequest(id) {
     };
 }
 
+/* -----------------------------------------------------------------------------
+   paint_orders — los pedidos de matizado de pgs/paintings.html
+
+   Una tabla aparte de `requests` porque es otro negocio: aquí nadie deja un
+   vehículo. Lo único que comparten es la forma del código, que se sortea con
+   el mismo generateId() y por la misma razón.
+-------------------------------------------------------------------------- */
+
+const INSERT_PAINT_ORDER = `
+    INSERT INTO paint_orders (id, method, brand, color_code, color_name, finish,
+                              reading_l, reading_a, reading_b,
+                              size, units, price,
+                              company, ruc, first_name, last_name,
+                              department, province, phone, email, notes)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
+            $17, $18, $19, $20, $21)
+    RETURNING id, status, created_at
+`;
+
+/**
+ * Guarda un pedido de matizado y devuelve el código asignado.
+ *
+ * Mismo sorteo del código y mismo reintento ante un choque que
+ * createRequest(): los dos códigos salen del mismo espacio de 10 dígitos,
+ * aunque vivan en tablas distintas.
+ */
+async function createPaintOrder(data) {
+    for (let attempt = 1; attempt <= ID_ATTEMPTS; attempt++) {
+        const id = generateId();
+        try {
+            const { rows } = await pool.query(INSERT_PAINT_ORDER, [
+                id,
+                data.method,
+                data.brand,
+                data.colorCode,
+                data.colorName,
+                data.finish,
+                data.reading ? data.reading.L : null,
+                data.reading ? data.reading.a : null,
+                data.reading ? data.reading.b : null,
+                data.size,
+                data.units,
+                data.price,
+                data.company,
+                data.ruc,
+                data.firstName,
+                data.lastName,
+                data.department,
+                data.province,
+                data.phone,
+                data.email,
+                data.notes,
+            ]);
+            return { id: rows[0].id.trim(), status: rows[0].status, createdAt: rows[0].created_at };
+        } catch (err) {
+            if (err.code !== UNIQUE_VIOLATION || attempt === ID_ATTEMPTS) throw err;
+        }
+    }
+    throw new Error('No se pudo generar un código libre'); // inalcanzable: el bucle lanza antes
+}
+
+
 /**
  * La cola de trabajo del taller: las solicitudes, la más reciente primero,
  * opcionalmente filtradas por estado.
@@ -490,6 +552,7 @@ function describe() {
 
 module.exports = {
     createRequest, findRequest, listRequests, listOccupied, updateRequestStatus,
+    createPaintOrder,
     occupyRequest, releaseRequest,
     listWorkerNotes, findWorkerNote, setWorkerNote, clearWorkerNote,
     ping, describe, pool, DATABASE_URL,

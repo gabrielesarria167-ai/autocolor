@@ -49,7 +49,7 @@ const brotli = promisify(zlib.brotliCompress);
 const gzip = promisify(zlib.gzip);
 const {
     createRequest, findRequest, listRequests, listOccupied, updateRequestStatus,
-    occupyRequest, releaseRequest,
+    occupyRequest, releaseRequest, createPaintOrder,
     listWorkerNotes, findWorkerNote, setWorkerNote, clearWorkerNote,
     ping, describe, pool, DATABASE_URL,
 } = require('./db');
@@ -306,6 +306,115 @@ function validateRequest(body, required) {
         lastName: text(body.lastName, { max: 80, required: need('lastName'), field: 'el apellido' }),
         department: text(body.department, { max: 80, required: need('department'), field: 'el departamento' }),
         province: text(body.province, { max: 80, required: need('province'), field: 'la provincia', agree: 'f' }),
+        phone,
+        email,
+        notes: text(body.notes, { max: 2000, field: 'las notas', agree: 'fp' }),
+    };
+}
+
+/* -----------------------------------------------------------------------------
+   Pedidos de matizado (pgs/paintings.html)
+
+   Otro formulario y otra tabla, así que otra validación — pero los mismos
+   ayudantes de arriba (text, integer) y los mismos mensajes en español, que es
+   lo que hace que los dos formularios fallen igual.
+
+   La regla que no se ve a simple vista: un pedido 'in_person' llega SIN color
+   y SIN envase, y eso es correcto. El cliente va a traer el vehículo para que
+   se lo midan, así que la fórmula no existe todavía y no hay nada que cotizar.
+   Los otros dos caminos sí traen las dos cosas, y se exigen.
+-------------------------------------------------------------------------- */
+
+const PAINT_METHODS = new Set(['code', 'reading', 'in_person']);
+const PAINT_FINISHES = new Set(['solido', 'metalico', 'perlado', 'tricapa']);
+// Las seis fracciones de galón que vende el taller. La lista está también en
+// SIZES (src/paints.js), que es la que dibuja las tarjetas, y en el CHECK de
+// `size` (server/schema.sql), que es la última palabra.
+const PAINT_SIZES = new Set(['1_32', '1_16', '1_8', '1_4', '1_2', '1_1']);
+const MAX_UNITS = 20;
+// El techo del precio guardado. No es una tarifa: es lo que impide que alguien
+// mande un número absurdo al campo que el mostrador va a leer como «esto se le
+// prometió en pantalla».
+const MAX_PAINT_PRICE = 100_000;
+const RUC_RE = /^(10|15|17|20)[0-9]{9}$/;
+
+/** Un valor de la lectura CIELAB, o null si el pedido no trae medición. */
+function labValue(value, { min, max, field }) {
+    if (value === undefined || value === null || value === '') return null;
+    const number = typeof value === 'number' ? value : Number(String(value).trim());
+    if (!Number.isFinite(number) || number < min || number > max) {
+        throw new BadRequest(`${capitalize(field)} no es válido.`);
+    }
+    // Dos decimales, que es lo que entrega un espectrofotómetro y lo que
+    // acepta la columna.
+    return Math.round(number * 100) / 100;
+}
+
+function validatePaintOrder(body) {
+    if (!body || typeof body !== 'object') throw new BadRequest('Cuerpo inválido.');
+    if (!PAINT_METHODS.has(body.method)) throw new BadRequest('Forma de identificar el color no válida.');
+
+    const inPerson = body.method === 'in_person';
+
+    // El color. Se exige en los dos caminos que lo resuelven en pantalla, y se
+    // acepta vacío en el que lo resuelve el taller.
+    const colorCode = text(body.colorCode, { max: 20, required: !inPerson, field: 'el código de color' });
+    const colorName = text(body.colorName, { max: 80, required: !inPerson, field: 'el nombre del color' });
+    const brand = text(body.brand, { max: 40, required: !inPerson, field: 'la marca', agree: 'f' });
+    if (body.finish || !inPerson) {
+        if (!PAINT_FINISHES.has(body.finish)) throw new BadRequest('Acabado no válido.');
+    }
+
+    // La lectura digital: o vienen los tres valores o no viene ninguno. Dos de
+    // tres no describen ningún color, y guardarlos sería guardar un dato falso.
+    const reading = body.reading && typeof body.reading === 'object' ? {
+        L: labValue(body.reading.L, { min: 0, max: 100, field: 'el valor L*' }),
+        a: labValue(body.reading.a, { min: -128, max: 128, field: 'el valor a*' }),
+        b: labValue(body.reading.b, { min: -128, max: 128, field: 'el valor b*' }),
+    } : null;
+    if (reading && (reading.L === null || reading.a === null || reading.b === null)) {
+        throw new BadRequest('La lectura necesita los tres valores: L*, a* y b*.');
+    }
+
+    // El envase. Los tres campos del pedido —envase, unidades y precio— van
+    // juntos: o están los tres o no está ninguno. Un pedido 'in_person' que
+    // trajera unidades sin envase dejaría en la base un «3» de nada, así que
+    // aquí se descartan en vez de guardarse a medias.
+    if (!inPerson && !PAINT_SIZES.has(body.size)) throw new BadRequest('Envase no válido.');
+    if (inPerson && body.size) throw new BadRequest('Un pedido con lectura en el taller no lleva envase.');
+
+    const units = inPerson ? null
+        : integer(body.units, { min: 1, max: MAX_UNITS, required: true, field: 'la cantidad', agree: 'f' });
+    const price = inPerson ? null
+        : integer(body.price, { min: 0, max: MAX_PAINT_PRICE, field: 'el precio' });
+
+    const ruc = text(body.ruc, { max: 11, required: true, field: 'el RUC' });
+    if (!RUC_RE.test(ruc)) throw new BadRequest('El RUC no es válido.');
+
+    const phone = text(body.phone, { max: 20, required: true, field: 'el teléfono' });
+    if (!PHONE_RE.test(phone)) throw new BadRequest('El teléfono debe tener 9 dígitos.');
+
+    // Obligatorio y no opcional como en `requests`: el código del pedido sale
+    // por correo, y sin él el cliente se queda sin su comprobante.
+    const email = text(body.email, { max: 254, required: true, field: 'el email' });
+    if (!EMAIL_RE.test(email)) throw new BadRequest('El email no es válido.');
+
+    return {
+        method: body.method,
+        brand,
+        colorCode,
+        colorName,
+        finish: body.finish || null,
+        reading,
+        size: inPerson ? null : body.size,
+        units,
+        price,
+        company: text(body.company, { max: 120, required: true, field: 'la razón social', agree: 'f' }),
+        ruc,
+        firstName: text(body.firstName, { max: 80, required: true, field: 'el nombre' }),
+        lastName: text(body.lastName, { max: 80, required: true, field: 'el apellido' }),
+        department: text(body.department, { max: 80, required: true, field: 'el departamento' }),
+        province: text(body.province, { max: 80, required: true, field: 'la provincia', agree: 'f' }),
         phone,
         email,
         notes: text(body.notes, { max: 2000, field: 'las notas', agree: 'fp' }),
@@ -1167,6 +1276,32 @@ async function handleApi(req, res, pathname) {
         // —ni siquiera si armar un cuerpo falla—, así que aquí no queda nada
         // colgando. Lo que tarden en salir es asunto de server/mail.js.
         mail.notifyNewRequest(created, data);
+        return;
+    }
+
+    if (req.method === 'POST' && pathname === '/api/paint-orders') {
+        // Las mismas tres puertas que /api/requests, por las mismas razones:
+        // JSON de verdad, desde el sitio, y con un techo por IP.
+        if (!/^application\/json\b/i.test(String(req.headers['content-type'] || ''))) {
+            return sendJson(res, 415, { error: 'El formulario debe enviarse como JSON.' });
+        }
+        if (!isOwnOrigin(req)) {
+            console.warn(`[paint-orders] refused origin ${req.headers.origin} (host ${req.headers.host})`);
+            return sendJson(res, 403, { error: 'Envía tu pedido desde el formulario del sitio.' });
+        }
+        if (!rateLimit(`paint:${rateKey(ip)}`, 10)) {
+            return sendJson(res, 429, { error: 'Demasiados pedidos. Espera un minuto.' });
+        }
+        const data = validatePaintOrder(await readJsonBody(req));
+        const created = await createPaintOrder(data);
+        console.log(`[paint-orders] nuevo pedido ${created.id} (${data.method}` +
+            `${data.colorCode ? `, ${data.brand} ${data.colorCode}` : ''}` +
+            `${data.size ? `, ${data.size} x${data.units}` : ''})`);
+        sendJson(res, 201, created);
+        // Detrás de la respuesta y sin await, igual que los de una solicitud:
+        // la fila ya está guardada y el cliente ya tiene su código, así que un
+        // tropiezo del correo no puede convertirse en un error del pedido.
+        mail.notifyNewPaintOrder(created, data);
         return;
     }
 

@@ -229,6 +229,92 @@ CREATE TRIGGER requests_touch_updated_at
 
 
 -- =============================================================================
+-- paint_orders — matizado sold over the counter to other companies
+-- =============================================================================
+--
+-- The orders that come from pgs/paintings.html: a workshop, a dealership or a
+-- body shop buying paint mixed to one colour. It is a different trade from
+-- `requests` —nobody leaves a vehicle here, there are no panels and no
+-- status ladder through the shop— so it is a different table rather than more
+-- nullable columns on that one.
+--
+-- The tracking code is the same kind of credential and is generated the same
+-- way (see generateId in server/db.js): ten random digits, primary key, never
+-- correlative.
+CREATE TABLE IF NOT EXISTS paint_orders (
+    id          char(10)    PRIMARY KEY CHECK (id ~ '^[0-9]{10}$'),
+
+    -- How the colour was identified. 'in_person' is the one that arrives with
+    -- no colour and no container: the customer is bringing the vehicle so the
+    -- shop can read it with the spectrophotometer, and the formula —and with
+    -- it the size and the price— does not exist yet. That is why every column
+    -- describing the colour and the order below is nullable.
+    method      text        NOT NULL CHECK (method IN ('code', 'reading', 'in_person')),
+
+    brand       text,
+    color_code  text,
+    color_name  text,
+    finish      text        CHECK (finish IN ('solido', 'metalico', 'perlado', 'tricapa')),
+
+    -- The CIELAB reading the customer typed in, when they measured the colour
+    -- with their own spectrophotometer. Three numbers, kept together as one
+    -- row of the order: the shop starts the formula from them.
+    reading_l   numeric(5, 2) CHECK (reading_l BETWEEN 0 AND 100),
+    reading_a   numeric(6, 2) CHECK (reading_a BETWEEN -128 AND 128),
+    reading_b   numeric(6, 2) CHECK (reading_b BETWEEN -128 AND 128),
+
+    -- The container, as a fraction of a US gallon. The volumes it stands for
+    -- (118 ml, 946 ml, 3.79 L…) are derived in src/paints.js and not stored:
+    -- they are a property of the fraction, not of the order.
+    size        text        CHECK (size IN ('1_32', '1_16', '1_8', '1_4', '1_2', '1_1')),
+    units       integer     CHECK (units BETWEEN 1 AND 20),
+
+    -- What the page showed as the total when the customer confirmed, in whole
+    -- soles. IT IS NOT THE BILL: prices on the site are referential and the
+    -- shop closes them when it mixes the colour. It is stored so that the
+    -- counter knows what was promised on screen.
+    price       integer     CHECK (price >= 0),
+
+    -- Quien compra. La razón social y el RUC son los de la factura, así que
+    -- el RUC lleva escrito su formato: once dígitos, de los tipos que emite
+    -- SUNAT (10, 15, 17 personas naturales; 20 jurídicas).
+    company     text        NOT NULL CHECK (length(btrim(company)) > 0),
+    ruc         text        NOT NULL CHECK (ruc ~ '^(10|15|17|20)[0-9]{9}$'),
+
+    first_name  text        NOT NULL CHECK (length(btrim(first_name)) > 0),
+    last_name   text        NOT NULL CHECK (length(btrim(last_name)) > 0),
+    department  text,
+    province    text,
+    phone       text        NOT NULL,   -- +51 y 9 dígitos, como en `requests`
+    email       text        NOT NULL,
+    notes       text,
+
+    -- Cinco estados y no los once de `requests`: un matizado se recibe, se
+    -- prepara, está listo y se entrega. No pasa por planchado ni por horno.
+    -- La lista se repite en PAINT_STATUSES (server/server.js); este CHECK es
+    -- la última palabra, y ampliarlo sobre una base ya creada es una
+    -- migración, porque CREATE TABLE IF NOT EXISTS no lo toca.
+    status      text        NOT NULL DEFAULT 'recibido'
+                            CHECK (status IN ('recibido', 'preparacion', 'listo',
+                                              'entregado', 'cancelado')),
+
+    created_at  timestamptz NOT NULL DEFAULT now(),
+    updated_at  timestamptz NOT NULL DEFAULT now()
+);
+
+-- La cola del mostrador: lo pendiente, lo más reciente primero.
+CREATE INDEX IF NOT EXISTS paint_orders_status_created_at_idx
+    ON paint_orders (status, created_at DESC);
+
+-- Mismo trigger que `requests`, por lo mismo: cambiar el estado a mano desde
+-- psql no debe dejar la fecha desactualizada.
+DROP TRIGGER IF EXISTS paint_orders_touch_updated_at ON paint_orders;
+CREATE TRIGGER paint_orders_touch_updated_at
+    BEFORE UPDATE ON paint_orders
+    FOR EACH ROW EXECUTE FUNCTION requests_touch_updated_at();
+
+
+-- =============================================================================
 -- worker_notes — what the boss has told each worker
 -- =============================================================================
 --

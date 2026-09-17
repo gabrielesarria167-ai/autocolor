@@ -55,6 +55,10 @@ const mailhtml = require('./mailhtml');
 // The panel names have to read the same in the email as they did on the
 // screen the customer picked them from, and one file is what guarantees it.
 const parts = require('../src/parts.js');
+// Idem para el matizado: los envases, los acabados y los precios los nombra
+// src/paints.js, y el correo del pedido tiene que decirlos igual que la
+// página donde se eligieron.
+const paints = require('../src/paints.js');
 
 // La llave de la API de Brevo (Brevo → SMTP & API → API keys). Es lo único
 // secreto que hace falta: no hay usuario ni contraseña que guardar.
@@ -611,6 +615,186 @@ const OUTBOX = [];
 let draining = false;
 let retryTimer = null;
 
+/* -----------------------------------------------------------------------------
+   Pedidos de matizado (pgs/paintings.html)
+
+   Los mismos dos correos —uno al cliente con su código, otro al taller con la
+   ficha— para el otro formulario del sitio. Las etiquetas salen de
+   src/paints.js, que es el archivo que la página lee para dibujar las
+   tarjetas: así el correo dice «1/4 galón (946 ml)» donde la pantalla decía
+   lo mismo.
+-------------------------------------------------------------------------- */
+
+const PAINT_METHOD_LABELS = {
+    code: 'Por código de color',
+    reading: 'Lectura digital del cliente',
+    in_person: 'Lectura en el taller',
+};
+
+function methodLabel(id) {
+    return label(PAINT_METHOD_LABELS, id);
+}
+
+function finishLabel(id) {
+    return id ? paints.finishLabel(id) : '';
+}
+
+/** «Toyota 1F7 · Plata Metálico», o lo que haya de eso. */
+function colourName(data) {
+    const code = [oneLine(data.brand), oneLine(data.colorCode)].filter(Boolean).join(' ');
+    return [code, oneLine(data.colorName)].filter(Boolean).join(' · ');
+}
+
+/** «1/4 galón (946 ml) × 2», o nada cuando el envase se decide en el taller. */
+function orderLine(data) {
+    const size = data.size ? paints.size(data.size) : null;
+    if (!size) return '';
+    const units = data.units || 1;
+    return `${size.label} (${size.volume})${units > 1 ? ` × ${units}` : ''}`;
+}
+
+function priceLabel(price) {
+    return price === null || price === undefined ? '' : `${paints.formatSoles(price)} (referencial)`;
+}
+
+function readingLabel(reading) {
+    if (!reading) return '';
+    return `L* ${reading.L} · a* ${reading.a} · b* ${reading.b}`;
+}
+
+/**
+ * El hex de la muestra. No es una columna del pedido: sale del catálogo, y
+ * hace falta buscar la marca por su nombre porque es el nombre —y no el id—
+ * lo que se guarda y lo que viaja en el correo.
+ *
+ * Vacío cuando el color no está en el catálogo o no hay color todavía; el
+ * correo se arma igual, sin muestra.
+ */
+function colourHex(data) {
+    if (!data.colorCode || !data.brand) return '';
+    const wanted = oneLine(data.brand).toLowerCase();
+    const brandId = Object.keys(paints.BRAND_NAMES)
+        .find((id) => paints.BRAND_NAMES[id].toLowerCase() === wanted);
+    if (!brandId) return '';
+    const colour = paints.findColour(brandId, data.colorCode);
+    return colour ? colour.hex : '';
+}
+
+function paintContext() {
+    return { oneLine, formatPhone, zoneLabel, methodLabel, finishLabel,
+             colourName, orderLine, priceLabel, readingLabel, colourHex,
+             siteUrl: SITE_URL, logoUrl: LOGO_URL, logoDarkUrl: LOGO_DARK_URL };
+}
+
+function paintCustomerMessage(created, data) {
+    const name = oneLine(data.firstName);
+    const inPerson = data.method === 'in_person';
+    const lines = [
+        name ? `Hola ${name},` : 'Hola,',
+        '',
+        ...(inPerson
+            ? ['Anotamos tu visita. Trae el vehículo o una pieza suelta y medimos el',
+               'color con el espectrofotómetro delante de ti; con el color aprobado',
+               'decidimos ahí mismo el envase y el precio.']
+            : ['Recibimos tu pedido de matizado. Preparamos la fórmula y te avisamos',
+               'en cuanto esté lista para recoger.']),
+        '',
+    ];
+
+    // Sin color ni envase todavía, el bloque no puede llamarse «tu pedido»: lo
+    // que hay es una visita, y la única línea que se puede escribir del color
+    // es dónde se va a medir.
+    const rows = [
+        row('Empresa', data.company),
+        row('Color', inPerson ? 'Se mide en el taller' : colourName(data)),
+        row('Acabado', finishLabel(data.finish)),
+        row('Envase', orderLine(data)),
+        row('Total', priceLabel(data.price)),
+    ];
+    const summary = block(inPerson ? 'TU VISITA' : 'TU PEDIDO', rows);
+    if (summary) lines.push(summary, '');
+
+    lines.push('Tu código de pedido es:', '', `    ${created.id}`, '');
+    lines.push(inPerson
+        ? 'Guárdalo: con él te atendemos en el mostrador sin repetir los datos.'
+        : 'Guárdalo: con él te atendemos en el mostrador y por WhatsApp.');
+
+    if (!inPerson) {
+        lines.push('', 'El precio es referencial. El taller lo cierra al matizar el color, y el',
+            'color se aprueba con plancha de prueba antes de entregarlo.');
+    }
+
+    lines.push('', '— Autocolor');
+
+    return {
+        to: [data.email],
+        subject: inPerson
+            ? `Tu visita a Autocolor — código ${created.id}`
+            : `Tu pedido de matizado en Autocolor — código ${created.id}`,
+        text: lines.join('\n'),
+        html: mailhtml.paintCustomerHtml(created, data, paintContext()),
+    };
+}
+
+function paintShopMessage(created, data) {
+    const blocks = [
+        data.method === 'in_person'
+            ? 'Visita para medir un color, desde la página de venta de matizado.'
+            : 'Nuevo pedido de matizado desde el sitio.',
+        block('CLIENTE', [
+            row('Empresa', data.company),
+            row('RUC', data.ruc),
+            row('Contacto', `${oneLine(data.firstName)} ${oneLine(data.lastName)}`),
+            row('Teléfono', formatPhone(data.phone)),
+            row('Email', data.email),
+            row('Zona', zoneLabel(data)),
+        ]),
+        block('PEDIDO', [
+            row('Identificado', methodLabel(data.method)),
+            row('Marca', data.brand),
+            row('Código', data.colorCode),
+            row('Color', data.colorName),
+            row('Acabado', finishLabel(data.finish)),
+            row('Lectura', readingLabel(data.reading)),
+            row('Envase', orderLine(data)),
+            row('Precio', priceLabel(data.price)),
+        ]),
+        data.notes ? `NOTAS DEL CLIENTE\n  ${oneLine(data.notes)}` : null,
+        `Pedido ${created.id}`,
+    ];
+
+    return {
+        to: [SHOP],
+        // Responder al correo le escribe al cliente, que es lo que se hace con
+        // esto: confirmar el color o avisar de que ya está listo.
+        replyTo: data.email || undefined,
+        subject: `Matizado ${created.id} — ${oneLine(data.company)}`,
+        text: blocks.filter(Boolean).join('\n\n'),
+        html: mailhtml.paintShopHtml(created, data, paintContext()),
+    };
+}
+
+/**
+ * Avisa de un pedido de matizado nuevo. Mismas reglas que notifyNewRequest():
+ * no lanza, encola los dos mensajes y devuelve en cuanto están en la cola.
+ */
+function notifyNewPaintOrder(created, data) {
+    if (!isConfigured()) return { customer: false };
+
+    if (withinDailyCap('shop', '')) {
+        enqueue(`aviso al taller del matizado ${created.id}`, () => paintShopMessage(created, data));
+    }
+
+    let customer = false;
+    if (data.email && withinDailyCap('customer', data.email)) {
+        enqueue(`confirmación al cliente del matizado ${created.id}`, () => paintCustomerMessage(created, data));
+        customer = true;
+    }
+
+    kick();
+    return { customer };
+}
+
 /**
  * Avisa de una solicitud nueva por correo. NO LANZA NI RECHAZA NUNCA, ni
  * siquiera si armar los mensajes falla: se la llama sin `await` y sin
@@ -871,9 +1055,12 @@ module.exports = {
     verify,
     describe,
     notifyNewRequest,
+    notifyNewPaintOrder,
     close,
     // Exportados para poder revisar los cuerpos sin mandar nada (ver
     // tools/mailpreview.js).
     customerMessage,
     shopMessage,
+    paintCustomerMessage,
+    paintShopMessage,
 };

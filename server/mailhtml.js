@@ -633,7 +633,227 @@ ${panelUrl ? `
     });
 }
 
+/* -----------------------------------------------------------------------------
+   Los dos correos de un pedido de matizado (pgs/paintings.html)
+
+   Misma maqueta y otro contenido. Lo que cambia respecto de una solicitud de
+   pintado es qué se está confirmando: aquí no hay vehículo en el taller ni
+   presupuesto por venir, hay un color, un envase y un precio referencial.
+
+   El cuadro del color es la pieza propia. Un pedido de matizado se reconoce
+   por su color antes que por su código, así que la muestra va arriba y grande
+   —un recuadro de color con su código al lado—, y lleva escrito que es
+   referencial: ningún cliente de correo pinta un metálico, y quien apruebe un
+   color mirando esto va a reclamar.
+-------------------------------------------------------------------------- */
+
+/** La muestra del color, o nada cuando el pedido viene sin color (in_person). */
+function swatchBox(hex, code, name) {
+    if (!hex) return '';
+    return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td width="64" valign="top" style="width:64px;">
+                  <table role="presentation" width="64" cellpadding="0" cellspacing="0" border="0">
+                    <tr><td height="64" bgcolor="${escapeHtml(hex)}" style="width:64px; height:64px; background-color:${escapeHtml(hex)}; border:1px solid ${LINE}; font-size:0; line-height:0;">&nbsp;</td></tr>
+                  </table>
+                </td>
+                <td valign="middle" style="padding-left:16px;">
+                  <div class="c-ink" style="font-family:${MONO}; font-size:22px; line-height:26px; letter-spacing:2px; color:${INK}; font-weight:bold;">${escapeHtml(code)}</div>
+                  <div class="c-body" style="font-family:${FONT}; font-size:15px; line-height:22px; color:${BODY}; padding-top:4px;">${escapeHtml(name)}</div>
+                </td>
+              </tr>
+            </table>`;
+}
+
+function paintCustomerHtml(created, data, ctx) {
+    const name = ctx.oneLine(data.firstName);
+    const inPerson = data.method === 'in_person';
+    const hex = ctx.colourHex(data);
+    const headline = inPerson
+        ? (name ? `${name}, te esperamos en el taller.` : 'Te esperamos en el taller.')
+        : (name ? `${name}, estamos preparando tu matizado.` : 'Estamos preparando tu matizado.');
+
+    const summary = summaryRows([
+        { label: 'Empresa', value: ctx.oneLine(data.company) },
+        { label: 'Color', value: inPerson ? 'Se mide en el taller' : ctx.colourName(data) },
+        { label: 'Acabado', value: ctx.finishLabel(data.finish) },
+        { label: 'Envase', value: ctx.orderLine(data) },
+        { label: 'Total', value: ctx.priceLabel(data.price) },
+    ]);
+
+    const body = `
+        <tr>
+          <td class="px" align="left" style="padding:36px 48px 0 48px;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td class="c-step-done" align="center" valign="middle" width="22" height="22" bgcolor="${INK}" style="width:22px; height:22px; background-color:${INK}; font-family:Arial,Helvetica,sans-serif; font-size:13px; line-height:22px; font-weight:bold; color:#ffffff;">&#10003;</td>
+                <td class="c-accent" style="padding-left:10px; font-family:${FONT}; font-size:11px; line-height:14px; letter-spacing:3px; color:${ACCENT}; text-transform:uppercase; font-weight:bold;">${inPerson ? 'Visita agendada' : 'Pedido recibido'}</td>
+              </tr>
+            </table>
+            <div class="c-ink" style="font-family:${DISPLAY}; font-size:32px; line-height:40px; color:${INK}; font-weight:500; padding-top:14px;">${escapeHtml(headline)}</div>
+            <div class="c-body" style="font-family:${FONT}; font-size:16px; line-height:26px; color:${BODY}; padding-top:14px;">
+              ${inPerson
+                ? 'Trae el vehículo o una pieza suelta y medimos el color con el espectrofotómetro delante de ti. Con el color aprobado decidimos ahí mismo el envase y el precio.'
+                : 'Preparamos la fórmula y te avisamos en cuanto esté lista para recoger. El color se aprueba con plancha de prueba antes de entregarlo.'}
+            </div>
+          </td>
+        </tr>
+${hex ? `
+        <tr>
+          <td class="px" style="padding:28px 48px 0 48px;">
+            ${swatchBox(hex, `${ctx.oneLine(data.brand)} ${ctx.oneLine(data.colorCode)}`.trim(), ctx.oneLine(data.colorName))}
+            <div class="c-muted" style="font-family:${FONT}; font-size:13px; line-height:20px; color:${MUTED}; padding-top:12px;">La muestra es referencial: una pantalla no reproduce un metálico ni un perlado.</div>
+          </td>
+        </tr>` : ''}
+
+        <tr>
+          <td class="px" style="padding:32px 48px 0 48px;">
+            <table role="presentation" class="c-box" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${GROUND}" style="background-color:${GROUND}; border:1px solid ${LINE};">
+              <tr>
+                <td style="padding:22px 24px;">
+                  <div class="c-muted" style="font-family:${FONT}; font-size:11px; line-height:14px; letter-spacing:2.5px; color:${MUTED}; text-transform:uppercase; padding-bottom:6px;">Código de pedido</div>
+                  <div class="c-ink" style="font-family:${MONO}; font-size:30px; line-height:34px; letter-spacing:3px; color:${INK}; font-weight:bold;">${escapeHtml(created.id)}</div>
+                </td>
+              </tr>
+              <tr>
+                <td class="c-box-rule" style="border-top:1px solid ${LINE}; padding:14px 24px 16px 24px;">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+${summary}
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+${hairline('36px 48px 0 48px')}
+
+        <tr>
+          <td class="px" style="padding:24px 48px 36px 48px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td class="stack" valign="middle">
+                  <div class="c-ink" style="font-family:${FONT}; font-size:15px; line-height:22px; color:${INK}; font-weight:bold;">${escapeHtml(SHOP_ADDRESS)}</div>
+                  <div class="c-body" style="font-family:${FONT}; font-size:14px; line-height:22px; color:${BODY};">${escapeHtml(SHOP_HOURS)}</div>
+                </td>
+                <td class="stack stack-gap" align="right" valign="middle" style="padding-left:24px;">
+                  <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                    <tr>
+                      <td class="c-outline" style="border:1px solid ${INK};">
+                        <a class="c-accent" href="https://wa.me/${SHOP_PHONE_TEL.replace(/\D/g, '')}" target="_blank" style="display:block; font-family:${FONT}; font-size:14px; line-height:20px; font-weight:bold; color:${ACCENT}; text-decoration:none; white-space:nowrap; padding:11px 16px;">WhatsApp · ${SHOP_PHONE}</a>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>`;
+
+    return shell({
+        title: inPerson ? `Tu visita a Autocolor — ${created.id}` : `Tu pedido de matizado — ${created.id}`,
+        preheader: inPerson
+            ? `Tu código es ${created.id}. Te esperamos para medir el color.`
+            : `Tu código es ${created.id}. Estamos preparando tu matizado.`,
+        kicker: 'Laboratorio de matizado',
+        body,
+        footerNote: 'Recibiste este correo porque hiciste un pedido de matizado en Autocolor.',
+        logoUrl: ctx.logoUrl,
+        logoDarkUrl: ctx.logoDarkUrl,
+    });
+}
+
+function paintShopHtml(created, data, ctx) {
+    const fullName = [ctx.oneLine(data.firstName), ctx.oneLine(data.lastName)].filter(Boolean).join(' ');
+    const phone = ctx.formatPhone(data.phone);
+    const email = ctx.oneLine(data.email);
+    const inPerson = data.method === 'in_person';
+    const hex = ctx.colourHex(data);
+
+    const contactRows = detailRows([
+        { label: 'Empresa', value: ctx.oneLine(data.company) },
+        { label: 'RUC', value: ctx.oneLine(data.ruc), html: `<span style="font-family:${MONO}; letter-spacing:1px;">${escapeHtml(ctx.oneLine(data.ruc))}</span>` },
+        { label: 'Contacto', value: fullName },
+        {
+            label: 'Teléfono',
+            value: phone,
+            html: `<a href="tel:${escapeHtml(ctx.oneLine(data.phone))}" style="color:${ACCENT}; text-decoration:none; font-weight:bold;">${escapeHtml(phone)}</a>`,
+        },
+        {
+            label: 'Email',
+            value: email,
+            html: `<a href="mailto:${escapeHtml(email)}" style="color:${ACCENT}; text-decoration:none;">${escapeHtml(email)}</a>`,
+        },
+        { label: 'Zona', value: ctx.zoneLabel(data) },
+    ]);
+
+    const orderRows = detailRows([
+        { label: 'Identificado', value: ctx.methodLabel(data.method) },
+        { label: 'Marca', value: ctx.oneLine(data.brand) },
+        { label: 'Código', value: ctx.oneLine(data.colorCode), html: `<span style="font-family:${MONO}; font-weight:bold; letter-spacing:1px;">${escapeHtml(ctx.oneLine(data.colorCode))}</span>` },
+        { label: 'Color', value: ctx.oneLine(data.colorName) },
+        { label: 'Acabado', value: ctx.finishLabel(data.finish) },
+        { label: 'Lectura CIELAB', value: ctx.readingLabel(data.reading) },
+        { label: 'Envase', value: ctx.orderLine(data) },
+        { label: 'Precio en pantalla', value: ctx.priceLabel(data.price) },
+    ]);
+
+    const body = `
+        <tr>
+          <td class="px" align="left" style="padding:36px 48px 0 48px;">
+            <div class="c-muted" style="font-family:${FONT}; font-size:11px; line-height:14px; letter-spacing:3px; color:${MUTED}; text-transform:uppercase;">Pedido ${escapeHtml(created.id)}</div>
+            <div class="c-ink" style="font-family:${DISPLAY}; font-size:28px; line-height:34px; color:${INK}; font-weight:500; padding-top:10px;">${escapeHtml(ctx.oneLine(data.company))}</div>
+            <div class="c-body" style="font-family:${FONT}; font-size:15px; line-height:24px; color:${BODY}; padding-top:6px;">${inPerson
+                ? 'Viene al taller a que le midamos el color. No hay envase ni precio todavía.'
+                : 'Pedido de matizado desde el sitio.'}</div>
+          </td>
+        </tr>
+
+        <tr>
+          <td class="px" style="padding:26px 48px 0 48px;">
+            ${eyebrow('Cliente')}
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+${contactRows}
+            </table>
+          </td>
+        </tr>
+
+        <tr>
+          <td class="px" style="padding:26px 48px 0 48px;">
+            ${eyebrow('El pedido')}
+            ${hex ? swatchBox(hex, ctx.oneLine(data.colorCode), ctx.oneLine(data.colorName)) + '<div style="height:16px; font-size:0; line-height:0;">&nbsp;</div>' : ''}
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+${orderRows}
+            </table>
+          </td>
+        </tr>
+${ctx.oneLine(data.notes) ? `
+        <tr>
+          <td class="px" style="padding:26px 48px 0 48px;">
+            ${eyebrow('Notas del cliente')}
+            <table role="presentation" class="c-note" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${GROUND}" style="background-color:${GROUND};">
+              <tr><td class="c-body" style="padding:14px 16px; font-family:${FONT}; font-size:15px; line-height:23px; color:${BODY};">${escapeMultiline(data.notes)}</td></tr>
+            </table>
+          </td>
+        </tr>` : ''}
+
+        <tr><td style="height:36px; font-size:0; line-height:0;">&nbsp;</td></tr>`;
+
+    return shell({
+        title: `Pedido de matizado ${created.id} — ${ctx.oneLine(data.company)}`,
+        preheader: [ctx.oneLine(data.company), ctx.colourName(data), ctx.orderLine(data)]
+            .filter(Boolean).join(' · '),
+        kicker: 'Aviso interno del taller',
+        body,
+        footerNote: 'Aviso automático de la página de venta de matizado. Responder a este correo le escribe al cliente.',
+        logoUrl: ctx.logoUrl,
+        logoDarkUrl: ctx.logoDarkUrl,
+    });
+}
+
 module.exports = {
     customerHtml,
     shopHtml,
+    paintCustomerHtml,
+    paintShopHtml,
 };

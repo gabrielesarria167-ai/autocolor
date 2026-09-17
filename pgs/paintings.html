@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#ffffff">
+    <meta name="description" content="Matizado de pintura automotriz para talleres y empresas: identifica el color, elige el envase y recibe tu pedido preparado.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600&family=Schibsted+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet">
+    <link rel="icon" href="../imgs/brand/favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="../imgs/brand/favicon.ico" sizes="48x48">
+    <link rel="apple-touch-icon" href="../imgs/brand/apple-touch-icon.png">
+    <link rel="stylesheet" href="../styles.css">
+    <script src="../src/config.js" defer></script>
+    <script src="../src/cities.js" defer></script>
+    <script src="../src/paints.js" defer></script>
+    <script src="../src/paintings.js" defer></script>
+
+    <title>Autocolor — Venta de matizado</title>
+</head>
+
+<body class="wizard wizard--paints">
+    <header class="site-header">
+        <a class="site-header__brand" href="../index.html" aria-label="Autocolor — inicio">
+            <img src="../imgs/brand/lockup-horizontal.svg" alt="Autocolor" class="site-header__logo" width="199" height="30">
+        </a>
+
+        <nav class="site-nav" aria-label="Navegación principal">
+            <a href="../index.html">Inicio</a>
+            <a href="../index.html#servicios">Servicios</a>
+            <a href="../index.html#acabados">Acabados</a>
+            <a href="../index.html#faq">Preguntas</a>
+            <a href="../index.html#contacto">Contacto</a>
+        </nav>
+
+        <div class="site-header__actions">
+            <span class="site-header__tag">Venta de matizado</span>
+            <button class="menu-toggle" type="button" id="menuToggle" aria-label="Abre el menú" aria-expanded="false"
+                aria-controls="navPanel">
+                <span></span><span></span><span></span>
+            </button>
+        </div>
+    </header>
+
+    <nav id="navPanel" class="nav-panel" aria-label="Menú principal">
+        <a href="../index.html">Inicio</a>
+        <a href="../index.html#servicios">Servicios</a>
+        <a href="../index.html#acabados">Acabados</a>
+        <a href="../index.html#faq">Preguntas</a>
+        <a href="../index.html#contacto">Contacto</a>
+    </nav>
+
+    <main class="repair">
+      <div class="wizard-card">
+        <nav class="progress" aria-label="Pasos">
+            <span class="progress-dot is-current" data-step="1" data-label="Color" aria-current="step"></span>
+            <span class="progress-line" data-after="1"><span class="fill"></span></span>
+            <span class="progress-dot" data-step="2" data-label="Cantidad"></span>
+            <span class="progress-line" data-after="2"><span class="fill"></span></span>
+            <span class="progress-dot" data-step="3" data-label="Empresa"></span>
+            <span class="progress-line" data-after="3"><span class="fill"></span></span>
+            <span class="progress-dot" data-step="4" data-label="Resumen"></span>
+        </nav>
+
+        <div class="wizard-body">
+
+        <!-- ==========================================================
+             Paso 1 — el color
+
+             Tres maneras de llegar al mismo dato, y ninguna es la
+             principal: el código lo tiene quien puede leer la etiqueta
+             del vehículo, la lectura digital quien ya midió el color con
+             su propio equipo, y el taller es para cuando el vehículo
+             está repintado y la etiqueta ya no dice la verdad.
+
+             La tercera termina el pedido antes: sin el color no hay
+             fórmula, y sin fórmula no hay cuánta pintura ni cuánto
+             cuesta. Lo que se envía entonces es una visita, no una
+             compra, y src/paintings.js salta el paso 2.
+             ========================================================== -->
+        <section class="step active" data-step="1">
+            <h1>¿Qué color necesitas?</h1>
+            <p class="step__subtitle">Tres formas de identificarlo. Elige la que tengas a mano.</p>
+
+            <!-- Botones con estado, no una tablist. Un tablist de verdad le
+                 debe al teclado las flechas y un tabindex móvil, y uno que no
+                 los cumple es peor que no declarar el patrón: los botones de
+                 cámara del paso 3 de repair.html se resuelven igual. -->
+            <div class="view-tabs method-tabs" id="methodTabs" role="group" aria-label="Cómo identificar el color">
+                <button type="button" class="view-tab is-active" id="methodTabCode"
+                    data-method="code" aria-pressed="true" aria-controls="methodPanelCode">Por código</button>
+                <button type="button" class="view-tab" id="methodTabReading"
+                    data-method="reading" aria-pressed="false" aria-controls="methodPanelReading">Lectura digital</button>
+                <button type="button" class="view-tab" id="methodTabShop"
+                    data-method="in_person" aria-pressed="false" aria-controls="methodPanelShop">En el taller</button>
+            </div>
+
+            <!-- Por código ------------------------------------------------>
+            <section class="method-panel" id="methodPanelCode" aria-labelledby="methodTabCode">
+                <section class="data-card">
+                    <h2 class="data-card__head">
+                        <span class="data-card__icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z" />
+                                <circle cx="8" cy="8" r="1.4" />
+                            </svg>
+                        </span>
+                        Código de color
+                    </h2>
+
+                    <div class="field-row field-row--wide">
+                        <div class="field">
+                            <label for="colorBrand">Marca del vehículo</label>
+                            <select id="colorBrand" class="is-placeholder" required>
+                                <option value="" selected disabled hidden>Seleccionar marca</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label for="colorCode">Código</label>
+                            <div class="code-search">
+                                <input type="text" id="colorCode" maxlength="12" placeholder="Ej. 1F7, 040, KAD"
+                                    autocomplete="off" spellcheck="false" aria-describedby="colorCodeHint">
+                                <button type="button" class="code-search__submit" id="colorSearch">Buscar</button>
+                            </div>
+                            <p class="field__hint" id="colorCodeHint">Está en una etiqueta del vehículo: marco de la
+                                puerta, bajo el capó o en el maletero.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <p class="method-note">
+                    ¿La etiqueta no aparece o el vehículo ya fue repintado? El código de fábrica ya no describe lo
+                    que tiene encima: usa la lectura digital o tráelo al taller.
+                </p>
+            </section>
+
+            <!-- Lectura digital -------------------------------------------->
+            <section class="method-panel" id="methodPanelReading" aria-labelledby="methodTabReading" hidden>
+                <section class="data-card">
+                    <h2 class="data-card__head">
+                        <span class="data-card__icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M4 7V5.5A1.5 1.5 0 0 1 5.5 4H9" />
+                                <path d="M20 7V5.5A1.5 1.5 0 0 0 18.5 4H15" />
+                                <path d="M4 17v1.5A1.5 1.5 0 0 0 5.5 20H9" />
+                                <path d="M20 17v1.5a1.5 1.5 0 0 1-1.5 1.5H15" />
+                                <path d="M7 12h10" />
+                            </svg>
+                        </span>
+                        Lectura de tu espectrofotómetro
+                    </h2>
+
+                    <p class="field__hint method-hint">Ingresa los tres valores CIELAB que entrega el equipo. Buscamos
+                        el color del catálogo más cercano a esa medición.</p>
+
+                    <div class="field-row">
+                        <div class="field">
+                            <label for="readingL">L*<span class="field__optional"> claridad</span></label>
+                            <input type="text" id="readingL" inputmode="decimal" maxlength="6" placeholder="0 – 100"
+                                autocomplete="off">
+                        </div>
+                        <div class="field">
+                            <label for="readingA">a*<span class="field__optional"> verde–rojo</span></label>
+                            <input type="text" id="readingA" inputmode="decimal" maxlength="6" placeholder="-128 – 128"
+                                autocomplete="off">
+                        </div>
+                        <div class="field">
+                            <label for="readingB">b*<span class="field__optional"> azul–amarillo</span></label>
+                            <input type="text" id="readingB" inputmode="decimal" maxlength="6" placeholder="-128 – 128"
+                                autocomplete="off">
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <button type="button" class="reading-submit" id="readingSearch">Buscar coincidencia</button>
+                    </div>
+                </section>
+
+                <p class="method-note">
+                    Sin equipo propio, la lectura la hacemos nosotros: trae el vehículo o una pieza y la medimos
+                    delante de ti.
+                </p>
+            </section>
+
+            <!-- En el taller ----------------------------------------------->
+            <section class="method-panel" id="methodPanelShop" aria-labelledby="methodTabShop" hidden>
+                <section class="data-card shop-card">
+                    <h2 class="data-card__head">
+                        <span class="data-card__icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M5 17H3.5v-5L5.5 7h13l2 5v5H19" />
+                                <path d="M9.5 17h5" />
+                                <circle cx="7" cy="17" r="2" />
+                                <circle cx="17" cy="17" r="2" />
+                            </svg>
+                        </span>
+                        Lo vemos en el taller
+                    </h2>
+
+                    <ol class="shop-steps">
+                        <li>
+                            <span class="shop-steps__n" aria-hidden="true">1</span>
+                            <span>Traes el vehículo o una pieza suelta —una tapa, un espejo, el tapón del
+                                combustible—.</span>
+                        </li>
+                        <li>
+                            <span class="shop-steps__n" aria-hidden="true">2</span>
+                            <span>Medimos el color con el espectrofotómetro delante de ti y ajustamos la fórmula
+                                sobre una plancha de prueba.</span>
+                        </li>
+                        <li>
+                            <span class="shop-steps__n" aria-hidden="true">3</span>
+                            <span>Con el color aprobado decidimos ahí mismo el envase y el precio.</span>
+                        </li>
+                    </ol>
+
+                    <p class="shop-card__note">Por eso este camino no pide cantidad ni precio todavía: sin la fórmula
+                        no hay nada que cotizar. Déjanos los datos de tu empresa y te esperamos.</p>
+                </section>
+
+                <p class="method-note">
+                    Jr. San Juan Masías, Ayacucho · Lunes a sábado, 07:30 – 20:00
+                </p>
+            </section>
+
+            <!-- El color encontrado, por cualquiera de los dos caminos que
+                 terminan en pantalla. Lo llena src/paintings.js. -->
+            <figure class="colour-card" id="colourCard" hidden>
+                <span class="colour-card__swatch" id="colourSwatch" aria-hidden="true"></span>
+                <figcaption class="colour-card__body">
+                    <span class="colour-card__status" id="colourStatus"></span>
+                    <strong class="colour-card__name" id="colourName"></strong>
+                    <dl class="colour-card__facts">
+                        <div><dt>Marca</dt><dd id="colourBrand"></dd></div>
+                        <div><dt>Código</dt><dd class="colour-card__code" id="colourCode"></dd></div>
+                        <div><dt>Acabado</dt><dd id="colourFinish"></dd></div>
+                    </dl>
+                    <p class="colour-card__note" id="colourNote"></p>
+                </figcaption>
+            </figure>
+
+            <p class="colour-miss" id="colourMiss" role="status" hidden></p>
+        </section>
+
+        <!-- ==========================================================
+             Paso 2 — el envase
+
+             Seis fracciones de galón, de la más chica a la más grande, y
+             cada una con su volumen y para qué alcanza. La conversión
+             importa más que la fracción: el envase se pide en octavos y
+             en cuartos, pero lo que se calcula al pintar son mililitros.
+             ========================================================== -->
+        <section class="step" data-step="2" hidden>
+            <h1>¿Cuánta pintura necesitas?</h1>
+            <p class="step__subtitle">Todos los envases se preparan con el mismo matizado y la misma fórmula.</p>
+
+            <div class="size-cards" id="sizeCards" role="radiogroup" aria-label="Tamaño del envase"></div>
+
+            <div class="order-bar" id="orderBar" hidden>
+                <div class="order-bar__units">
+                    <span class="order-bar__label" id="unitsLabel">Unidades</span>
+                    <div class="units-stepper" role="group" aria-labelledby="unitsLabel">
+                        <button type="button" class="units-stepper__btn" id="unitsDown" aria-label="Quitar una unidad">−</button>
+                        <output class="units-stepper__value" id="unitsValue" for="unitsDown unitsUp">1</output>
+                        <button type="button" class="units-stepper__btn" id="unitsUp" aria-label="Agregar una unidad">+</button>
+                    </div>
+                </div>
+
+                <p class="order-bar__total" aria-live="polite">
+                    <span>Total referencial</span>
+                    <strong id="orderTotal"></strong>
+                </p>
+            </div>
+
+            <p class="order-note" id="unitsNote" hidden></p>
+        </section>
+
+        <!-- ==========================================================
+             Paso 3 — la empresa
+
+             El pedido lo hace un taller, una concesionaria o una
+             empresa, así que el RUC no es un extra: es lo que permite
+             emitir la factura y lo que identifica al comprador cuando
+             el mismo taller manda a dos personas distintas.
+             ========================================================== -->
+        <section class="step" data-step="3" hidden>
+            <h1>¿A nombre de quién va el pedido?</h1>
+            <p class="step__subtitle">Con estos datos preparamos el matizado y emitimos la factura.</p>
+
+            <form class="company-form" id="companyForm" novalidate>
+                <section class="data-card">
+                    <h2 class="data-card__head">
+                        <span class="data-card__icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M4 20V6l7-3v17" />
+                                <path d="M11 9h6a2 2 0 0 1 2 2v9" />
+                                <path d="M3 20h18" />
+                                <path d="M7 9v.01M7 13v.01M15 13v.01M15 16v.01" />
+                            </svg>
+                        </span>
+                        Empresa
+                    </h2>
+
+                    <div class="field-row field-row--wide">
+                        <div class="field">
+                            <label for="companyName">Razón social</label>
+                            <input type="text" id="companyName" maxlength="120" placeholder="Ej. Taller Los Andes S.A.C."
+                                autocomplete="organization" required>
+                        </div>
+                        <div class="field">
+                            <label for="companyRuc">RUC</label>
+                            <input type="text" id="companyRuc" inputmode="numeric" maxlength="11" placeholder="20123456789"
+                                autocomplete="off" spellcheck="false" required aria-describedby="companyRucError">
+                            <p class="field__error" id="companyRucError" role="alert" hidden></p>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="data-card">
+                    <h2 class="data-card__head">
+                        <span class="data-card__icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="8" r="3.6" />
+                                <path d="M4.5 20.5c0-3.6 3.4-5.6 7.5-5.6s7.5 2 7.5 5.6" />
+                            </svg>
+                        </span>
+                        Persona de contacto
+                    </h2>
+
+                    <div class="field-row field-row--wide">
+                        <div class="field">
+                            <label for="firstName">Nombres</label>
+                            <input type="text" id="firstName" autocomplete="given-name" placeholder="Ingresa tus nombres"
+                                maxlength="80" required>
+                        </div>
+                        <div class="field">
+                            <label for="lastName">Apellidos</label>
+                            <input type="text" id="lastName" autocomplete="family-name"
+                                placeholder="Ingresa tus apellidos" maxlength="80" required>
+                        </div>
+                    </div>
+
+                    <div class="field-row field-row--wide">
+                        <div class="field">
+                            <label for="department">Departamento</label>
+                            <select id="department" autocomplete="address-level1" class="is-placeholder" required>
+                                <option value="" selected disabled hidden>Selecciona tu departamento</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label for="province">Provincia</label>
+                            <select id="province" autocomplete="address-level2" class="is-placeholder" disabled required>
+                                <option value="" selected disabled hidden>Selecciona tu provincia</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="field-row field-row--wide">
+                        <div class="field">
+                            <label for="phone">Teléfono</label>
+                            <div class="phone-input">
+                                <span class="phone-input__prefix" aria-hidden="true">+51</span>
+                                <input type="tel" id="phone" autocomplete="tel" inputmode="numeric"
+                                    pattern="[0-9]{9}" maxlength="9" placeholder="987654321" required
+                                    aria-describedby="phoneError">
+                            </div>
+                            <p class="field__error" id="phoneError" role="alert" hidden></p>
+                        </div>
+                        <div class="field">
+                            <label for="email">Email</label>
+                            <input type="email" id="email" autocomplete="email"
+                                pattern="[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}" required
+                                aria-describedby="emailError">
+                            <p class="field__error" id="emailError" role="alert" hidden></p>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label for="notes">Notas adicionales <span class="field__optional">(opcional)</span></label>
+                        <textarea id="notes" rows="3" maxlength="2000"
+                            placeholder="Plazos, cantidad de vehículos, detalles útiles…"></textarea>
+                    </div>
+                </section>
+            </form>
+        </section>
+
+        <!-- ==========================================================
+             Paso 4 — el resumen
+
+             Todo lo elegido en una sola pantalla, antes de que se envíe
+             nada. Es la última oportunidad de leerlo completo, así que
+             cada bloque lleva su enlace de vuelta al paso donde se
+             cambia.
+             ========================================================== -->
+        <section class="step" data-step="4" hidden>
+            <h1>Revisa tu pedido</h1>
+            <p class="step__subtitle">Si todo está bien, confírmalo y te enviamos tu código.</p>
+
+            <div class="summary" id="summary"></div>
+
+            <p class="summary__price" id="summaryPrice" hidden>
+                <span>Total referencial</span>
+                <strong id="summaryTotal"></strong>
+            </p>
+
+            <p class="summary__legal" id="summaryLegal"></p>
+
+            <p class="form-error" id="submitError" role="alert" hidden></p>
+        </section>
+
+        <div class="success" id="success" hidden>
+            <span class="success__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <path d="M20 6L9 17l-5-5" />
+                </svg>
+            </span>
+            <h1 tabindex="-1">¡Pedido confirmado!</h1>
+            <p id="successLead">Te enviamos el código por correo.</p>
+
+            <div class="tracking-code">
+                <span class="tracking-code__label">Tu código de pedido</span>
+                <div class="tracking-code__row">
+                    <strong class="tracking-code__value" id="successCode">··········</strong>
+                    <button type="button" class="tracking-code__copy" id="copyCodeBtn">Copiar</button>
+                </div>
+                <p class="tracking-code__hint">Guárdalo: con este código te atendemos en el mostrador y por
+                    WhatsApp, sin tener que repetir los datos.</p>
+            </div>
+
+            <button type="button" class="success__reset" id="resetBtn">Nuevo pedido</button>
+        </div>
+        </div><!-- /.wizard-body -->
+
+        <div class="wizard-foot">
+            <button class="back-link" type="button" id="backLink" hidden>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <path d="M15 18l-6-6 6-6" />
+                </svg>
+                Atrás
+            </button>
+
+            <div class="confirm-container">
+                <p class="confirm-hint" id="stepHint" role="status" hidden></p>
+                <button class="step-confirm" type="button" id="stepConfirm" aria-disabled="true"
+                    aria-describedby="stepHint">Continuar</button>
+            </div>
+        </div>
+      </div><!-- /.wizard-card -->
+    </main>
+
+    <p class="wizard-note">Precios referenciales · El color se confirma con plancha de prueba ·
+        <a href="../index.html#contacto">Habla con el taller</a>
+    </p>
+
+</body>
+
+</html>
