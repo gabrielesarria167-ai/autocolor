@@ -244,12 +244,14 @@ CREATE TRIGGER requests_touch_updated_at
 CREATE TABLE IF NOT EXISTS paint_orders (
     id          char(10)    PRIMARY KEY CHECK (id ~ '^[0-9]{10}$'),
 
-    -- How the colour was identified. 'in_person' is the one that arrives with
+    -- How the colour was identified. 'model' is a colour picked from the
+    -- page's list by model and year, without reading the label: the shop
+    -- should confirm it. 'in_person' is the one that arrives with
     -- no colour and no container: the customer is bringing the vehicle so the
     -- shop can read it with the spectrophotometer, and the formula —and with
     -- it the size and the price— does not exist yet. That is why every column
     -- describing the colour and the order below is nullable.
-    method      text        NOT NULL CHECK (method IN ('code', 'reading', 'in_person')),
+    method      text        NOT NULL CHECK (method IN ('code', 'model', 'reading', 'in_person')),
 
     brand       text,
     color_code  text,
@@ -308,6 +310,12 @@ CREATE INDEX IF NOT EXISTS paint_orders_status_created_at_idx
 
 -- Mismo trigger que `requests`, por lo mismo: cambiar el estado a mano desde
 -- psql no debe dejar la fecha desactualizada.
+-- 'model' came after the table did: a base created before it still has the
+-- three-value CHECK, which Postgres named paint_orders_method_check.
+ALTER TABLE paint_orders DROP CONSTRAINT IF EXISTS paint_orders_method_check;
+ALTER TABLE paint_orders ADD CONSTRAINT paint_orders_method_check
+    CHECK (method IN ('code', 'model', 'reading', 'in_person'));
+
 DROP TRIGGER IF EXISTS paint_orders_touch_updated_at ON paint_orders;
 CREATE TRIGGER paint_orders_touch_updated_at
     BEFORE UPDATE ON paint_orders

@@ -649,14 +649,21 @@ ${panelUrl ? `
    color mirando esto va a reclamar.
 -------------------------------------------------------------------------- */
 
-/** La muestra del color, o nada cuando el pedido viene sin color (in_person). */
+/**
+ * The colour's swatch with its code and name, or nothing when the order has
+ * no colour (in_person). A colour the guides have no chip for still shows
+ * its code and name, beside a blank box that says so.
+ */
 function swatchBox(hex, code, name) {
-    if (!hex) return '';
+    if (!hex && !String(code || '').trim()) return '';
+    const box = hex
+        ? `<td height="64" bgcolor="${escapeHtml(hex)}" style="width:64px; height:64px; background-color:${escapeHtml(hex)}; border:1px solid ${LINE}; font-size:0; line-height:0;">&nbsp;</td>`
+        : `<td height="64" align="center" valign="middle" bgcolor="#f3f4f7" style="width:64px; height:64px; background-color:#f3f4f7; border:1px dashed ${LINE}; font-family:${FONT}; font-size:10px; line-height:12px; color:${MUTED};">Sin<br>muestra</td>`;
     return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
               <tr>
                 <td width="64" valign="top" style="width:64px;">
                   <table role="presentation" width="64" cellpadding="0" cellspacing="0" border="0">
-                    <tr><td height="64" bgcolor="${escapeHtml(hex)}" style="width:64px; height:64px; background-color:${escapeHtml(hex)}; border:1px solid ${LINE}; font-size:0; line-height:0;">&nbsp;</td></tr>
+                    <tr>${box}</tr>
                   </table>
                 </td>
                 <td valign="middle" style="padding-left:16px;">
@@ -700,7 +707,7 @@ function paintCustomerHtml(created, data, ctx) {
             </div>
           </td>
         </tr>
-${hex ? `
+${data.colorCode ? `
         <tr>
           <td class="px" style="padding:28px 48px 0 48px;">
             ${swatchBox(hex, `${ctx.oneLine(data.brand)} ${ctx.oneLine(data.colorCode)}`.trim(), ctx.oneLine(data.colorName))}
@@ -823,7 +830,7 @@ ${contactRows}
         <tr>
           <td class="px" style="padding:26px 48px 0 48px;">
             ${eyebrow('El pedido')}
-            ${hex ? swatchBox(hex, ctx.oneLine(data.colorCode), ctx.oneLine(data.colorName)) + '<div style="height:16px; font-size:0; line-height:0;">&nbsp;</div>' : ''}
+            ${data.colorCode ? swatchBox(hex, ctx.oneLine(data.colorCode), ctx.oneLine(data.colorName)) + '<div style="height:16px; font-size:0; line-height:0;">&nbsp;</div>' : ''}
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
 ${orderRows}
             </table>

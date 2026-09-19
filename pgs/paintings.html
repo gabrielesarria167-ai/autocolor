@@ -16,6 +16,8 @@
     <link rel="stylesheet" href="../styles.css">
     <script src="../src/config.js" defer></script>
     <script src="../src/cities.js" defer></script>
+    <script src="../src/carModels.js" defer></script>
+    <script src="../src/paintCatalog.js" defer></script>
     <script src="../src/paints.js" defer></script>
     <script src="../src/paintings.js" defer></script>
 
@@ -129,6 +131,42 @@
                             <p class="field__hint" id="colorCodeHint">Está en una etiqueta del vehículo: marco de la
                                 puerta, bajo el capó o en el maletero.</p>
                         </div>
+                    </div>
+
+                    <!-- The finder for whoever has no label to read: model and
+                         year narrow the brand's colours to a grid to pick from.
+                         Filled by src/paintings.js from src/paintCatalog.js. -->
+                    <button type="button" class="finder-toggle" id="finderToggle" aria-expanded="false"
+                        aria-controls="colourFinder">¿No sabes el código? Búscalo por modelo y año</button>
+
+                    <div class="colour-finder" id="colourFinder" hidden>
+                        <div class="field-row">
+                            <div class="field">
+                                <label for="finderModel">Modelo</label>
+                                <select id="finderModel" class="is-placeholder" disabled>
+                                    <option value="" selected>Elige primero la marca</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label for="finderYear">Año</label>
+                                <select id="finderYear" class="is-placeholder">
+                                    <option value="" selected>Todos los años</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="finder-tools">
+                            <div class="finder-families" id="finderFamilies" role="group"
+                                aria-label="Filtrar por tono"></div>
+                            <input type="search" class="finder-search" id="finderSearch"
+                                placeholder="Filtrar por nombre o código" aria-label="Filtrar por nombre o código"
+                                autocomplete="off" spellcheck="false">
+                        </div>
+
+                        <p class="finder-note" id="finderNote" role="status"></p>
+                        <button type="button" class="finder-widen" id="finderWiden" hidden></button>
+                        <div class="swatch-grid" id="finderGrid" role="group" aria-label="Colores"></div>
+                        <button type="button" class="finder-more" id="finderMore" hidden></button>
                     </div>
                 </section>
 

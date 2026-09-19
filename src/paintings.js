@@ -37,6 +37,10 @@
         // contarla en el resumen y en el correo: es lo que el taller usará
         // para ajustar la fórmula.
         reading: null,
+        // Whether the colour was picked from the finder's list rather than
+        // read off the label. It travels as method 'model', so the shop
+        // knows to confirm it before mixing.
+        picked: false,
         size: null,
         units: 1
     };
@@ -318,13 +322,16 @@
     function clearColour() {
         state.colour = null;
         state.reading = null;
+        state.picked = false;
         if (colourCard) colourCard.hidden = true;
         if (colourMiss) colourMiss.hidden = true;
+        // the grid's selection mark follows the card
+        if (finder && !finder.hidden) renderFinder();
     }
 
     function showColour(colour, quality) {
         state.colour = colour;
-        colourSwatch.style.background = colour.hex;
+        setSwatch(colourSwatch, colour.hex);
         colourStatus.textContent = quality ? quality.label : "Color encontrado";
         colourStatus.className = "colour-card__status" + (quality ? " is-" + quality.level : "");
         colourName.textContent = colour.name;
@@ -362,6 +369,7 @@
         }
         var colour = PAINTS.findColour(brandId, code);
         if (colour) {
+            state.picked = false;
             showColour(colour, null);
             return;
         }
@@ -389,8 +397,270 @@
         brandSelect.addEventListener("change", function () {
             brandSelect.classList.toggle("is-placeholder", brandSelect.value === "");
             clearColour();
+            fillFinderModels();
             refreshConfirm();
         });
+    }
+
+    /* ---------------------------------------------------------------------
+       The finder: for whoever has no label to read
+
+       Model and year narrow the brand's colours to a grid. The guides behind
+       the catalogue only list the colours with a compatibility note, and
+       only up to model year 2018, so the grid says which list it is showing:
+       the model's own, or the brand's colours of that year when the model is
+       not listed (Hilux, Onix and the other cars sold only down here).
+       --------------------------------------------------------------------- */
+
+    var CARS = window.CAR_CATALOG || null;
+    var FINDER_PAGE = 36;
+    var finderToggle = document.getElementById("finderToggle");
+    var finder = document.getElementById("colourFinder");
+    var finderModel = document.getElementById("finderModel");
+    var finderYear = document.getElementById("finderYear");
+    var finderFamilies = document.getElementById("finderFamilies");
+    var finderSearch = document.getElementById("finderSearch");
+    var finderNote = document.getElementById("finderNote");
+    var finderGrid = document.getElementById("finderGrid");
+    var finderMore = document.getElementById("finderMore");
+    var finderWiden = document.getElementById("finderWiden");
+    var finderState = { family: "", shown: FINDER_PAGE };
+    var covered = PAINTS ? PAINTS.coverage() : { from: 0, to: 0 };
+
+    function setSwatch(el, hex) {
+        // A colour with no chip in the guides gets a hatch, not a guessed
+        // hex: an invented swatch is exactly what the customer would trust.
+        el.style.background = hex || "";
+        el.classList.toggle("swatch--none", !hex);
+    }
+
+    function fillFinderModels() {
+        if (!finderModel) return;
+        var brand = CARS && brandSelect.value ? CARS.findBrand(brandSelect.value) : null;
+        finderModel.innerHTML = "";
+        var first = document.createElement("option");
+        first.value = "";
+        first.textContent = brand ? "Todos los modelos" : "Elige primero la marca";
+        finderModel.appendChild(first);
+        if (brand) {
+            brand.models.forEach(function (model) {
+                var opt = document.createElement("option");
+                opt.value = model.id;
+                opt.textContent = model.name;
+                finderModel.appendChild(opt);
+            });
+        }
+        finderModel.disabled = !brand;
+        finderModel.classList.add("is-placeholder");
+        renderFinder();
+    }
+
+    function fillFinderYears() {
+        var now = new Date().getFullYear();
+        for (var y = now + 1; y >= 1995; y--) {
+            var opt = document.createElement("option");
+            opt.value = String(y);
+            opt.textContent = String(y);
+            finderYear.appendChild(opt);
+        }
+    }
+
+    function fillFinderFamilies() {
+        var all = [{ id: "", label: "Todos" }].concat(PAINTS.FAMILIES);
+        all.forEach(function (fam) {
+            var btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "finder-family" + (fam.id === "" ? " is-active" : "");
+            btn.dataset.family = fam.id;
+            btn.setAttribute("aria-pressed", String(fam.id === ""));
+            btn.textContent = fam.label;
+            finderFamilies.appendChild(btn);
+        });
+    }
+
+    // Did the colour run in `year`? A year either side counts: the guides
+    // date a colour by model year, and a car sold in December is next year's.
+    function ranIn(span, year) {
+        return span[0] - 1 <= year && year <= span[1] + 1;
+    }
+
+    // The list the grid shows, before the family and text filters, and the
+    // sentence that says what it is.
+    function finderList() {
+        var brandId = brandSelect.value;
+        if (!brandId) return { items: [], note: "Elige la marca arriba para ver sus colores." };
+        var brandName = PAINTS.brandName(brandId);
+        var modelId = finderModel.value;
+        var model = modelId && CARS ? CARS.findModel(brandId, modelId) : null;
+        var year = Number(finderYear.value) || null;
+        var late = year && year > covered.to;
+        var note;
+
+        var own = model ? PAINTS.modelColours(brandId, modelId) : null;
+        if (own) {
+            var mine = own;
+            if (year && !late) mine = own.filter(function (c) { return ranIn(c.modelYears, year); });
+            if (late) mine = own.filter(function (c) { return c.modelYears[1] >= covered.to - 2; });
+            if (mine.length) {
+                note = "Colores del " + model.name + (year && !late ? " " + year : "") +
+                    " registrados en las guías del fabricante." +
+                    (late ? " Llegan hasta " + covered.to + ": si tu " + model.name + " es de " + year +
+                        " y su color es nuevo, puede no estar." : "") +
+                    " La lista no es completa: si no ves el tuyo, mira todos los de " + brandName + ".";
+                return { items: mine, note: note, widen: brandName };
+            }
+        }
+
+        var list = PAINTS.coloursOf(brandId);
+        if (year && !late) list = list.filter(function (c) { return ranIn(c.years, year); });
+        if (late) list = list.filter(function (c) { return c.years[1] >= covered.to - 2; });
+        list.sort(function (a, b) { return b.years[1] - a.years[1] || a.name.localeCompare(b.name); });
+
+        if (model) {
+            note = "No tenemos la lista propia del " + model.name + ": te mostramos los colores de " +
+                brandName + (year && !late ? " de " + year : "") + ".";
+        } else {
+            note = "Colores de " + brandName + (year && !late ? " de " + year : "") + ".";
+        }
+        if (late) {
+            note += " Nuestras guías llegan hasta " + covered.to + ", así que aquí van los que seguían en uso;" +
+                " un color más nuevo puede no estar.";
+        }
+        return { items: list, note: note };
+    }
+
+    function renderFinder() {
+        if (!finder || finder.hidden || !PAINTS) return;
+        var result = finderList();
+        var q = PAINTS.normalizeCode(finderSearch.value);
+        var text = finderSearch.value.trim().toLowerCase();
+        var items = result.items.filter(function (c) {
+            if (finderState.family && c.family !== finderState.family) return false;
+            if (!text) return true;
+            if (c.name.toLowerCase().indexOf(text) !== -1) return true;
+            if (!q) return false;
+            return [c.code].concat(c.alt || []).some(function (code) {
+                return PAINTS.normalizeCode(code).indexOf(q) === 0;
+            });
+        });
+
+        finderGrid.innerHTML = "";
+        items.slice(0, finderState.shown).forEach(function (colour) {
+            var btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "swatch-option";
+            var picked = state.colour && state.colour.brandId === colour.brandId && state.colour.code === colour.code;
+            btn.classList.toggle("is-selected", !!picked);
+            btn.setAttribute("aria-pressed", String(!!picked));
+
+            var chip = document.createElement("span");
+            chip.className = "swatch-option__chip";
+            chip.setAttribute("aria-hidden", "true");
+            setSwatch(chip, colour.hex);
+
+            var code = document.createElement("span");
+            code.className = "swatch-option__code";
+            code.textContent = colour.code;
+
+            var name = document.createElement("span");
+            name.className = "swatch-option__name";
+            name.textContent = colour.name;
+
+            var span = colour.modelYears || colour.years;
+            var meta = document.createElement("span");
+            meta.className = "swatch-option__meta";
+            meta.textContent = PAINTS.finishLabel(colour.finish) + " · " +
+                (span[0] === span[1] ? span[0] : span[0] + "–" + span[1]);
+
+            btn.appendChild(chip);
+            btn.appendChild(code);
+            btn.appendChild(name);
+            btn.appendChild(meta);
+            btn.addEventListener("click", function () { pickFromFinder(colour); });
+            finderGrid.appendChild(btn);
+        });
+
+        var rest = items.length - finderState.shown;
+        finderMore.hidden = rest <= 0;
+        if (rest > 0) finderMore.textContent = "Ver " + Math.min(rest, FINDER_PAGE) + " colores más (" + rest + " en total)";
+
+        if (items.length === 0) {
+            finderNote.textContent = result.items.length
+                ? "Ningún color de esta lista coincide con el filtro."
+                : result.note + " No encontramos colores para esa combinación: prueba otro año, o usa la " +
+                  "lectura digital o el taller.";
+        } else {
+            finderNote.textContent = result.note;
+        }
+        finderWiden.hidden = !result.widen;
+        if (result.widen) finderWiden.textContent = "Ver todos los colores de " + result.widen;
+    }
+
+    function pickFromFinder(colour) {
+        // The code goes into the field too, so the panel reads the same as
+        // after a search by code, and the summary names where it came from.
+        codeInput.value = colour.code;
+        showColour(colour, { level: "picked", label: "Elegido de la lista" });
+        state.picked = true;
+        colourNote.textContent = "Elegido por modelo y año, sin ver la etiqueta: confírmalo con el código " +
+            "del vehículo si puedes. " + colourNote.textContent;
+        renderFinder();
+        colourCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+
+    function resetFinderPaging() {
+        finderState.shown = FINDER_PAGE;
+        renderFinder();
+    }
+
+    if (finderToggle && finder && PAINTS) {
+        fillFinderYears();
+        fillFinderFamilies();
+
+        finderToggle.addEventListener("click", function () {
+            var open = finder.hidden;
+            finder.hidden = !open;
+            finderToggle.setAttribute("aria-expanded", String(open));
+            if (open) {
+                renderFinder();
+                (brandSelect.value ? finderModel : brandSelect).focus();
+            }
+        });
+        [finderModel, finderYear].forEach(function (select) {
+            select.addEventListener("change", function () {
+                select.classList.toggle("is-placeholder", select.value === "");
+                resetFinderPaging();
+            });
+        });
+        finderFamilies.addEventListener("click", function (e) {
+            var btn = e.target.closest(".finder-family");
+            if (!btn) return;
+            finderState.family = btn.dataset.family;
+            Array.prototype.forEach.call(finderFamilies.children, function (b) {
+                var on = b === btn;
+                b.classList.toggle("is-active", on);
+                b.setAttribute("aria-pressed", String(on));
+            });
+            resetFinderPaging();
+        });
+        finderSearch.addEventListener("input", resetFinderPaging);
+        finderSearch.addEventListener("keydown", function (e) {
+            if (e.key === "Enter") e.preventDefault();
+        });
+        finderWiden.addEventListener("click", function () {
+            // Keeps the year: "all of Chevrolet's 2017 colours" is the next
+            // best list to the Tracker's own.
+            finderModel.value = "";
+            finderModel.classList.add("is-placeholder");
+            resetFinderPaging();
+            finderModel.focus();
+        });
+        finderMore.addEventListener("click", function () {
+            finderState.shown += FINDER_PAGE;
+            renderFinder();
+        });
+    } else if (finderToggle) {
+        finderToggle.hidden = true;
     }
 
     // Lectura digital: tres números, el catálogo ordenado por distancia y el
@@ -736,6 +1006,7 @@
 
     var METHOD_LABELS = {
         code: "Por código de color",
+        model: "Elegido por modelo y año",
         reading: "Lectura digital",
         in_person: "Lectura en el taller"
     };
@@ -745,7 +1016,7 @@
         summaryBox.innerHTML = "";
 
         // El color -----------------------------------------------------
-        var colourRows = [{ label: "Identificado", value: METHOD_LABELS[state.method] }];
+        var colourRows = [{ label: "Identificado", value: METHOD_LABELS[orderMethod()] }];
         var swatch = null;
 
         if (state.colour) {
@@ -762,7 +1033,7 @@
             }
             swatch = document.createElement("span");
             swatch.className = "summary__swatch";
-            swatch.style.background = state.colour.hex;
+            setSwatch(swatch, state.colour.hex);
             swatch.setAttribute("aria-hidden", "true");
         } else {
             colourRows.push({ label: "Color", value: "Se mide en el taller, con el vehículo delante" });
@@ -837,9 +1108,13 @@
         submitError.hidden = !message;
     }
 
+    function orderMethod() {
+        return state.method === "code" && state.picked ? "model" : state.method;
+    }
+
     function orderPayload() {
         return {
-            method: state.method,
+            method: orderMethod(),
             // Sin color en el camino del taller: los tres campos viajan vacíos
             // y el servidor los acepta así (ver validatePaintOrder).
             brand: state.colour ? state.colour.brand : "",
@@ -947,7 +1222,7 @@
     }
 
     document.getElementById("resetBtn").addEventListener("click", function () {
-        state = { method: "code", colour: null, reading: null, size: null, units: 1 };
+        state = { method: "code", colour: null, reading: null, picked: false, size: null, units: 1 };
 
         methodTabs.forEach(function (tab) {
             var active = tab.dataset.method === "code";

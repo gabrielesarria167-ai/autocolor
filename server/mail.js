@@ -627,6 +627,7 @@ let retryTimer = null;
 
 const PAINT_METHOD_LABELS = {
     code: 'Por código de color',
+    model: 'Elegido por modelo y año (sin ver la etiqueta: confirmar)',
     reading: 'Lectura digital del cliente',
     in_person: 'Lectura en el taller',
 };

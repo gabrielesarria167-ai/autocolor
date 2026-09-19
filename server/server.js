@@ -325,7 +325,7 @@ function validateRequest(body, required) {
    Los otros dos caminos sí traen las dos cosas, y se exigen.
 -------------------------------------------------------------------------- */
 
-const PAINT_METHODS = new Set(['code', 'reading', 'in_person']);
+const PAINT_METHODS = new Set(['code', 'model', 'reading', 'in_person']);
 const PAINT_FINISHES = new Set(['solido', 'metalico', 'perlado', 'tricapa']);
 // Las seis fracciones de galón que vende el taller. La lista está también en
 // SIZES (src/paints.js), que es la que dibuja las tarjetas, y en el CHECK de

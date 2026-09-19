@@ -82,7 +82,9 @@ lo abre a propósito, por ejemplo para probar el sitio desde el móvil.
 | `src/parts.js` | El nombre de cada pieza de carrocería y la lista de piezas de cada silueta, compartidos por los dos formularios, la lista sin 3D del paso 3 y los correos |
 | `vendor/three@0.169.0/` | The four three.js files the viewer imports, self-hosted (MIT licence alongside) |
 | `pgs/paintings.html`, `src/paintings.js` | Venta de matizado a otras empresas |
-| `src/paints.js` | El catálogo de colores por marca, los seis envases y sus precios; lo leen la página y los correos del pedido |
+| `src/paints.js` | Los colores por marca (leídos de `src/paintCatalog.js`), los seis envases y sus precios; lo leen la página y los correos del pedido |
+| `src/paintCatalog.js` | Generado por `tools/paint-catalog/`: los códigos de pintura de las diez marcas y los colores de cada modelo, de las guías de Sherwin-Williams |
+| `tools/paint-catalog/` | Descarga y lee las guías de color de Sherwin-Williams y genera `src/paintCatalog.js` (ver su README) |
 | `src/lookup.js` | Consulta de una solicitud por su código |
 | `pgs/taller.html`, `src/staff.js` | Panel del taller: la cola de trabajo, el monitor del jefe y el registro de vehículos del local |
 | `src/cities.js` | Departamentos y provincias del Perú |
@@ -500,9 +502,14 @@ razonable.
 Son cuatro pasos y un camino que termina antes:
 
 1. **El color**, de tres maneras. Por **código de fábrica**, buscándolo en el
-   catálogo de `src/paints.js` dentro de su marca —el mismo «040» es un blanco
-   en Toyota y un negro en Mercedes-Benz, así que el código nunca se busca
-   suelto—. Por **lectura digital**, escribiendo los tres valores CIELAB que
+   catálogo dentro de su marca —el mismo «040» es un blanco en Toyota y un
+   negro en Mercedes-Benz, así que el código nunca se busca suelto—; vale
+   cualquiera de los códigos de una pintura (en Chevrolet, «GAZ», «8624» y
+   «WA8624» son el mismo blanco). Quien no tiene la etiqueta a mano abre
+   **«¿No sabes el código?»**: marca, modelo y año, y una grilla de colores
+   para elegir, con filtro por tono y por nombre. Ese pedido viaja con
+   `method = 'model'` para que el taller confirme el color antes de matizar.
+   Por **lectura digital**, escribiendo los tres valores CIELAB que
    entrega el espectrofotómetro del cliente: la página los compara con el
    catálogo por ΔE\*ab y enseña el más cercano con su diferencia. Y **en el
    taller**, que es cuando el vehículo ya fue repintado y su etiqueta no
@@ -522,11 +529,22 @@ Ese pedido llega a la base con `method = 'in_person'` y sin color, sin envase
 y sin precio, y lo que se confirma es una visita — así lo dicen el resumen, la
 pantalla de éxito y el correo.
 
-**Los precios y el catálogo de colores son un punto de partida, no un
-inventario.** Viven en `src/paints.js`, con sus códigos, sus nombres y un hex
-de muestra por color; completarlos es agregar filas. La página llama
-referencial a todo importe y repite que el color se aprueba con plancha de
-prueba, porque una muestra en pantalla no reproduce un metálico y un precio
+**El catálogo de colores sale de Sherwin-Williams.** `src/paintCatalog.js`
+(generado, no se edita a mano) reúne unos 780 códigos de las diez marcas con
+su nombre, su acabado, los años en que se usaron y, cuando hay, una muestra
+tomada del chip impreso; y, para 57 de los 108 modelos de `src/carModels.js`,
+qué colores llevó cada uno. Lo arma `tools/paint-catalog/` a partir de las
+guías de compatibilidad y los manuales de color que Sherwin-Williams
+Automotive publica para talleres (ver su README). Tiene tres límites que la
+página dice en voz alta: es mercado estadounidense hasta el modelo 2018 —los
+colores nuevos y los modelos que solo se venden aquí (Hilux, Onix, Sail,
+Groove, N300, los Fiat brasileños) no tienen lista propia, y el buscador cae a
+los colores de la marca de ese año—, las listas por modelo son parciales, y la
+muestra es un escaneo, más oscura que la pintura real en los metálicos.
+
+**Los precios son un punto de partida.** Viven en `src/paints.js`. La página
+llama referencial a todo importe y repite que el color se aprueba con plancha
+de prueba, porque una muestra en pantalla no reproduce un metálico y un precio
 cerrado sin matizar no es un precio.
 
 Cada pedido deja una fila en `paint_orders` (ver `server/schema.sql`) y

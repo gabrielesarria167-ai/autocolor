@@ -4242,6 +4242,204 @@ body.wizard {
     display: none;
 }
 
+/* A colour the guides have no chip for: a hatch, never a guessed hex. */
+.swatch--none {
+    background: repeating-linear-gradient(135deg, var(--surface-tint) 0 6px, var(--surface) 6px 12px) !important;
+}
+
+/* A colour picked from the finder, not read off the label. */
+.colour-card__status.is-picked {
+    background: var(--brand-soft);
+    color: var(--ink);
+}
+
+/* ===== Step 1: the finder, for whoever has no label to read ===== */
+.finder-toggle {
+    display: inline-block;
+    margin: 2px 0 16px;
+    padding: 0;
+    background: none;
+    border: 0;
+    color: var(--ink);
+    font: inherit;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+}
+
+.finder-toggle[aria-expanded="true"] {
+    text-decoration-style: dotted;
+}
+
+.colour-finder {
+    margin: 0 0 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+}
+
+.colour-finder[hidden] {
+    display: none;
+}
+
+.finder-tools {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 4px 0 12px;
+}
+
+.finder-families {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.finder-family {
+    padding: 5px 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: border-color 0.2s var(--ease-out), background 0.2s var(--ease-out);
+}
+
+.finder-family:hover {
+    border-color: var(--border-strong);
+}
+
+.finder-family.is-active {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: #fff;
+}
+
+.finder-search {
+    width: 100%;
+    padding: 9px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    color: var(--ink);
+    font: inherit;
+    font-size: 0.92rem;
+}
+
+.finder-search:focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 1px;
+}
+
+.finder-widen {
+    margin: -6px 0 12px;
+    padding: 0;
+    background: none;
+    border: 0;
+    color: var(--ink);
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+}
+
+.finder-widen[hidden] {
+    display: none;
+}
+
+.finder-note {
+    margin: 0 0 12px;
+    font-size: 0.85rem;
+    line-height: var(--lh-snug);
+    color: var(--text-dim);
+}
+
+.swatch-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+    gap: 8px;
+}
+
+.swatch-option {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1px;
+    min-width: 0;
+    padding: 8px 8px 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--ink);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out);
+}
+
+.swatch-option:hover {
+    border-color: var(--border-strong);
+}
+
+.swatch-option.is-selected {
+    border-color: var(--ink);
+    box-shadow: inset 0 0 0 1px var(--ink);
+}
+
+.swatch-option__chip {
+    align-self: stretch;
+    height: 44px;
+    margin-bottom: 7px;
+    border: 1px solid var(--border);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+}
+
+.swatch-option__code {
+    font-family: var(--font-label);
+    font-variant-numeric: tabular-nums;
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+}
+
+.swatch-option__name {
+    max-width: 100%;
+    font-size: 0.8rem;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+}
+
+.swatch-option__meta {
+    margin-top: 2px;
+    font-size: 0.72rem;
+    color: var(--text-faint);
+}
+
+.finder-more {
+    display: block;
+    width: 100%;
+    margin-top: 10px;
+    padding: 10px;
+    background: none;
+    border: 1px dashed var(--border-strong);
+    color: var(--ink);
+    font: inherit;
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.finder-more:hover {
+    border-style: solid;
+}
+
+.finder-more[hidden] {
+    display: none;
+}
+
 @media (max-width: 520px) {
     .colour-card {
         grid-template-columns: 1fr;
