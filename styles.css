@@ -1578,6 +1578,25 @@ html:has(body.home) {
     }
 }
 
+/* Five links and the button only just fit from 900px: until there is room,
+   the links close up instead of wrapping "Cómo funciona" onto two lines. */
+@media (min-width: 900px) and (max-width: 1099px) {
+    .site-nav {
+        gap: 0;
+        margin-left: 12px;
+    }
+
+    .site-nav a {
+        padding-inline: 8px;
+        white-space: nowrap;
+    }
+
+    .site-nav a::after {
+        left: 8px;
+        right: 8px;
+    }
+}
+
 /* ===== Home: shared section furniture ===== */
 .section {
     padding: 72px 20px;
@@ -1989,6 +2008,101 @@ html:has(body.home) {
     color: var(--text-dim);
     font-size: 0.95rem;
     line-height: var(--lh-body);
+}
+
+/* ===== Home: trade sale band ===== */
+/* Paint sold to other shops, under the service grid: the copy beside the
+   three ways to give us the colour, set like the discount scale. */
+.trade {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 24px;
+    margin-top: 20px;
+    padding: 28px;
+    background: var(--ground-raised);
+    border: 1px solid var(--border);
+}
+
+@media (min-width: 820px) {
+    .trade {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+        align-items: center;
+        gap: 40px;
+    }
+}
+
+.trade__copy {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.trade__eyebrow {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+}
+
+.trade__copy h3 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.35rem;
+    font-weight: 600;
+    color: var(--ink);
+}
+
+.trade__copy p:not(.trade__eyebrow) {
+    margin: 0;
+    max-width: 46ch;
+    color: var(--text-dim);
+    font-size: 0.95rem;
+    line-height: var(--lh-snug);
+}
+
+.trade__copy .btn {
+    margin-top: 12px;
+}
+
+.trade__ways {
+    display: grid;
+    grid-template-columns: 1fr;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--border);
+    border-left: 1px solid var(--border);
+}
+
+@media (min-width: 520px) {
+    .trade__ways {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+.trade__ways li {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 16px;
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+}
+
+.trade__ways strong {
+    font-family: var(--font-display);
+    font-size: 1.2rem;
+    font-weight: 500;
+    color: var(--ink);
+}
+
+.trade__ways span {
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    line-height: var(--lh-snug);
 }
 
 /* ===== Home: process steps ===== */
