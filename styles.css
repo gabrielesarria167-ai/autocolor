@@ -1556,6 +1556,17 @@ html:has(body.home) {
     background: var(--brand-dark) !important;
 }
 
+.nav-panel__cta--ghost {
+    background: transparent;
+    border: 1px solid var(--border-strong);
+    color: var(--ink) !important;
+}
+
+.nav-panel__cta--ghost:hover {
+    background: var(--surface-tint) !important;
+    border-color: var(--ink);
+}
+
 @media (min-width: 900px) {
     .site-header {
         padding: 13px 32px;
@@ -1578,8 +1589,28 @@ html:has(body.home) {
     }
 }
 
-/* Five links and the button only just fit from 900px: until there is room,
-   the links close up instead of wrapping "Cómo funciona" onto two lines. */
+/* Four links and two buttons need about 1060px at full spacing. Below that
+   the links close up instead of wrapping "Cómo funciona" onto two lines, and
+   under 1000px the logo drops to its mobile height and the trade button to
+   one word. */
+.site-header .label-short {
+    display: none;
+}
+
+@media (min-width: 900px) and (max-width: 999px) {
+    .site-header__logo {
+        height: 24px;
+    }
+
+    .site-header .label-long {
+        display: none;
+    }
+
+    .site-header .label-short {
+        display: inline;
+    }
+}
+
 @media (min-width: 900px) and (max-width: 1099px) {
     .site-nav {
         gap: 0;
@@ -1719,6 +1750,58 @@ html:has(body.home) {
     flex-wrap: wrap;
     gap: 12px;
     margin-top: 32px;
+}
+
+/* The trade door: one bordered row under the owner's actions, a step below
+   the quote button but louder than a text link. */
+.hero__trade {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    max-width: 460px;
+    margin-top: 16px;
+    padding: 14px 18px;
+    background: var(--ground-raised);
+    border: 1px solid var(--border-strong);
+    color: var(--ink);
+    transition: border-color 0.18s var(--ease-out), background 0.18s var(--ease-out);
+}
+
+.hero__trade:hover {
+    border-color: var(--ink);
+    background: var(--surface-tint);
+}
+
+.hero__trade-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.hero__trade-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+}
+
+.hero__trade-text {
+    font-weight: 600;
+    font-size: 1rem;
+    line-height: var(--lh-compact);
+}
+
+.hero__trade svg {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    transition: transform 0.18s var(--ease-out);
+}
+
+.hero__trade:hover svg {
+    transform: translateX(3px);
 }
 
 .hero__trust {
@@ -2012,15 +2095,17 @@ html:has(body.home) {
 
 /* ===== Home: trade sale band ===== */
 /* Paint sold to other shops, under the service grid: the copy beside the
-   three ways to give us the colour, set like the discount scale. */
+   three ways to give us the colour. Ink, like the recommended tier, so it
+   reads as the second offer on the page and not as a footnote to the first. */
 .trade {
     display: grid;
     grid-template-columns: 1fr;
     gap: 24px;
     margin-top: 20px;
-    padding: 28px;
-    background: var(--ground-raised);
-    border: 1px solid var(--border);
+    padding: 32px 28px;
+    background: var(--ink);
+    border: 1px solid var(--ink);
+    color: #fff;
 }
 
 @media (min-width: 820px) {
@@ -2044,27 +2129,42 @@ html:has(body.home) {
     font-size: 0.72rem;
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: var(--text-faint);
+    color: rgba(255, 255, 255, 0.66);
 }
 
 .trade__copy h3 {
     margin: 0;
     font-family: var(--font-display);
-    font-size: 1.35rem;
+    font-size: 1.6rem;
     font-weight: 600;
-    color: var(--ink);
+    color: #fff;
 }
 
 .trade__copy p:not(.trade__eyebrow) {
     margin: 0;
     max-width: 46ch;
-    color: var(--text-dim);
+    color: rgba(255, 255, 255, 0.78);
     font-size: 0.95rem;
     line-height: var(--lh-snug);
 }
 
 .trade__copy .btn {
-    margin-top: 12px;
+    margin-top: 14px;
+}
+
+.trade__btn {
+    background: #fff;
+    border-color: #fff;
+    color: var(--ink);
+}
+
+.trade__btn:hover {
+    background: var(--surface-tint);
+    border-color: var(--surface-tint);
+}
+
+.trade :focus-visible {
+    outline-color: #fff;
 }
 
 .trade__ways {
@@ -2073,8 +2173,8 @@ html:has(body.home) {
     margin: 0;
     padding: 0;
     list-style: none;
-    border-top: 1px solid var(--border);
-    border-left: 1px solid var(--border);
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    border-left: 1px solid rgba(255, 255, 255, 0.22);
 }
 
 @media (min-width: 520px) {
@@ -2088,19 +2188,19 @@ html:has(body.home) {
     flex-direction: column;
     gap: 6px;
     padding: 16px;
-    border-right: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
+    border-right: 1px solid rgba(255, 255, 255, 0.22);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.22);
 }
 
 .trade__ways strong {
     font-family: var(--font-display);
     font-size: 1.2rem;
     font-weight: 500;
-    color: var(--ink);
+    color: #fff;
 }
 
 .trade__ways span {
-    color: var(--text-dim);
+    color: rgba(255, 255, 255, 0.72);
     font-size: 0.85rem;
     line-height: var(--lh-snug);
 }
@@ -2743,6 +2843,20 @@ html:has(body.home) {
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 64px;
     }
+}
+
+/* Qualified to beat the `.home p` margin reset. */
+.contact__copy .contact__trade {
+    margin-top: 18px;
+    color: var(--text-dim);
+    font-size: 0.95rem;
+}
+
+.contact__trade a {
+    color: var(--ink);
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 3px;
 }
 
 .contact__copy .section__lede {
