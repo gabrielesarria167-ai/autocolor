@@ -79,11 +79,13 @@ svg {
     --radius-sm: 0;
     --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
     /* Jost is the geometric face closest to the wordmark; Schibsted Grotesk
-       is the sturdy grotesque the tagline is set in the spirit of; Plex Mono
-       carries labels, codes and plates. */
+       is the sturdy grotesque the tagline is set in the spirit of; Archivo,
+       a grotesque drawn for technical use, carries labels, codes and plates.
+       Every rule that sets it also asks for tabular figures, so a ten-digit
+       code keeps one width whichever digits it has. */
     --font-body: 'Schibsted Grotesk', 'Helvetica Neue', Arial, sans-serif;
     --font-display: 'Jost', 'Futura', 'Century Gothic', 'Avenir Next', sans-serif;
-    --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+    --font-label: 'Archivo', 'Helvetica Neue', Arial, sans-serif;
 
     /* Type scale. Leading tightens as the type grows and tracking opens back
        toward zero as it shrinks — a 74px line and a 22px line cannot share one
@@ -620,7 +622,8 @@ svg {
     padding: 3px 10px;
     background: var(--tier);
     color: #fff;
-    font-family: var(--font-mono);
+    font-family: var(--font-label);
+    font-variant-numeric: tabular-nums;
     font-size: 0.68rem;
     font-weight: 500;
     letter-spacing: 0.08em;
@@ -1752,56 +1755,22 @@ html:has(body.home) {
     margin-top: 32px;
 }
 
-/* The trade door: one bordered row under the owner's actions, a step below
-   the quote button but louder than a text link. */
+/* The trade buyer's own line under the owner's actions: a subtitle naming
+   who it is for, then its button. */
 .hero__trade {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    max-width: 460px;
-    margin-top: 16px;
-    padding: 14px 18px;
-    background: var(--ground-raised);
-    border: 1px solid var(--border-strong);
-    color: var(--ink);
-    transition: border-color 0.18s var(--ease-out), background 0.18s var(--ease-out);
+    margin-top: 28px;
 }
 
-.hero__trade:hover {
-    border-color: var(--ink);
-    background: var(--surface-tint);
+.home .hero__trade-lede {
+    margin-bottom: 12px;
+    color: var(--text-dim);
+    font-size: 0.98rem;
+    line-height: var(--lh-snug);
 }
 
-.hero__trade-copy {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-.hero__trade-eyebrow {
-    font-family: var(--font-mono);
-    font-size: 0.72rem;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--text-faint);
-}
-
-.hero__trade-text {
+.hero__trade-lede strong {
     font-weight: 600;
-    font-size: 1rem;
-    line-height: var(--lh-compact);
-}
-
-.hero__trade svg {
-    width: 18px;
-    height: 18px;
-    flex-shrink: 0;
-    transition: transform 0.18s var(--ease-out);
-}
-
-.hero__trade:hover svg {
-    transform: translateX(3px);
+    color: var(--ink);
 }
 
 .hero__trust {
@@ -1932,7 +1901,8 @@ html:has(body.home) {
 
 .swatches__label {
     color: var(--text-dim);
-    font-family: var(--font-mono);
+    font-family: var(--font-label);
+    font-variant-numeric: tabular-nums;
     font-size: 0.72rem;
     font-weight: 500;
     letter-spacing: 0.08em;
@@ -2125,7 +2095,8 @@ html:has(body.home) {
 
 .trade__eyebrow {
     margin: 0;
-    font-family: var(--font-mono);
+    font-family: var(--font-label);
+    font-variant-numeric: tabular-nums;
     font-size: 0.72rem;
     letter-spacing: 0.06em;
     text-transform: uppercase;
@@ -2250,7 +2221,8 @@ html:has(body.home) {
     background: var(--ground);
     border: 1px solid var(--ink);
     color: var(--ink);
-    font-family: var(--font-mono);
+    font-family: var(--font-label);
+    font-variant-numeric: tabular-nums;
     font-size: 0.95rem;
     line-height: 1;
 }
@@ -2326,7 +2298,8 @@ html:has(body.home) {
     background: var(--ground);
     border: 1px solid var(--ink);
     color: var(--ink);
-    font-family: var(--font-mono);
+    font-family: var(--font-label);
+    font-variant-numeric: tabular-nums;
     font-size: 0.7rem;
     font-weight: 500;
     letter-spacing: 0.08em;
@@ -2366,7 +2339,8 @@ html:has(body.home) {
 }
 
 .tier__price span {
-    font-family: var(--font-mono);
+    font-family: var(--font-label);
+    font-variant-numeric: tabular-nums;
     font-size: 0.72rem;
     font-weight: 500;
     letter-spacing: 0.08em;
@@ -2523,7 +2497,8 @@ html:has(body.home) {
 }
 
 .discount__steps span {
-    font-family: var(--font-mono);
+    font-family: var(--font-label);
+    font-variant-numeric: tabular-nums;
     font-size: 0.72rem;
     font-weight: 500;
     letter-spacing: 0.08em;
@@ -2886,7 +2861,8 @@ html:has(body.home) {
 }
 
 .contact__label {
-    font-family: var(--font-mono);
+    font-family: var(--font-label);
+    font-variant-numeric: tabular-nums;
     font-size: 0.72rem;
     font-weight: 500;
     letter-spacing: 0.08em;
@@ -3004,7 +2980,8 @@ a.contact__value:hover {
 
 .site-footer__nav h2 {
     margin: 0 0 6px;
-    font-family: var(--font-mono);
+    font-family: var(--font-label);
+    font-variant-numeric: tabular-nums;
     font-size: 0.72rem;
     font-weight: 500;
     letter-spacing: 0.08em;
@@ -3143,7 +3120,8 @@ body.wizard {
 .wizard .site-header__tag {
     display: none;
     color: var(--text-dim);
-    font-family: var(--font-mono);
+    font-family: var(--font-label);
+    font-variant-numeric: tabular-nums;
     font-size: 0.78rem;
     font-weight: 500;
     letter-spacing: 0.06em;
@@ -3233,7 +3211,8 @@ body.wizard {
     background: var(--surface);
     border: 1px solid var(--border-strong);
     color: var(--text-faint);
-    font-family: var(--font-mono);
+    font-family: var(--font-label);
+    font-variant-numeric: tabular-nums;
     font-size: 0.82rem;
     font-weight: 500;
     box-shadow: none;
@@ -3730,7 +3709,8 @@ body.wizard {
 
 .tracking-code__label {
     display: block;
-    font-family: var(--font-mono);
+    font-family: var(--font-label);
+    font-variant-numeric: tabular-nums;
     font-size: 0.74rem;
     font-weight: 500;
     letter-spacing: 0.08em;
@@ -3750,7 +3730,8 @@ body.wizard {
 /* Separado con letter-spacing en vez de espacios de verdad, para que el
    código se pueda leer en voz alta pero copiarse tal cual. */
 .tracking-code__value {
-    font-family: var(--font-mono);
+    font-family: var(--font-label);
+    font-variant-numeric: tabular-nums;
     font-size: clamp(1.5rem, 1.2rem + 1.4vw, 2rem);
     font-weight: 600;
     letter-spacing: 0.14em;
@@ -3847,7 +3828,8 @@ body.wizard {
 }
 
 .lookup__form .field input {
-    font-family: var(--font-mono);
+    font-family: var(--font-label);
+    font-variant-numeric: tabular-nums;
     letter-spacing: 0.12em;
 }
 
@@ -3925,7 +3907,8 @@ body.wizard {
 }
 
 .lookup__code {
-    font-family: var(--font-mono);
+    font-family: var(--font-label);
+    font-variant-numeric: tabular-nums;
     letter-spacing: 0.1em;
 }
 
@@ -4064,7 +4047,8 @@ body.wizard {
     width: auto;
     border: none;
     background: none;
-    font-family: var(--font-mono);
+    font-family: var(--font-label);
+    font-variant-numeric: tabular-nums;
     text-transform: uppercase;
 }
 
@@ -4126,7 +4110,8 @@ body.wizard {
     height: 26px;
     background: var(--brand-soft);
     color: var(--brand);
-    font-family: var(--font-mono);
+    font-family: var(--font-label);
+    font-variant-numeric: tabular-nums;
     font-size: 0.82rem;
     font-weight: 600;
 }
@@ -4229,7 +4214,8 @@ body.wizard {
 }
 
 .colour-card__code {
-    font-family: var(--font-mono);
+    font-family: var(--font-label);
+    font-variant-numeric: tabular-nums;
     letter-spacing: 0.04em;
 }
 
@@ -4341,7 +4327,8 @@ body.wizard {
 }
 
 .size-card__volume {
-    font-family: var(--font-mono);
+    font-family: var(--font-label);
+    font-variant-numeric: tabular-nums;
     font-size: 0.82rem;
     color: var(--text-dim);
 }
@@ -4422,7 +4409,8 @@ body.wizard {
     min-width: 44px;
     padding: 8px 0;
     border-inline: 1px solid var(--border-strong);
-    font-family: var(--font-mono);
+    font-family: var(--font-label);
+    font-variant-numeric: tabular-nums;
     font-size: 0.95rem;
     font-weight: 600;
 }
@@ -4539,8 +4527,9 @@ body.wizard {
     overflow-wrap: anywhere;
 }
 
-.summary__mono {
-    font-family: var(--font-mono);
+.summary__code {
+    font-family: var(--font-label);
+    font-variant-numeric: tabular-nums;
     letter-spacing: 0.02em;
 }
 
@@ -4649,7 +4638,8 @@ body.staff {
 }
 
 .staff-topbar__label {
-    font-family: var(--font-mono);
+    font-family: var(--font-label);
+    font-variant-numeric: tabular-nums;
     font-size: 0.72rem;
     font-weight: 500;
     letter-spacing: 0.1em;
@@ -4935,7 +4925,8 @@ body.staff {
 }
 
 .staff-table__code {
-    font-family: var(--font-mono);
+    font-family: var(--font-label);
+    font-variant-numeric: tabular-nums;
     font-size: 0.85rem;
     font-weight: 600;
     letter-spacing: 0.04em;
@@ -4949,7 +4940,8 @@ body.staff {
     padding: 3px 8px;
     border-radius: 0;
     background: var(--surface-tint);
-    font-family: var(--font-mono);
+    font-family: var(--font-label);
+    font-variant-numeric: tabular-nums;
     font-size: 0.82rem;
     font-weight: 600;
     letter-spacing: 0.05em;
@@ -5475,7 +5467,8 @@ body.staff {
 
 .staff-profile__code {
     margin: 6px 0 0;
-    font-family: var(--font-mono);
+    font-family: var(--font-label);
+    font-variant-numeric: tabular-nums;
     font-size: 0.85rem;
     letter-spacing: 0.1em;
     color: var(--text-dim);
@@ -5749,7 +5742,8 @@ body.staff {
 
 .staff-monitor__worker p {
     margin: 0;
-    font-family: var(--font-mono);
+    font-family: var(--font-label);
+    font-variant-numeric: tabular-nums;
     font-size: 0.78rem;
     letter-spacing: 0.08em;
     color: var(--text-faint);
@@ -5798,7 +5792,8 @@ body.staff {
    is useful when needed, not before. */
 .staff-monitor__code {
     margin-left: auto;
-    font-family: var(--font-mono);
+    font-family: var(--font-label);
+    font-variant-numeric: tabular-nums;
     font-size: 0.75rem;
     color: var(--text-faint);
 }
@@ -6382,7 +6377,8 @@ body.staff {
 
 .staff-intake__done-code {
     margin: 14px 0 0;
-    font-family: var(--font-mono);
+    font-family: var(--font-label);
+    font-variant-numeric: tabular-nums;
     font-size: 2.6rem;
     font-weight: 600;
     letter-spacing: 0.12em;

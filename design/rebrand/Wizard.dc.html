@@ -7,13 +7,13 @@
 <body>
 <x-dc>
 <helmet>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600&family=Schibsted+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600&family=Schibsted+Grotesk:wght@400;500;600;700&family=Archivo:wght@400;500;600&display=swap">
   <style>
     body { margin: 0; background: #f3f4f7; color: #262d40; font-family: 'Schibsted Grotesk', 'Helvetica Neue', Arial, sans-serif; -webkit-font-smoothing: antialiased; }
     a { color: #262d40; text-underline-offset: 3px; } a:hover { color: #181d2a; }
     h1, h2, p { margin: 0; }
     .display { font-family: 'Jost', 'Futura', 'Century Gothic', 'Avenir Next', sans-serif; font-weight: 500; letter-spacing: -0.02em; }
-    .label { font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: #5a6275; }
+    .label { font-family: 'Archivo', 'Helvetica Neue', Arial, sans-serif; font-size: 12px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: #5a6275; }
     .field { display: flex; flex-direction: column; gap: 8px; }
     .field span.name { font-size: 14px; font-weight: 600; color: #262d40; }
     .input { height: 48px; box-sizing: border-box; border: 1px solid #c9ced8; background: #ffffff; padding: 0 14px; display: flex; align-items: center; justify-content: space-between; font-size: 15px; color: #8a91a2; }
@@ -38,22 +38,22 @@
       <!-- progress -->
       <div style="padding: 22px 36px 20px; border-bottom: 1px solid #e3e6ec; display: flex; align-items: flex-start">
         <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; width: 72px">
-          <span style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: #262d40; color: #fff; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 13px">1</span>
+          <span style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: #262d40; color: #fff; font-family: 'Archivo', 'Helvetica Neue', Arial, sans-serif; font-size: 13px">1</span>
           <span style="font-size: 13px; font-weight: 600; color: #262d40">Vehículo</span>
         </div>
         <div style="flex: 1; height: 1px; background: #c9ced8; margin-top: 16px"></div>
         <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; width: 72px">
-          <span style="width: 32px; height: 32px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border: 1px solid #c9ced8; color: #8a91a2; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 13px">2</span>
+          <span style="width: 32px; height: 32px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border: 1px solid #c9ced8; color: #8a91a2; font-family: 'Archivo', 'Helvetica Neue', Arial, sans-serif; font-size: 13px">2</span>
           <span style="font-size: 13px; color: #8a91a2">Acabado</span>
         </div>
         <div style="flex: 1; height: 1px; background: #c9ced8; margin-top: 16px"></div>
         <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; width: 72px">
-          <span style="width: 32px; height: 32px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border: 1px solid #c9ced8; color: #8a91a2; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 13px">3</span>
+          <span style="width: 32px; height: 32px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border: 1px solid #c9ced8; color: #8a91a2; font-family: 'Archivo', 'Helvetica Neue', Arial, sans-serif; font-size: 13px">3</span>
           <span style="font-size: 13px; color: #8a91a2">Piezas</span>
         </div>
         <div style="flex: 1; height: 1px; background: #c9ced8; margin-top: 16px"></div>
         <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; width: 72px">
-          <span style="width: 32px; height: 32px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border: 1px solid #c9ced8; color: #8a91a2; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 13px">4</span>
+          <span style="width: 32px; height: 32px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border: 1px solid #c9ced8; color: #8a91a2; font-family: 'Archivo', 'Helvetica Neue', Arial, sans-serif; font-size: 13px">4</span>
           <span style="font-size: 13px; color: #8a91a2">Contacto</span>
         </div>
       </div>
@@ -78,9 +78,9 @@
               <div class="input">Seleccionar modelo
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8a91a2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg></div></div>
             <div class="field"><span class="name">Año</span><div class="input">Ej. 2020</div></div>
-            <div class="field"><span class="name">Placa</span><div class="input" style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 14px">Ej. ABC-123</div></div>
+            <div class="field"><span class="name">Placa</span><div class="input" style="font-family: 'Archivo', 'Helvetica Neue', Arial, sans-serif; font-size: 14px">Ej. ABC-123</div></div>
             <div class="field"><span class="name">Kilometraje <span style="font-weight: 400; color: #8a91a2">(opcional)</span></span><div class="input">Ej. 85000</div></div>
-            <div class="field"><span class="name">Código de color <span style="font-weight: 400; color: #8a91a2">(opcional)</span></span><div class="input" style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 14px">Ej. 1F7</div>
+            <div class="field"><span class="name">Código de color <span style="font-weight: 400; color: #8a91a2">(opcional)</span></span><div class="input" style="font-family: 'Archivo', 'Helvetica Neue', Arial, sans-serif; font-size: 14px">Ej. 1F7</div>
               <span style="font-size: 13px; color: #7a8193">Generalmente está en una etiqueta del vehículo.</span></div>
           </div>
         </div>
@@ -110,7 +110,7 @@
       <div style="display: flex; flex-direction: column; gap: 8px">
         <span style="font-size: 14px; font-weight: 600">Código de seguimiento</span>
         <div style="display: flex">
-          <div class="input" style="flex: 1; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; letter-spacing: 0.12em; font-size: 14px">1234567890</div>
+          <div class="input" style="flex: 1; font-family: 'Archivo', 'Helvetica Neue', Arial, sans-serif; letter-spacing: 0.12em; font-size: 14px">1234567890</div>
           <span style="display: inline-flex; align-items: center; height: 48px; padding: 0 18px; background: #262d40; color: #fff; font-size: 15px; font-weight: 600">Consultar</span>
         </div>
       </div>

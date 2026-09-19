@@ -59,7 +59,9 @@ const NOTE_DARK = '#161b27';    // the notes box
 const FONT = "'Schibsted Grotesk',Arial,Helvetica,sans-serif";
 // The site's display face, for the customer email's headline. Same caveat.
 const DISPLAY = "'Jost','Century Gothic',Futura,Arial,sans-serif";
-const MONO = "'Courier New',Courier,monospace";
+// The site's label face, for codes, plates and the RUC. Same caveat; the
+// fallback is Arial, not a typewriter face.
+const LABEL = "'Archivo',Arial,Helvetica,sans-serif";
 
 
 // Los datos del taller en el pie de los dos correos.
@@ -135,7 +137,7 @@ function codePanel(label, code) {
               <tr>
                 <td class="c-panel" align="center" bgcolor="${INK}" style="padding:22px 24px; background-color:${INK};">
                   <div style="font-family:${FONT}; font-size:11px; line-height:14px; letter-spacing:3px; color:#c3c8d4; text-transform:uppercase; padding-bottom:10px;">${escapeHtml(label)}</div>
-                  <div style="font-family:${MONO}; font-size:28px; line-height:32px; letter-spacing:4px; color:#ffffff; font-weight:bold;">${escapeHtml(code)}</div>
+                  <div style="font-family:${LABEL}; font-size:28px; line-height:32px; letter-spacing:4px; color:#ffffff; font-weight:bold;">${escapeHtml(code)}</div>
                 </td>
               </tr>
             </table>`;
@@ -164,8 +166,8 @@ function stepMarker(step, number) {
         return `<table role="presentation" width="28" cellpadding="0" cellspacing="0" border="0"><tr><td class="c-step-done" ${cell} width="28" height="28" bgcolor="${INK}" style="width:28px; height:28px; background-color:${INK}; font-family:Arial,Helvetica,sans-serif; font-size:15px; line-height:28px; font-weight:bold; color:#ffffff;">&#10003;</td></tr></table>`;
     }
     const ring = step.state === 'now'
-        ? `class="c-step-now" width="24" height="24" style="width:24px; height:24px; border:2px solid ${INK}; background-color:${CARD}; font-family:${MONO}; font-size:13px; line-height:24px; font-weight:bold; color:${INK};"`
-        : `class="c-step-next" width="26" height="26" style="width:26px; height:26px; border:1px solid ${RULE_STRONG}; background-color:${CARD}; font-family:${MONO}; font-size:13px; line-height:26px; color:${MUTED};"`;
+        ? `class="c-step-now" width="24" height="24" style="width:24px; height:24px; border:2px solid ${INK}; background-color:${CARD}; font-family:${LABEL}; font-size:13px; line-height:24px; font-weight:bold; color:${INK};"`
+        : `class="c-step-next" width="26" height="26" style="width:26px; height:26px; border:1px solid ${RULE_STRONG}; background-color:${CARD}; font-family:${LABEL}; font-size:13px; line-height:26px; color:${MUTED};"`;
     return `<table role="presentation" width="28" cellpadding="0" cellspacing="0" border="0"><tr><td ${cell} ${ring}>${number}</td></tr></table>`;
 }
 
@@ -265,7 +267,7 @@ function shell({ title, preheader, kicker, body, footerNote, logoUrl, logoDarkUr
   table, td, div, p, a { font-family: Arial, sans-serif; }
 </style>
 <![endif]-->
-<link href="https://fonts.googleapis.com/css2?family=Jost:wght@500&family=Schibsted+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Jost:wght@500&family=Schibsted+Grotesk:wght@400;500;600;700&family=Archivo:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
   body { margin:0; padding:0; width:100%; background-color:${GROUND}; }
   table { border-collapse:collapse; }
@@ -382,7 +384,7 @@ function customerHtml(created, data, ctx, walkIn) {
         : `${subject.charAt(0).toUpperCase()}${subject.slice(1)} ${where}.`;
 
     const vehicle = ctx.vehicleName(data, true, true);
-    const plateHtml = `<span class="c-ink" style="font-family:${MONO}; font-weight:bold; letter-spacing:1px; color:${INK};">${escapeHtml(plate)}</span>`;
+    const plateHtml = `<span class="c-ink" style="font-family:${LABEL}; font-weight:bold; letter-spacing:1px; color:${INK};">${escapeHtml(plate)}</span>`;
     const summary = summaryRows([
         {
             label: 'Vehículo',
@@ -429,7 +431,7 @@ ${timeline(ctx.customerSteps(created, walkIn))}
                     <tr>
                       <td class="stack" valign="middle">
                         <div class="c-muted" style="font-family:${FONT}; font-size:11px; line-height:14px; letter-spacing:2.5px; color:${MUTED}; text-transform:uppercase; padding-bottom:6px;">Código de seguimiento</div>
-                        <div class="c-ink" style="font-family:${MONO}; font-size:30px; line-height:34px; letter-spacing:3px; color:${INK}; font-weight:bold;">${escapeHtml(created.id)}</div>
+                        <div class="c-ink" style="font-family:${LABEL}; font-size:30px; line-height:34px; letter-spacing:3px; color:${INK}; font-weight:bold;">${escapeHtml(created.id)}</div>
                       </td>${lookupUrl ? `
                       <td class="stack stack-gap" align="right" valign="middle" style="padding-left:16px;">
                         ${button(lookupUrl, 'Ver el avance →', true)}
@@ -561,7 +563,7 @@ function shopHtml(created, data, ctx, walkIn) {
           <td class="px" align="left" style="padding:36px 48px 0 48px;">
             ${eyebrow(walkIn ? 'Registrada en el local' : 'Nueva solicitud')}
             <div class="c-ink" style="font-family:${FONT}; font-size:26px; line-height:34px; color:${INK}; font-weight:normal;">${escapeHtml(fullName || 'Solicitud sin nombre')}</div>
-            ${data.plate ? `<div class="c-accent" style="font-family:${MONO}; font-size:18px; line-height:26px; letter-spacing:2px; color:${ACCENT}; padding-top:6px; font-weight:bold;">${escapeHtml(data.plate)}</div>` : ''}
+            ${data.plate ? `<div class="c-accent" style="font-family:${LABEL}; font-size:18px; line-height:26px; letter-spacing:2px; color:${ACCENT}; padding-top:6px; font-weight:bold;">${escapeHtml(data.plate)}</div>` : ''}
           </td>
         </tr>
 
@@ -658,7 +660,7 @@ function swatchBox(hex, code, name) {
                   </table>
                 </td>
                 <td valign="middle" style="padding-left:16px;">
-                  <div class="c-ink" style="font-family:${MONO}; font-size:22px; line-height:26px; letter-spacing:2px; color:${INK}; font-weight:bold;">${escapeHtml(code)}</div>
+                  <div class="c-ink" style="font-family:${LABEL}; font-size:22px; line-height:26px; letter-spacing:2px; color:${INK}; font-weight:bold;">${escapeHtml(code)}</div>
                   <div class="c-body" style="font-family:${FONT}; font-size:15px; line-height:22px; color:${BODY}; padding-top:4px;">${escapeHtml(name)}</div>
                 </td>
               </tr>
@@ -712,7 +714,7 @@ ${hex ? `
               <tr>
                 <td style="padding:22px 24px;">
                   <div class="c-muted" style="font-family:${FONT}; font-size:11px; line-height:14px; letter-spacing:2.5px; color:${MUTED}; text-transform:uppercase; padding-bottom:6px;">Código de pedido</div>
-                  <div class="c-ink" style="font-family:${MONO}; font-size:30px; line-height:34px; letter-spacing:3px; color:${INK}; font-weight:bold;">${escapeHtml(created.id)}</div>
+                  <div class="c-ink" style="font-family:${LABEL}; font-size:30px; line-height:34px; letter-spacing:3px; color:${INK}; font-weight:bold;">${escapeHtml(created.id)}</div>
                 </td>
               </tr>
               <tr>
@@ -772,7 +774,7 @@ function paintShopHtml(created, data, ctx) {
 
     const contactRows = detailRows([
         { label: 'Empresa', value: ctx.oneLine(data.company) },
-        { label: 'RUC', value: ctx.oneLine(data.ruc), html: `<span style="font-family:${MONO}; letter-spacing:1px;">${escapeHtml(ctx.oneLine(data.ruc))}</span>` },
+        { label: 'RUC', value: ctx.oneLine(data.ruc), html: `<span style="font-family:${LABEL}; letter-spacing:1px;">${escapeHtml(ctx.oneLine(data.ruc))}</span>` },
         { label: 'Contacto', value: fullName },
         {
             label: 'Teléfono',
@@ -790,7 +792,7 @@ function paintShopHtml(created, data, ctx) {
     const orderRows = detailRows([
         { label: 'Identificado', value: ctx.methodLabel(data.method) },
         { label: 'Marca', value: ctx.oneLine(data.brand) },
-        { label: 'Código', value: ctx.oneLine(data.colorCode), html: `<span style="font-family:${MONO}; font-weight:bold; letter-spacing:1px;">${escapeHtml(ctx.oneLine(data.colorCode))}</span>` },
+        { label: 'Código', value: ctx.oneLine(data.colorCode), html: `<span style="font-family:${LABEL}; font-weight:bold; letter-spacing:1px;">${escapeHtml(ctx.oneLine(data.colorCode))}</span>` },
         { label: 'Color', value: ctx.oneLine(data.colorName) },
         { label: 'Acabado', value: ctx.finishLabel(data.finish) },
         { label: 'Lectura CIELAB', value: ctx.readingLabel(data.reading) },

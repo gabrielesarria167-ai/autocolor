@@ -263,7 +263,7 @@ original arrives, replace the traced paths and keep the file names.
 
 The visual system that goes with it is one ink, `#262D40` (the logo's), on
 white and a cool tint `#F3F4F7`; square corners like the mark; Jost for
-headings, Schibsted Grotesk for text and IBM Plex Mono for labels and codes.
+headings, Schibsted Grotesk for text and Archivo for labels and codes.
 The tokens are at the top of `styles.css`. The only other colours are the
 paint's own: the preview swatches, the vehicle, and the green and gold of the
 Económico and Alta gama finish levels. The design canvas the redesign was

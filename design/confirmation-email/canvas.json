@@ -10,7 +10,7 @@
       "x": 0,
       "y": -250,
       "w": 560,
-      "text": "Customer confirmation email (server/mailhtml.js › customerHtml), three directions. Same brand: ink #262D40, square corners, Jost / Schibsted Grotesk / Plex Mono. Sample data from tools/mailpreview.js.\n\nIn real inboxes most people see Arial and Courier New (Gmail strips web fonts); every layout here can be rebuilt as nested tables."
+      "text": "Customer confirmation email (server/mailhtml.js › customerHtml), three directions. Same brand: ink #262D40, square corners, Jost / Schibsted Grotesk / Archivo. Sample data from tools/mailpreview.js.\n\nIn real inboxes most people see Arial and Courier New (Gmail strips web fonts); every layout here can be rebuilt as nested tables."
     },
     {
       "id": "a-ficha",

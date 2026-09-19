@@ -723,7 +723,7 @@
             dt.textContent = row.label;
             var dd = document.createElement("dd");
             dd.textContent = row.value;
-            if (row.mono) dd.className = "summary__mono";
+            if (row.code) dd.className = "summary__code";
             wrap.appendChild(dt);
             wrap.appendChild(dd);
             list.appendChild(wrap);
@@ -750,14 +750,14 @@
 
         if (state.colour) {
             colourRows.push({ label: "Marca", value: state.colour.brand });
-            colourRows.push({ label: "Código", value: state.colour.code, mono: true });
+            colourRows.push({ label: "Código", value: state.colour.code, code: true });
             colourRows.push({ label: "Color", value: state.colour.name });
             colourRows.push({ label: "Acabado", value: PAINTS.finishLabel(state.colour.finish) });
             if (state.reading) {
                 colourRows.push({
                     label: "Tu lectura",
                     value: "L* " + state.reading.L + " · a* " + state.reading.a + " · b* " + state.reading.b,
-                    mono: true
+                    code: true
                 });
             }
             swatch = document.createElement("span");
@@ -793,11 +793,11 @@
         // La empresa ---------------------------------------------------
         summaryBox.appendChild(summaryBlock("La empresa", 3, [
             { label: "Razón social", value: companyName.value.trim() },
-            { label: "RUC", value: companyRuc.value.trim(), mono: true },
+            { label: "RUC", value: companyRuc.value.trim(), code: true },
             { label: "Contacto", value: firstNameInput.value.trim() + " " + lastNameInput.value.trim() },
             { label: "Zona", value: provinceSelect.value && departmentSelect.value
                 ? provinceSelect.value + ", " + departmentSelect.value : "" },
-            { label: "Teléfono", value: "+51 " + phoneInput.value, mono: true },
+            { label: "Teléfono", value: "+51 " + phoneInput.value, code: true },
             { label: "Email", value: emailInput.value.trim() },
             { label: "Notas", value: notesInput.value.trim() }
         ]));
