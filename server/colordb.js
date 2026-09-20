@@ -116,10 +116,12 @@ const pool = enabled
         // database, and the requests are the ones that must not queue.
         max: Number(process.env.AUTOCOLOR_COLORDB_MAX) || 4,
         idleTimeoutMillis: 30_000,
-        // Long, like db.js: a managed database suspends its compute when idle
-        // and the first connection after that pays the start as well as the
-        // network and the TLS.
-        connectionTimeoutMillis: 15_000,
+        // Still long, because a managed database suspends its compute when
+        // idle and the first connection after that pays the start as well as
+        // the network and the TLS. Half of what it was, though: call() now
+        // gets a second attempt, and two at seven seconds is the same wait a
+        // customer already faced for one at fifteen.
+        connectionTimeoutMillis: 7_000,
     })
     : null;
 
@@ -163,12 +165,40 @@ function describe() {
  * 503. Everything else rethrows and stays a 500: an outage and a bug should
  * not look the same from outside. */
 const OUTAGE_CODES = new Set(['57P01', '57P02', '57P03', '53300', '53400', '3D000', '28000', '28P01']);
+
+/* Failures where the connection was never made, so nothing ran on the server
+ * and asking again is both safe and likely to work.
+ *
+ * DNS is the one that actually bit us: this machine briefly stopped resolving
+ * the Neon host, every lookup failed, and because pg-pool's own timeout error
+ * carries no `code` and does not say "timeout expired", classify() did not
+ * recognise it as an outage at all -- so the route answered 500 instead of
+ * 503 and the page never fell back to the local catalogue. Both halves of
+ * that are fixed here. */
+const TRANSIENT_CODES = new Set([
+    'ENOTFOUND',     // DNS: no such host
+    'EAI_AGAIN',     // DNS: the resolver timed out or was unreachable
+    'ETIMEDOUT',
+    'ECONNRESET',
+    'ECONNREFUSED',
+    'EHOSTUNREACH',
+    'ENETUNREACH',
+    'EPIPE',
+]);
+
+function transient(err) {
+    const code = err && err.code ? String(err.code) : '';
+    if (TRANSIENT_CODES.has(code)) return true;
+    // pg and pg-pool report these as plain Errors with no code.
+    return /connection timeout|timeout expired|connection terminated|socket hang up/i
+        .test(err && err.message ? err.message : '');
+}
+
 function classify(err) {
     const code = err && err.code ? String(err.code) : '';
     const outage = OUTAGE_CODES.has(code)
         || code.startsWith('08')
-        || ['ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND', 'EHOSTUNREACH', 'ECONNRESET'].includes(code)
-        || /timeout expired/i.test(err && err.message ? err.message : '');
+        || transient(err);
     if (!outage) return err;
     // The detail stays in our log; the thrown error carries none of it, so no
     // route can leak the shape of the database in a message.
@@ -176,12 +206,24 @@ function classify(err) {
     return new ColourDbUnavailable();
 }
 
+/* One retry, and only for a failure that never reached the server. A query
+ * that did reach it and failed is not repeated: every function here is STABLE
+ * and read-only so a repeat would be harmless, but "harmless" is not a reason
+ * to send it twice, and a real error should surface on the first try. */
+const CALL_ATTEMPTS = 2;
+
 async function call(sql, params) {
     if (!enabled) throw new ColourDbUnavailable();
-    try {
-        return await pool.query(sql, params);
-    } catch (err) {
-        throw classify(err);
+    for (let attempt = 1; ; attempt += 1) {
+        try {
+            return await pool.query(sql, params);
+        } catch (err) {
+            if (attempt >= CALL_ATTEMPTS || !transient(err)) throw classify(err);
+            console.warn(`[colordb] ${err.code || 'connection failure'} on attempt `
+                + `${attempt}, trying once more`);
+            // Short: the point is to outlast a blip, not to hold a page open.
+            await new Promise((resolve) => setTimeout(resolve, 300));
+        }
     }
 }
 
