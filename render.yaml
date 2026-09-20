@@ -80,6 +80,25 @@ services:
       - key: DATABASE_URL
         sync: false
 
+      # La base de colores: el catálogo de Sherwin-Williams que identifica los
+      # colores en la página de matizado. Es otra base y otro rol, no el mismo
+      # de arriba con otro nombre.
+      #
+      # El rol es colordb_app, que no puede leer ninguna tabla: sólo ejecutar
+      # seis funciones. Se crea con SQL y nunca desde la consola de Neon, donde
+      # recibiría neon_superuser y podría leerlo todo. Ver
+      # server/colordb/README.md.
+      #
+      # Aquí el sslmode=verify-full no es una recomendación: server/colordb.js
+      # comprueba la URL al arrancar y no se conecta si falta. Si esta variable
+      # no está, el sitio funciona igual —el buscador contesta 503 y la página
+      # usa el catálogo local—, así que no es motivo para no desplegar.
+      #
+      # El rol dueño (AUTOCOLOR_COLORDB_ADMIN_URL) NO va aquí: carga las tablas
+      # desde la máquina de trabajo y el servidor no tiene nada que hacer con él.
+      - key: AUTOCOLOR_COLORDB_URL
+        sync: false
+
       # Sin ella, /api/staff/* responde 503 y el panel queda apagado. Se lee una
       # sola vez al arrancar (server/auth.js), así que cambiarla exige reiniciar
       # el servicio.

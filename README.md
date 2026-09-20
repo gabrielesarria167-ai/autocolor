@@ -82,9 +82,11 @@ lo abre a propósito, por ejemplo para probar el sitio desde el móvil.
 | `src/parts.js` | El nombre de cada pieza de carrocería y la lista de piezas de cada silueta, compartidos por los dos formularios, la lista sin 3D del paso 3 y los correos |
 | `vendor/three@0.169.0/` | The four three.js files the viewer imports, self-hosted (MIT licence alongside) |
 | `pgs/paintings.html`, `src/paintings.js` | Venta de matizado a otras empresas |
-| `src/paints.js` | Los colores por marca (leídos de `src/paintCatalog.js`), los seis envases y sus precios; lo leen la página y los correos del pedido |
-| `src/paintCatalog.js` | Generado por `tools/paint-catalog/`: los códigos de pintura de las diez marcas y los colores de cada modelo, de las guías de Sherwin-Williams |
+| `src/paints.js` | Los acabados y sus recargos, los seis envases y sus precios, y la búsqueda de muestra en `src/paintCatalog.js`; lo leen la página y los correos del pedido |
+| `src/paintCatalog.js` | Generado por `tools/paint-catalog/`: 528 muestras medidas de diez marcas. Ya no es la lista de colores — es lo único que sabe de qué color se ve un código en pantalla |
+| `src/colourIndex.js` | Generado por `server/colordb/build-index.js`: las 383 marcas y 3.490 modelos de la base de colores, en un archivo para que los dos `<select>` no esperen |
 | `tools/paint-catalog/` | Descarga y lee las guías de color de Sherwin-Williams y genera `src/paintCatalog.js` (ver su README) |
+| `server/colordb.js`, `server/colordb/` | La base de colores: 68.717 colores del fabricante, sólo lectura y accesible sólo por funciones (ver su README) |
 | `src/lookup.js` | Consulta de una solicitud por su código |
 | `pgs/taller.html`, `src/staff.js` | Panel del taller: la cola de trabajo, el monitor del jefe y el registro de vehículos del local |
 | `src/cities.js` | Departamentos y provincias del Perú |
@@ -529,18 +531,32 @@ Ese pedido llega a la base con `method = 'in_person'` y sin color, sin envase
 y sin precio, y lo que se confirma es una visita — así lo dicen el resumen, la
 pantalla de éxito y el correo.
 
-**El catálogo de colores sale de Sherwin-Williams.** `src/paintCatalog.js`
-(generado, no se edita a mano) reúne unos 780 códigos de las diez marcas con
-su nombre, su acabado, los años en que se usaron y, cuando hay, una muestra
-tomada del chip impreso; y, para 57 de los 108 modelos de `src/carModels.js`,
-qué colores llevó cada uno. Lo arma `tools/paint-catalog/` a partir de las
-guías de compatibilidad y los manuales de color que Sherwin-Williams
-Automotive publica para talleres (ver su README). Tiene tres límites que la
-página dice en voz alta: es mercado estadounidense hasta el modelo 2018 —los
-colores nuevos y los modelos que solo se venden aquí (Hilux, Onix, Sail,
-Groove, N300, los Fiat brasileños) no tienen lista propia, y el buscador cae a
-los colores de la marca de ese año—, las listas por modelo son parciales, y la
-muestra es un escaneo, más oscura que la pintura real en los metálicos.
+**El color se identifica contra el catálogo del fabricante.** Es una base
+aparte, de sólo lectura: 68.717 colores, 383 marcas y 693.636 asociaciones
+vehículo-color, extraídas del propio software de matizado del taller. La
+página la consulta por `/api/colours/*`, y el detalle de cómo está encerrada
+—tablas invisibles para el rol de la aplicación, seis funciones y nada más,
+`sslmode=verify-full` comprobado al arrancar— está en
+`server/colordb/README.md`.
+
+Las marcas y los modelos no viajan: van en `src/colourIndex.js`, un archivo,
+para que los dos `<select>` se llenen sin pedir nada, por el mismo argumento
+que `src/carModels.js` da para el catálogo de vehículos. Lo que viaja son los
+colores, que a 693.636 filas no caben en ninguna otra parte.
+
+**`src/paintCatalog.js` dejó de ser la lista y pasó a ser la muestra.** Esa
+base no guarda ningún color de pantalla —ni hex, ni RGB, ni L\*a\*b\*—, así que
+las 528 muestras medidas de las diez marcas que más vende el taller son lo
+único con lo que se puede pintar un rectángulo, y lo único contra lo que la
+lectura digital puede medir una distancia. La mayoría de los colores de la
+base no tiene muestra y se dibuja con la trama rayada, que es más honesto que
+inventar un hex.
+
+El acabado es el otro hueco: la base no lo dice para ninguno de estos colores,
+y el acabado multiplica el precio. Se deduce de los sufijos MET, PEARL, MICA y
+3C del nombre —acierta el 70% de las veces contra las muestras medidas— y la
+ficha deja corregirlo; cuando no hay nombre que leer, uno de cada ocho colores,
+lo elige el cliente antes de poder continuar.
 
 **Los precios son un punto de partida.** Viven en `src/paints.js`. La página
 llama referencial a todo importe y repite que el color se aprueba con plancha
@@ -562,6 +578,30 @@ ficha al taller.
 La consulta devuelve solo eso: el código circula en mensajes y papeles, así
 que no debería alcanzar para sacar el teléfono, el correo ni las notas de un
 cliente.
+
+Las del catálogo de colores. Todas de lectura, todas exigen marca —no hay
+ninguna que conteste «todos los colores»— y todas van contra la base de sólo
+lectura de `server/colordb/`:
+
+| Ruta | Qué hace |
+| --- | --- |
+| `GET /api/colours/makes` | Las 383 marcas, las diez del taller primero. Cachea una hora |
+| `GET /api/colours/makes/:id/models` | Los modelos de una marca. Cachea una hora |
+| `GET /api/colours/browse?make&model&year&from` | Una página de 60 colores y si hay más. Nunca dice cuántos hay. 20 al minuto |
+| `GET /api/colours/search?make&code` | El código de fábrica exacto, hasta 12 versiones. Igualdad, nunca prefijo ni patrón. 20 al minuto |
+| `GET /api/colours/:code` | Un color por su id de Sherwin |
+
+Las dos primeras existen sobre todo como respaldo y diagnóstico: la página las
+lleva en `src/colourIndex.js` y no las pide.
+
+Copiar el catálogo entero se encarece en tres sitios a la vez, porque
+cualquiera de ellos por separado es débil: los límites viven dentro de las
+funciones SQL (61 filas por página, salto recortado a 600), no hay ninguna
+consulta sin marca ni ninguna búsqueda por prefijo, y hay dos techos diarios
+—2.000 peticiones por dirección y 60.000 por proceso— que una ventana de un
+minuto no puede dar. Pasado el segundo, el buscador contesta 503 y lo dice una
+vez en el registro: lo que convierte un copiado repartido entre muchas
+direcciones de un éxito invisible en una caída que se ve el mismo día.
 
 Las del panel del taller, todas detrás de la contraseña compartida:
 
