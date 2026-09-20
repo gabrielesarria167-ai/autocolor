@@ -26,8 +26,40 @@ cd "$HERE"
 PG_BIN="${AUTOCOLOR_PG_BIN:-/Applications/Postgres.app/Contents/Versions/latest/bin}"
 PSQL="$PG_BIN/psql"
 
-: "${AUTOCOLOR_COLORDB_ADMIN_URL:?set it to the owner connection string}"
-: "${AUTOCOLOR_COLORDB_APP_PASSWORD:?set it to the password for colordb_app}"
+# Both come from the repository's .env when they are not already exported, the
+# same file and the same precedence server/env.js uses: the real environment
+# wins, the file fills the gaps.
+#
+# Reading them from a file rather than typing them is the point. A secret typed
+# on a command line lands in the shell's history and is visible to anyone who
+# can run ps while this is going, and the `read -p` that would avoid that is
+# spelled differently in bash and zsh -- which is its own way to leak one.
+ENV_FILE="$HERE/../../.env"
+if [ -f "$ENV_FILE" ]; then
+    for key in AUTOCOLOR_COLORDB_ADMIN_URL AUTOCOLOR_COLORDB_APP_PASSWORD; do
+        eval "current=\${$key-}"
+        [ -n "$current" ] && continue
+        # The last assignment wins, comments and blank lines are skipped, and a
+        # matching pair of surrounding quotes is stripped.
+        value="$(sed -n "s/^[[:space:]]*$key[[:space:]]*=//p" "$ENV_FILE" | tail -n 1)"
+        [ -z "$value" ] && continue
+        case "$value" in
+            \"*\") value="${value#\"}"; value="${value%\"}" ;;
+            \'*\') value="${value#\'}"; value="${value%\'}" ;;
+        esac
+        export "$key=$value"
+    done
+fi
+
+if [ -z "${AUTOCOLOR_COLORDB_ADMIN_URL:-}" ] || [ -z "${AUTOCOLOR_COLORDB_APP_PASSWORD:-}" ]; then
+    echo "Missing credentials. Put these two in $(cd "$HERE/../.." && pwd)/.env:" >&2
+    echo "" >&2
+    echo "    AUTOCOLOR_COLORDB_ADMIN_URL=postgresql://owner:pass@host/colordb?sslmode=verify-full" >&2
+    echo "    AUTOCOLOR_COLORDB_APP_PASSWORD=a-fresh-password-for-colordb_app" >&2
+    echo "" >&2
+    echo ".env is gitignored. Neither belongs on a command line." >&2
+    exit 1
+fi
 
 if [ ! -x "$PSQL" ]; then
     echo "No psql in: $PG_BIN" >&2
