@@ -16,6 +16,9 @@
 CREATE INDEX make_group_idx ON colour.make (group_id);
 CREATE INDEX vc_code_idx    ON colour.vehicle_colour (group_id, owner_key);
 CREATE INDEX vc_model_idx   ON colour.vehicle_colour (group_id, model_id, year_max DESC);
+-- For the grouping in api.colours_for: browsing a make aggregates every row it
+-- has, and this keeps that an index scan rather than a heap scan plus sort.
+CREATE INDEX vc_colour_idx  ON colour.vehicle_colour (group_id, color_code, owner_key);
 
 ANALYZE;
 

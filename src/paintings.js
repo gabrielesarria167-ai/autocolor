@@ -27,6 +27,70 @@
     // escuchadores de más abajo con un TypeError en la primera línea.
     var PAINTS = window.AUTOCOLOR_PAINTS || null;
 
+    /* El catálogo del fabricante: 68.717 colores y 383 marcas, en el servidor.
+       Ver server/colordb/README.md.
+
+       Las marcas y los modelos vienen en src/colourIndex.js, un archivo, así
+       que los dos <select> se llenan sin pedir nada. Los colores no caben en
+       un archivo —693.636 asociaciones— y son lo único que viaja.
+
+       PAINTS deja de ser el catálogo y pasa a ser lo que la base no tiene: la
+       muestra en pantalla de 528 colores medidos y su acabado. Decora las
+       filas que llegan; ya no las produce. */
+    var INDEX = window.AUTOCOLOR_COLOUR_INDEX || null;
+    var API = (window.AUTOCOLOR_API_BASE || "") + "/api/colours";
+
+    // Del nombre que enseña la base al id del catálogo local, para poder
+    // pedirle la muestra. Solo las diez marcas que vende el taller tienen una.
+    var SIDECAR_BY_LABEL = {};
+    if (PAINTS) {
+        Object.keys(PAINTS.BRAND_NAMES).forEach(function (id) {
+            SIDECAR_BY_LABEL[PAINTS.BRAND_NAMES[id]] = id;
+        });
+    }
+
+    function makeLabel(makeId) {
+        if (!INDEX) return "";
+        var found = null;
+        INDEX.makes.some(function (m) {
+            if (String(m[0]) === String(makeId)) { found = m[1]; return true; }
+            return false;
+        });
+        return found || "";
+    }
+
+    /* Una fila de la base, vestida con lo que el catálogo local sepa de ella.
+       La base no tiene ningún color de pantalla —ni hex, ni RGB, ni L*a*b*—,
+       así que la muestra sale de aquí o no sale. El acabado de la base es
+       deducido del nombre; el del catálogo está medido, así que ese manda. */
+    function fromDb(row, makeId) {
+        var label = makeLabel(makeId);
+        var brandId = SIDECAR_BY_LABEL[label] || "";
+        var chip = brandId && PAINTS ? PAINTS.findColour(brandId, row.code) : null;
+        return {
+            swCode: row.swCode,
+            code: row.code,
+            name: row.name,
+            swName: row.swName && row.swName !== row.name ? row.swName : "",
+            finish: (chip && chip.finish) || FINISH_OF[row.finish] || null,
+            finishGuessed: !(chip && chip.finish),
+            family: row.family || "otro",
+            years: row.years && row.years[0] !== null ? row.years : null,
+            brandWide: !!row.brandWide,
+            dualTone: !!row.dualTone,
+            modelName: row.modelName || "",
+            hex: chip ? chip.hex : "",
+            brand: label,
+            brandId: brandId,
+            makeId: makeId
+        };
+    }
+
+    // Las letras que guarda la base, a los ids de FINISHES en src/paints.js.
+    // 'u' es «no hay nombre que leer»: se queda sin acabado y lo elige el
+    // cliente, porque el acabado multiplica el precio.
+    var FINISH_OF = { s: "solido", m: "metalico", p: "perlado", t: "tricapa", u: null };
+
     var state = {
         // 'code' | 'reading' | 'in_person' — cómo se identificó el color.
         method: "code",
@@ -83,6 +147,9 @@
     var colourBrand = document.getElementById("colourBrand");
     var colourCode = document.getElementById("colourCode");
     var colourFinish = document.getElementById("colourFinish");
+    var colourAlias = document.getElementById("colourAlias");
+    var colourFinishPick = document.getElementById("colourFinishPick");
+    var colourFinishAsk = document.getElementById("colourFinishAsk");
     var colourNote = document.getElementById("colourNote");
     var colourMiss = document.getElementById("colourMiss");
 
@@ -147,7 +214,11 @@
     function isStepValid(step) {
         if (step === 1) {
             // El taller no necesita color: el pedido es la visita.
-            return state.method === "in_person" || !!state.colour;
+            if (state.method === "in_person") return true;
+            // Con acabado, siempre: es lo que multiplica el precio, y el
+            // catálogo del fabricante no lo trae para uno de cada ocho
+            // colores. Sin él no hay nada que cotizar en el paso 2.
+            return !!state.colour && !!state.colour.finish;
         }
         if (step === 2) return !!state.size;
         if (step === 3) {
@@ -176,7 +247,12 @@
         }
 
         if (step === 1) {
-            if (state.method === "code") {
+            // Color encontrado pero sin acabado: lo que falta es una pastilla,
+            // no el código, así que el aviso manda allí y no al campo de arriba.
+            if (state.colour && !state.colour.finish) {
+                first = colourFinishPick ? colourFinishPick.querySelector(".finish-chip") : null;
+                setStepHint("Elige el acabado para poder cotizar el color.");
+            } else if (state.method === "code") {
                 need(!!brandSelect.value, brandSelect);
                 need(codeInput.value.trim() !== "", codeInput);
                 setStepHint("Busca tu código de color para continuar.");
@@ -324,8 +400,11 @@
         state.reading = null;
         state.picked = false;
         if (colourCard) colourCard.hidden = true;
+        if (colourAlias) colourAlias.hidden = true;
+        if (colourFinishPick) colourFinishPick.hidden = true;
         if (colourMiss) colourMiss.hidden = true;
-        // the grid's selection mark follows the card
+        // the grid's selection mark follows the card. renderFinder() and not
+        // requestFinder(): this only repaints what is loaded.
         if (finder && !finder.hidden) renderFinder();
     }
 
@@ -335,20 +414,66 @@
         colourStatus.textContent = quality ? quality.label : "Color encontrado";
         colourStatus.className = "colour-card__status" + (quality ? " is-" + quality.level : "");
         colourName.textContent = colour.name;
+        if (colourAlias) {
+            colourAlias.textContent = colour.swName || "";
+            colourAlias.hidden = !colour.swName;
+        }
         colourBrand.textContent = colour.brand;
         colourCode.textContent = colour.code;
-        colourFinish.textContent = PAINTS.finishLabel(colour.finish);
+        paintFinish();
+
+        colourCard.hidden = false;
+        colourMiss.hidden = true;
+        refreshConfirm();
+    }
+
+    /* El acabado, y la nota de debajo.
+
+       Cuando el catálogo del fabricante no lo dice —uno de cada ocho colores
+       no trae nombre que leer— se pregunta en vez de suponer: el acabado
+       multiplica el precio en src/paints.js, así que suponerlo mal es cobrar
+       mal. Cuando sí lo dice pero es deducido del nombre, se puede corregir,
+       porque deducirlo acierta siete de cada diez veces. */
+    function paintFinish() {
+        var colour = state.colour;
+        if (!colour) return;
+        var known = !!colour.finish;
+        colourFinish.textContent = known ? PAINTS.finishLabel(colour.finish) : "Elígelo abajo";
+
+        if (colourFinishPick) {
+            colourFinishPick.hidden = known && !colour.finishGuessed;
+            colourFinishAsk.textContent = known
+                ? "El acabado lo deducimos del nombre del color. Si tu etiqueta dice otra cosa, corrígelo: cambia el precio."
+                : "Este color no trae acabado en el catálogo. Elígelo para poder cotizarlo: es lo que decide el precio.";
+            Array.prototype.forEach.call(colourFinishPick.querySelectorAll(".finish-chip"), function (b) {
+                var on = b.dataset.finish === colour.finish;
+                b.classList.toggle("is-active", on);
+                b.setAttribute("aria-pressed", String(on));
+            });
+        }
 
         var finish = PAINTS.FINISHES[colour.finish];
         var note = finish ? finish.note : "";
         // La muestra en pantalla es una aproximación y hay que decirlo donde
         // se la está mirando: un metálico no cabe en un rectángulo de color, y
-        // quien compra por la muestra reclama después.
-        colourNote.textContent = note + " La muestra es referencial: el color se aprueba con plancha de prueba.";
+        // quien compra por la muestra reclama después. La mayoría de los
+        // colores de la base no tiene ninguna, y entonces la nota lo dice.
+        colourNote.textContent = note + (colour.hex
+            ? " La muestra es referencial: el color se aprueba con plancha de prueba."
+            : " De este color no tenemos muestra medida: se aprueba con plancha de prueba.");
+    }
 
-        colourCard.hidden = false;
-        colourMiss.hidden = true;
-        refreshConfirm();
+    if (colourFinishPick) {
+        colourFinishPick.addEventListener("click", function (e) {
+            var btn = e.target.closest(".finish-chip");
+            if (!btn || !state.colour) return;
+            state.colour.finish = btn.dataset.finish;
+            state.colour.finishGuessed = true;
+            paintFinish();
+            // El precio de cada envase sale del acabado, así que se rehace.
+            refreshSizePrices();
+            refreshConfirm();
+        });
     }
 
     function showMiss(message) {
@@ -359,23 +484,127 @@
         refreshConfirm();
     }
 
+    // El valor del <select> es un id de la base cuando hay índice, y un id
+    // del catálogo local cuando no lo hay. Esto devuelve el segundo a partir
+    // del primero, que es lo que necesita la muestra.
+    function sidecarId(value) {
+        if (!value) return "";
+        if (!INDEX) return value;
+        return SIDECAR_BY_LABEL[makeLabel(value)] || "";
+    }
+
+    function searchLocally(value, code) {
+        var brandId = sidecarId(value);
+        if (!brandId || !PAINTS) return null;
+        var found = PAINTS.findColour(brandId, code);
+        if (!found) return null;
+        // Sin swCode: este color salió del catálogo local, no de la base, y
+        // el servidor no tiene nada que volver a resolver.
+        return {
+            swCode: "", code: found.code, name: found.name, swName: "",
+            finish: found.finish, finishGuessed: false, family: found.family || "otro",
+            years: found.years || null, brandWide: false, dualTone: false, modelName: "",
+            hex: found.hex, brand: found.brand, brandId: brandId, makeId: value
+        };
+    }
+
+    function missMessage(brandName, code) {
+        return "No tenemos «" + code.toUpperCase() + "» entre los colores de " + brandName +
+            ". Revisa el código en la etiqueta, o usa la lectura digital o el taller: " +
+            "los colores que no están en la lista los preparamos midiendo la pieza.";
+    }
+
+    var searchToken = 0;
+
     function searchByCode() {
         if (!PAINTS) return;
-        var brandId = brandSelect.value;
+        var value = brandSelect.value;
         var code = codeInput.value.trim();
-        if (!brandId || code === "") {
+        if (!value || code === "") {
             explainStep(1);
             return;
         }
-        var colour = PAINTS.findColour(brandId, code);
-        if (colour) {
-            state.picked = false;
-            showColour(colour, null);
+
+        // Sin índice no hay base que preguntar: queda el catálogo local, que
+        // es como funcionaba la página antes de todo esto.
+        if (!INDEX) {
+            var local = searchLocally(value, code);
+            if (local) { state.picked = false; showColour(local, null); }
+            else showMiss(missMessage(PAINTS.brandName(value), code));
             return;
         }
-        showMiss("No tenemos «" + code.toUpperCase() + "» en el catálogo de " +
-            PAINTS.brandName(brandId) + ". Revisa el código en la etiqueta, o usa la lectura digital " +
-            "o el taller: los colores que no están en la lista los preparamos midiendo la pieza.");
+
+        var mine = ++searchToken;
+        var label = codeSearchBtn ? codeSearchBtn.textContent : "";
+        if (codeSearchBtn) {
+            codeSearchBtn.disabled = true;
+            codeSearchBtn.textContent = "Buscando…";
+        }
+
+        fetch(API + "/search?make=" + encodeURIComponent(value) + "&code=" + encodeURIComponent(code))
+            .then(function (response) {
+                if (API_MISSING_STATUS.indexOf(response.status) !== -1) {
+                    throw new Error(API_MISSING_MESSAGE);
+                }
+                return response.json().catch(function () { return {}; }).then(function (body) {
+                    if (!response.ok) {
+                        var err = new Error(body.error || "No pudimos buscar ese código.");
+                        err.soft = response.status === 503;
+                        throw err;
+                    }
+                    return body;
+                });
+            })
+            .then(function (body) {
+                if (mine !== searchToken) return;
+                var items = (body.items || []).map(function (row) { return fromDb(row, value); });
+                if (items.length === 0) {
+                    showMiss(missMessage(makeLabel(value), code));
+                    return;
+                }
+                state.picked = false;
+                if (items.length === 1) {
+                    showColour(items[0], null);
+                    return;
+                }
+                // Un mismo código de fábrica puede tener varias versiones, por
+                // año o por modelo. Se muestran en la rejilla para que elija
+                // quien sí sabe cuál es su coche.
+                showColour(items[0], null);
+                finderState.rows = items;
+                finderState.hasMore = false;
+                finderState.error = "";
+                if (finder && finder.hidden) {
+                    finder.hidden = false;
+                    finderToggle.setAttribute("aria-expanded", "true");
+                }
+                renderFinder();
+                finderNote.textContent = "El código «" + code.toUpperCase() + "» tiene " +
+                    items.length + " versiones. Elige la de tu modelo o año.";
+            })
+            .catch(function (err) {
+                if (mine !== searchToken) return;
+                // Con la base caída o sin conexión, el catálogo local todavía
+                // sabe de diez marcas: la página degrada, no se rompe.
+                var offline = err instanceof TypeError;
+                var fallback = (offline || err.soft) ? searchLocally(value, code) : null;
+                if (fallback) {
+                    state.picked = false;
+                    showColour(fallback, null);
+                    colourNote.textContent = "Del catálogo local: el buscador completo no" +
+                        " responde ahora mismo. " + colourNote.textContent;
+                    return;
+                }
+                showMiss(offline
+                    ? "No pudimos conectar con el servidor. Revisa tu conexión e inténtalo nuevamente."
+                    : err.message);
+            })
+            .then(function () {
+                if (mine === searchToken && codeSearchBtn) {
+                    codeSearchBtn.disabled = false;
+                    codeSearchBtn.textContent = label;
+                }
+            });
     }
 
     if (codeSearchBtn) codeSearchBtn.addEventListener("click", searchByCode);
@@ -397,6 +626,8 @@
         brandSelect.addEventListener("change", function () {
             brandSelect.classList.toggle("is-placeholder", brandSelect.value === "");
             clearColour();
+            // fillFinderModels() ends in resetFinderPaging(), so the grid
+            // reloads for the new make rather than showing the old one's.
             fillFinderModels();
             refreshConfirm();
         });
@@ -412,8 +643,9 @@
        not listed (Hilux, Onix and the other cars sold only down here).
        --------------------------------------------------------------------- */
 
-    var CARS = window.CAR_CATALOG || null;
-    var FINDER_PAGE = 36;
+    // La página pide de a 60 porque la base contesta de a 60: el límite vive
+    // dentro de la función SQL, no aquí, y aquí sólo se sabe si hay más.
+    var FINDER_PAGE = 60;
     var finderToggle = document.getElementById("finderToggle");
     var finder = document.getElementById("colourFinder");
     var finderModel = document.getElementById("finderModel");
@@ -424,8 +656,7 @@
     var finderGrid = document.getElementById("finderGrid");
     var finderMore = document.getElementById("finderMore");
     var finderWiden = document.getElementById("finderWiden");
-    var finderState = { family: "", shown: FINDER_PAGE };
-    var covered = PAINTS ? PAINTS.coverage() : { from: 0, to: 0 };
+    var finderState = { family: "", from: 0, rows: [], hasMore: false, error: "" };
 
     function setSwatch(el, hex) {
         // A colour with no chip in the guides gets a hatch, not a guessed
@@ -436,28 +667,32 @@
 
     function fillFinderModels() {
         if (!finderModel) return;
-        var brand = CARS && brandSelect.value ? CARS.findBrand(brandSelect.value) : null;
+        var makeId = brandSelect.value;
+        var list = INDEX && makeId ? (INDEX.models[makeId] || []) : null;
         finderModel.innerHTML = "";
         var first = document.createElement("option");
         first.value = "";
-        first.textContent = brand ? "Todos los modelos" : "Elige primero la marca";
+        first.textContent = makeId ? "Todos los modelos" : "Elige primero la marca";
         finderModel.appendChild(first);
-        if (brand) {
-            brand.models.forEach(function (model) {
+        if (list) {
+            list.forEach(function (model) {
                 var opt = document.createElement("option");
-                opt.value = model.id;
-                opt.textContent = model.name;
+                opt.value = String(model[0]);
+                opt.textContent = model[1];
                 finderModel.appendChild(opt);
             });
         }
-        finderModel.disabled = !brand;
+        // Una marca sin modelos propios no deja el <select> muerto: sus
+        // colores están a nivel de marca, que es donde vive más de la mitad
+        // de este catálogo, y «todos los modelos» los trae igual.
+        finderModel.disabled = !makeId;
         finderModel.classList.add("is-placeholder");
-        renderFinder();
+        resetFinderPaging();
     }
 
     function fillFinderYears() {
         var now = new Date().getFullYear();
-        for (var y = now + 1; y >= 1995; y--) {
+        for (var y = now + 1; y >= 1980; y--) {
             var opt = document.createElement("option");
             opt.value = String(y);
             opt.textContent = String(y);
@@ -478,78 +713,121 @@
         });
     }
 
-    // Did the colour run in `year`? A year either side counts: the guides
-    // date a colour by model year, and a car sold in December is next year's.
-    function ranIn(span, year) {
-        return span[0] - 1 <= year && year <= span[1] + 1;
+    /* La página pide los colores; antes los tenía.
+
+       Dos cosas a la vez para que no se pisen: un número que sube en cada
+       petición, y un AbortController. El número es el que garantiza que una
+       respuesta lenta no escriba encima de una rápida que salió después; el
+       abort es el que evita gastar los bytes de la que ya no importa.
+
+       No hay debounce, y no es un olvido: lo único que dispara una petición es
+       cambiar uno de los dos <select> o pulsar «ver más». El buscador de texto
+       y las pastillas de tono filtran lo que ya está en pantalla. */
+    var finderToken = 0;
+    var finderAbort = null;
+
+    function finderUrl() {
+        var params = "?make=" + encodeURIComponent(brandSelect.value);
+        if (finderModel.value) params += "&model=" + encodeURIComponent(finderModel.value);
+        if (finderYear.value) params += "&year=" + encodeURIComponent(finderYear.value);
+        if (finderState.from) params += "&from=" + finderState.from;
+        return API + "/browse" + params;
     }
 
-    // The list the grid shows, before the family and text filters, and the
-    // sentence that says what it is.
-    function finderList() {
-        var brandId = brandSelect.value;
-        if (!brandId) return { items: [], note: "Elige la marca arriba para ver sus colores." };
-        var brandName = PAINTS.brandName(brandId);
-        var modelId = finderModel.value;
-        var model = modelId && CARS ? CARS.findModel(brandId, modelId) : null;
-        var year = Number(finderYear.value) || null;
-        var late = year && year > covered.to;
-        var note;
-
-        var own = model ? PAINTS.modelColours(brandId, modelId) : null;
-        if (own) {
-            var mine = own;
-            if (year && !late) mine = own.filter(function (c) { return ranIn(c.modelYears, year); });
-            if (late) mine = own.filter(function (c) { return c.modelYears[1] >= covered.to - 2; });
-            if (mine.length) {
-                note = "Colores del " + model.name + (year && !late ? " " + year : "") +
-                    " registrados en las guías del fabricante." +
-                    (late ? " Llegan hasta " + covered.to + ": si tu " + model.name + " es de " + year +
-                        " y su color es nuevo, puede no estar." : "") +
-                    " La lista no es completa: si no ves el tuyo, mira todos los de " + brandName + ".";
-                return { items: mine, note: note, widen: brandName };
-            }
-        }
-
-        var list = PAINTS.coloursOf(brandId);
-        if (year && !late) list = list.filter(function (c) { return ranIn(c.years, year); });
-        if (late) list = list.filter(function (c) { return c.years[1] >= covered.to - 2; });
-        list.sort(function (a, b) { return b.years[1] - a.years[1] || a.name.localeCompare(b.name); });
-
-        if (model) {
-            note = "No tenemos la lista propia del " + model.name + ": te mostramos los colores de " +
-                brandName + (year && !late ? " de " + year : "") + ".";
-        } else {
-            note = "Colores de " + brandName + (year && !late ? " de " + year : "") + ".";
-        }
-        if (late) {
-            note += " Nuestras guías llegan hasta " + covered.to + ", así que aquí van los que seguían en uso;" +
-                " un color más nuevo puede no estar.";
-        }
-        return { items: list, note: note };
+    function setFinderBusy(busy) {
+        finderGrid.classList.toggle("is-loading", busy);
+        finderMore.disabled = busy;
+        finderSearch.disabled = busy && finderState.rows.length === 0;
     }
 
+    function requestFinder() {
+        if (!finder || finder.hidden) return;
+        if (!brandSelect.value) {
+            finderState.rows = [];
+            finderState.hasMore = false;
+            finderState.error = "";
+            renderFinder();
+            return;
+        }
+        var mine = ++finderToken;
+        if (finderAbort) finderAbort.abort();
+        finderAbort = typeof AbortController === "function" ? new AbortController() : null;
+
+        setFinderBusy(true);
+        if (finderState.rows.length === 0) finderNote.textContent = "Buscando colores…";
+
+        fetch(finderUrl(), finderAbort ? { signal: finderAbort.signal } : undefined)
+            .then(function (response) {
+                if (API_MISSING_STATUS.indexOf(response.status) !== -1) {
+                    throw new Error(API_MISSING_MESSAGE);
+                }
+                return response.json().catch(function () { return {}; }).then(function (body) {
+                    if (!response.ok) {
+                        var err = new Error(body.error || "No pudimos traer los colores.");
+                        err.soft = response.status === 503;
+                        throw err;
+                    }
+                    return body;
+                });
+            })
+            .then(function (body) {
+                if (mine !== finderToken) return;
+                var makeId = brandSelect.value;
+                var fresh = (body.items || []).map(function (row) { return fromDb(row, makeId); });
+                finderState.rows = finderState.from ? finderState.rows.concat(fresh) : fresh;
+                finderState.hasMore = !!body.hasMore;
+                finderState.error = "";
+                renderFinder();
+            })
+            .catch(function (err) {
+                if (err.name === "AbortError" || mine !== finderToken) return;
+                // Sin conexión o con la base apagada quedan los 777 colores
+                // del catálogo local, que son diez marcas pero son algo. Solo
+                // sirve si la marca elegida es una de ellas.
+                var offline = err instanceof TypeError;
+                finderState.rows = [];
+                finderState.hasMore = false;
+                finderState.error = offline
+                    ? "No pudimos conectar con el servidor. Revisa tu conexión e inténtalo nuevamente."
+                    : err.message;
+                renderFinder();
+            })
+            .then(function () {
+                if (mine === finderToken) setFinderBusy(false);
+            });
+    }
+
+    // Pinta lo que ya está cargado. No pide nada: el filtro de texto y las
+    // pastillas de tono trabajan sobre las filas que hay, igual que antes.
     function renderFinder() {
         if (!finder || finder.hidden || !PAINTS) return;
-        var result = finderList();
+
+        if (!brandSelect.value) {
+            finderGrid.innerHTML = "";
+            finderMore.hidden = true;
+            finderWiden.hidden = true;
+            finderNote.textContent = "Elige la marca arriba para ver sus colores.";
+            return;
+        }
+
         var q = PAINTS.normalizeCode(finderSearch.value);
         var text = finderSearch.value.trim().toLowerCase();
-        var items = result.items.filter(function (c) {
+        var items = finderState.rows.filter(function (c) {
             if (finderState.family && c.family !== finderState.family) return false;
             if (!text) return true;
             if (c.name.toLowerCase().indexOf(text) !== -1) return true;
+            if (c.swName && c.swName.toLowerCase().indexOf(text) !== -1) return true;
             if (!q) return false;
-            return [c.code].concat(c.alt || []).some(function (code) {
-                return PAINTS.normalizeCode(code).indexOf(q) === 0;
-            });
+            return PAINTS.normalizeCode(c.code).indexOf(q) === 0;
         });
 
         finderGrid.innerHTML = "";
-        items.slice(0, finderState.shown).forEach(function (colour) {
+        items.forEach(function (colour) {
             var btn = document.createElement("button");
             btn.type = "button";
             btn.className = "swatch-option";
-            var picked = state.colour && state.colour.brandId === colour.brandId && state.colour.code === colour.code;
+            var picked = state.colour && state.colour.swCode === colour.swCode
+                && state.colour.code === colour.code;
             btn.classList.toggle("is-selected", !!picked);
             btn.setAttribute("aria-pressed", String(!!picked));
 
@@ -566,11 +844,9 @@
             name.className = "swatch-option__name";
             name.textContent = colour.name;
 
-            var span = colour.modelYears || colour.years;
             var meta = document.createElement("span");
             meta.className = "swatch-option__meta";
-            meta.textContent = PAINTS.finishLabel(colour.finish) + " · " +
-                (span[0] === span[1] ? span[0] : span[0] + "–" + span[1]);
+            meta.textContent = finderMeta(colour);
 
             btn.appendChild(chip);
             btn.appendChild(code);
@@ -580,20 +856,52 @@
             finderGrid.appendChild(btn);
         });
 
-        var rest = items.length - finderState.shown;
-        finderMore.hidden = rest <= 0;
-        if (rest > 0) finderMore.textContent = "Ver " + Math.min(rest, FINDER_PAGE) + " colores más (" + rest + " en total)";
-
-        if (items.length === 0) {
-            finderNote.textContent = result.items.length
-                ? "Ningún color de esta lista coincide con el filtro."
-                : result.note + " No encontramos colores para esa combinación: prueba otro año, o usa la " +
-                  "lectura digital o el taller.";
-        } else {
-            finderNote.textContent = result.note;
+        // «Ver más» y no «ver N más»: la base nunca dice cuántos hay, a
+        // propósito, así que la página tampoco puede prometerlo.
+        finderMore.hidden = !finderState.hasMore;
+        finderMore.textContent = "Ver más colores";
+        finderWiden.hidden = !finderModel.value;
+        if (finderModel.value) {
+            finderWiden.textContent = "Ver todos los colores de " + makeLabel(brandSelect.value);
         }
-        finderWiden.hidden = !result.widen;
-        if (result.widen) finderWiden.textContent = "Ver todos los colores de " + result.widen;
+
+        finderNote.textContent = finderNoteText(items.length);
+    }
+
+    function finderMeta(colour) {
+        var bits = [];
+        if (colour.finish) bits.push(PAINTS.finishLabel(colour.finish));
+        if (colour.years) {
+            bits.push(colour.years[0] === colour.years[1]
+                ? String(colour.years[0])
+                : colour.years[0] + "–" + colour.years[1]);
+        }
+        if (colour.dualTone) bits.push("bitono");
+        return bits.join(" · ");
+    }
+
+    function finderNoteText(shown) {
+        if (finderState.error) return finderState.error;
+        var brandName = makeLabel(brandSelect.value);
+        if (finderState.rows.length === 0) {
+            return "No encontramos colores de " + brandName + " para esa combinación." +
+                " Prueba otro año o quita el modelo, o usa la lectura digital o el taller.";
+        }
+        if (shown === 0) return "Ningún color de los cargados coincide con el filtro.";
+
+        var modelName = finderModel.options[finderModel.selectedIndex];
+        var where = finderModel.value && modelName
+            ? "del " + modelName.textContent
+            : "de " + brandName;
+        var note = "Colores " + where +
+            (finderYear.value ? " de " + finderYear.value : "") +
+            " en el catálogo del fabricante.";
+        // Más de la mitad de este catálogo cuelga de la marca y no del
+        // modelo, así que conviene decir cuándo lo que se ve es eso.
+        if (finderModel.value && finderState.rows.some(function (c) { return c.brandWide; })) {
+            note += " Algunos están registrados para toda la marca, no para ese modelo.";
+        }
+        return note;
     }
 
     function pickFromFinder(colour) {
@@ -608,8 +916,19 @@
         colourCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
 
+    // Una petición nueva: se vuelve a la primera página y se tiran las filas
+    // cargadas, porque describen otra combinación.
     function resetFinderPaging() {
-        finderState.shown = FINDER_PAGE;
+        finderState.from = 0;
+        finderState.rows = [];
+        finderState.hasMore = false;
+        finderState.error = "";
+        requestFinder();
+    }
+
+    // El filtro de texto y las pastillas de tono no piden nada: trabajan
+    // sobre lo que ya está cargado.
+    function refilterFinder() {
         renderFinder();
     }
 
@@ -622,7 +941,10 @@
             finder.hidden = !open;
             finderToggle.setAttribute("aria-expanded", String(open));
             if (open) {
-                renderFinder();
+                // Al abrir se pide de verdad: hasta ahora no había nada que
+                // pintar, porque los colores ya no viven en la página.
+                if (finderState.rows.length === 0) resetFinderPaging();
+                else renderFinder();
                 (brandSelect.value ? finderModel : brandSelect).focus();
             }
         });
@@ -641,9 +963,9 @@
                 b.classList.toggle("is-active", on);
                 b.setAttribute("aria-pressed", String(on));
             });
-            resetFinderPaging();
+            refilterFinder();
         });
-        finderSearch.addEventListener("input", resetFinderPaging);
+        finderSearch.addEventListener("input", refilterFinder);
         finderSearch.addEventListener("keydown", function (e) {
             if (e.key === "Enter") e.preventDefault();
         });
@@ -656,8 +978,17 @@
             finderModel.focus();
         });
         finderMore.addEventListener("click", function () {
-            finderState.shown += FINDER_PAGE;
-            renderFinder();
+            // La base recorta el salto a 600 y contesta 400 pasado eso, así
+            // que «ver más» se apaga antes de llegar en vez de dar vueltas.
+            if (finderState.from + FINDER_PAGE > 600) {
+                finderState.hasMore = false;
+                finderMore.hidden = true;
+                finderNote.textContent = "Son muchos colores para verlos de una." +
+                    " Afina el modelo o el año para ver el resto.";
+                return;
+            }
+            finderState.from += FINDER_PAGE;
+            requestFinder();
         });
     } else if (finderToggle) {
         finderToggle.hidden = true;
@@ -1121,6 +1452,10 @@
             brandId: state.colour ? state.colour.brandId : "",
             colorCode: state.colour ? state.colour.code : "",
             colorName: state.colour ? state.colour.name : "",
+            // El id de Sherwin, cuando el color salió de la base. Es lo que el
+            // servidor vuelve a resolver antes de guardar, y lo que encuentra
+            // la fórmula en el mostrador. Vacío si vino del catálogo local.
+            swCode: state.colour ? (state.colour.swCode || "") : "",
             finish: state.colour ? state.colour.finish : "",
             reading: state.reading,
             size: skipsQuantity() ? "" : state.size,
@@ -1306,7 +1641,19 @@
        Arranque
        --------------------------------------------------------------------- */
 
-    if (PAINTS && brandSelect) {
+    // Las 383 marcas del catálogo del fabricante, las diez que vende el taller
+    // primero. Sale de un archivo, así que no hay espera ni nada que cargar.
+    if (INDEX && brandSelect) {
+        INDEX.makes.forEach(function (make) {
+            var opt = document.createElement("option");
+            opt.value = String(make[0]);
+            opt.textContent = make[1];
+            brandSelect.appendChild(opt);
+        });
+    } else if (PAINTS && brandSelect) {
+        // Sin el índice queda el catálogo local: diez marcas, pero la página
+        // vende igual. El valor sigue siendo un id, y searchByCode() distingue
+        // los dos casos por SIDECAR_BY_LABEL.
         PAINTS.brands().forEach(function (brand) {
             var opt = document.createElement("option");
             opt.value = brand.id;

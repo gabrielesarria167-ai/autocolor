@@ -17,6 +17,7 @@
     <script src="../src/config.js" defer></script>
     <script src="../src/cities.js" defer></script>
     <script src="../src/carModels.js" defer></script>
+    <script src="../src/colourIndex.js" defer></script>
     <script src="../src/paintCatalog.js" defer></script>
     <script src="../src/paints.js" defer></script>
     <script src="../src/paintings.js" defer></script>
@@ -129,13 +130,17 @@
                                 <button type="button" class="code-search__submit" id="colorSearch">Buscar</button>
                             </div>
                             <p class="field__hint" id="colorCodeHint">Está en una etiqueta del vehículo: marco de la
-                                puerta, bajo el capó o en el maletero.</p>
+                                puerta, bajo el capó o en el maletero. Escríbelo tal cual: buscamos ese código
+                                exacto entre los del fabricante.</p>
                         </div>
                     </div>
 
                     <!-- The finder for whoever has no label to read: model and
-                         year narrow the brand's colours to a grid to pick from.
-                         Filled by src/paintings.js from src/paintCatalog.js. -->
+                         year narrow the make's colours to a grid to pick from.
+                         The makes and models come from src/colourIndex.js, a
+                         file, so these two selects never wait. The colours come
+                         from /api/colours/browse: there are 693,636 of them,
+                         which is not a file. See server/colordb/README.md. -->
                     <button type="button" class="finder-toggle" id="finderToggle" aria-expanded="false"
                         aria-controls="colourFinder">¿No sabes el código? Búscalo por modelo y año</button>
 
@@ -193,8 +198,15 @@
                         Lectura de tu espectrofotómetro
                     </h2>
 
-                    <p class="field__hint method-hint">Ingresa los tres valores CIELAB que entrega el equipo. Buscamos
-                        el color del catálogo más cercano a esa medición.</p>
+                    <!-- La lectura se compara contra las muestras medidas de
+                         src/paintCatalog.js, no contra la base del fabricante:
+                         aquélla no guarda ningún color de pantalla —ni hex, ni
+                         RGB, ni L*a*b*—, así que no hay nada contra lo que
+                         medir una distancia. Son 528 muestras de diez marcas, y
+                         el texto lo dice en vez de prometer el catálogo entero. -->
+                    <p class="field__hint method-hint">Ingresa los tres valores CIELAB que entrega el equipo.
+                        Buscamos la muestra más cercana entre las que tenemos medidas, que son las de las marcas
+                        que más vendemos. Si tu color no está entre ellas, el taller lo prepara midiendo la pieza.</p>
 
                     <div class="field-row">
                         <div class="field">
@@ -274,11 +286,30 @@
                 <figcaption class="colour-card__body">
                     <span class="colour-card__status" id="colourStatus"></span>
                     <strong class="colour-card__name" id="colourName"></strong>
+                    <!-- El nombre que le da Sherwin, cuando no es el mismo que
+                         el del fabricante. El del fabricante viene en su
+                         idioma —SCHWARZGRAU, GRIGIO METROPOLI— y este suele
+                         ser el que se entiende en el mostrador. -->
+                    <span class="colour-card__alias" id="colourAlias" hidden></span>
                     <dl class="colour-card__facts">
                         <div><dt>Marca</dt><dd id="colourBrand"></dd></div>
                         <div><dt>Código</dt><dd class="colour-card__code" id="colourCode"></dd></div>
                         <div><dt>Acabado</dt><dd id="colourFinish"></dd></div>
                     </dl>
+
+                    <!-- El catálogo del fabricante no dice el acabado de uno
+                         de cada ocho colores, y el acabado multiplica el
+                         precio. Cuando no se sabe, lo elige quien compra, en
+                         vez de cobrarle un sólido por un tricapa. -->
+                    <div class="colour-card__finish" id="colourFinishPick" hidden>
+                        <p class="colour-card__finish-ask" id="colourFinishAsk"></p>
+                        <div class="finish-chips" role="group" aria-label="Acabado de la pintura">
+                            <button type="button" class="finish-chip" data-finish="solido" aria-pressed="false">Sólido</button>
+                            <button type="button" class="finish-chip" data-finish="metalico" aria-pressed="false">Metálico</button>
+                            <button type="button" class="finish-chip" data-finish="perlado" aria-pressed="false">Perlado</button>
+                            <button type="button" class="finish-chip" data-finish="tricapa" aria-pressed="false">Tricapa</button>
+                        </div>
+                    </div>
                     <p class="colour-card__note" id="colourNote"></p>
                 </figcaption>
             </figure>

@@ -4226,6 +4226,72 @@ body.wizard {
     color: var(--text-faint);
 }
 
+/* El nombre que le da Sherwin. Va debajo del del fabricante y más callado:
+   el de arriba es el que dice la etiqueta del coche —y viene en el idioma de
+   donde se fabricó—, este es el que se entiende en el mostrador. */
+.colour-card__alias {
+    display: block;
+    margin-top: 2px;
+    font-size: 0.85rem;
+    color: var(--text-faint);
+}
+
+/* Elegir el acabado. Sale cuando el catálogo del fabricante no lo dice —uno de
+   cada ocho colores— o cuando lo dedujimos del nombre. No es un adorno: el
+   acabado multiplica el precio, así que es más honesto preguntarlo que
+   suponerlo y cobrar de menos. */
+.colour-card__finish {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+}
+
+.colour-card__finish-ask {
+    margin: 0 0 8px;
+    font-size: 0.85rem;
+    line-height: var(--lh-snug);
+    color: var(--text-dim);
+}
+
+.finish-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+/* Rectángulos como las pastillas de tono del buscador, y no píldoras: aquí
+   se filtra y se elige, y las píldoras son de estado. Ver la nota junto a
+   .staff-chip. */
+.finish-chip {
+    padding: 5px 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: border-color 0.2s var(--ease-out), background 0.2s var(--ease-out);
+}
+
+.finish-chip:hover {
+    border-color: var(--border-strong);
+}
+
+.finish-chip.is-active {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: #fff;
+}
+
+/* Los colores ya no están en la página: hay que ir a buscarlos. Se apaga la
+   rejilla mientras llegan en vez de vaciarla, porque vaciarla haría saltar el
+   alto de la página en cada cambio de modelo o de año. */
+.swatch-grid.is-loading {
+    opacity: 0.45;
+    pointer-events: none;
+}
+
 /* El código que no está en el catálogo. No es un error del cliente, así que
    no se pinta de rojo: es una nota que además ofrece los otros dos caminos. */
 .colour-miss {

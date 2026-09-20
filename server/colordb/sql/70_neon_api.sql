@@ -98,9 +98,19 @@ BEGIN
     IF p_make IS NULL THEN
         RAISE EXCEPTION 'make required' USING ERRCODE = '22023';
     END IF;
+    -- Grouped, because vehicle_colour holds one row per model. Browsing a
+    -- whole make without this returns the same colour once for every model
+    -- that ever wore it -- Hyundai is 8,816 rows for 2,652 colours -- and the
+    -- grid fills with the same tile over and over. Grouping also means the
+    -- page of 61 is 61 real colours, which matters because that page is the
+    -- limit everything else is measured against.
+    --
+    -- The year span becomes the widest any model had it, which is the honest
+    -- answer to "when did this make sell this colour".
     RETURN QUERY
     SELECT c.color_code, v.owner_code, c.oem_name, c.sw_name, c.finish, c.family,
-           v.year_min, v.year_max, (v.model_id IS NULL), v.dual_tone
+           min(v.year_min), max(v.year_max),
+           bool_and(v.model_id IS NULL), bool_or(v.dual_tone)
     FROM vehicle_colour v
     JOIN colour c ON c.color_code = v.color_code
     WHERE v.group_id = p_make
@@ -115,7 +125,8 @@ BEGIN
            OR (v.year_min IS NULL AND v.year_max IS NULL)
            OR (p_year BETWEEN coalesce(v.year_min, -32768)::integer - 1
                           AND coalesce(v.year_max,  32767)::integer + 1))
-    ORDER BY (v.model_id IS NULL), v.year_max DESC NULLS LAST, c.oem_name
+    GROUP BY c.color_code, v.owner_code, c.oem_name, c.sw_name, c.finish, c.family
+    ORDER BY bool_and(v.model_id IS NULL), max(v.year_max) DESC NULLS LAST, c.oem_name
     OFFSET v_from LIMIT 61;
 END $$;
 
@@ -157,14 +168,23 @@ BEGIN
     IF length(k) > 10 THEN
         RAISE EXCEPTION 'code too long' USING ERRCODE = '22023';
     END IF;
+    -- Grouped for the same reason as colours_for. One factory code can still
+    -- answer with several rows -- a code reused across years, or two colours
+    -- that share it -- and those are worth showing, so the customer picks.
+    -- The same colour repeated per model is not.
     RETURN QUERY
     SELECT c.color_code, v.owner_code, c.oem_name, c.sw_name, c.finish, c.family,
-           v.year_min, v.year_max, mo.name, (v.model_id IS NULL), v.dual_tone
+           min(v.year_min), max(v.year_max),
+           -- The model of one of the rows, so the customer can recognise it.
+           -- NULL when the colour is registered for the whole make.
+           (array_agg(mo.name ORDER BY mo.name) FILTER (WHERE mo.name IS NOT NULL))[1],
+           bool_and(v.model_id IS NULL), bool_or(v.dual_tone)
     FROM vehicle_colour v
     JOIN colour c ON c.color_code = v.color_code
     LEFT JOIN model mo ON mo.model_id = v.model_id
     WHERE v.group_id = p_make AND v.owner_key = k
-    ORDER BY v.year_max DESC NULLS LAST, (v.model_id IS NULL)
+    GROUP BY c.color_code, v.owner_code, c.oem_name, c.sw_name, c.finish, c.family
+    ORDER BY max(v.year_max) DESC NULLS LAST, bool_and(v.model_id IS NULL)
     LIMIT 12;
 END $$;
 
