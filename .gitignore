@@ -1,7 +1,15 @@
 node_modules/
 .DS_Store
 *.log
+
+# El .env y cualquier copia suya. El patrón es amplio a propósito: `.env` a
+# secas no cubre un `.env.bak` hecho de paso antes de editarlo, y ese archivo
+# lleva las mismas credenciales en un repositorio que se publica entero.
+# .env.example sí se versiona: no tiene valores, solo el comentario de cada
+# variable.
 .env
+.env.*
+!.env.example
 
 # Fuentes 3D. Los .blend y los .glb sin comprimir se quedan en el disco pero
 # no en el repositorio: no se sirven nunca, pesan cientos de MB y GitHub Pages
