@@ -24,17 +24,57 @@
 -- dollar-quoted string, and not a GUC because that would leave the password
 -- readable in the session. push.sh reads it from the environment rather than
 -- passing it as an argument, where ps would show it.
-SELECT format('CREATE ROLE colordb_app LOGIN NOINHERIT PASSWORD %L', :'app_pw')
+SELECT format('CREATE ROLE colordb_app LOGIN NOINHERIT NOCREATEDB NOCREATEROLE PASSWORD %L', :'app_pw')
  WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'colordb_app')
 UNION ALL
 SELECT format('ALTER ROLE colordb_app PASSWORD %L', :'app_pw')
  WHERE EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'colordb_app')
 \gexec
 
-ALTER ROLE colordb_app NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+-- Only the two a managed Postgres will let the project owner set.
+--
+-- A new role is already NOSUPERUSER, NOREPLICATION and NOBYPASSRLS, and on
+-- Neon nobody can say so out loud: the project owner holds neon_superuser, not
+-- SUPERUSER, and only a true superuser may change those three attributes --
+-- even to switch them off. Asserting them stops the script with "permission
+-- denied to alter role" after the role has been created but before a single
+-- grant is made.
+ALTER ROLE colordb_app NOCREATEDB NOCREATEROLE;
+
 -- Neon's free tier is a small compute shared with the requests database. Eight
 -- is twice the application pool, leaving room for a deploy overlapping itself.
 ALTER ROLE colordb_app CONNECTION LIMIT 8;
+
+-- So the three that cannot be set are checked instead, which is worth more
+-- than setting them would have been: this also catches a colordb_app created
+-- in the Neon console, which arrives holding neon_superuser and can read every
+-- table in the database no matter what the rest of this file grants. That is
+-- the mistake this whole file is written around, and until now nothing here
+-- would have noticed it.
+DO $$
+DECLARE r record; memberships text;
+BEGIN
+    SELECT rolsuper, rolreplication, rolbypassrls, rolcreatedb, rolcreaterole
+      INTO r FROM pg_roles WHERE rolname = 'colordb_app';
+
+    IF r.rolsuper OR r.rolreplication OR r.rolbypassrls
+       OR r.rolcreatedb OR r.rolcreaterole THEN
+        RAISE EXCEPTION 'colordb_app holds attributes it must not: superuser=%, replication=%, bypassrls=%, createdb=%, createrole=%',
+            r.rolsuper, r.rolreplication, r.rolbypassrls, r.rolcreatedb, r.rolcreaterole;
+    END IF;
+
+    -- It must belong to nothing. neon_superuser is granted by membership, not
+    -- as an attribute, so the check above would not see it.
+    SELECT string_agg(g.rolname, ', ') INTO memberships
+    FROM pg_auth_members m
+    JOIN pg_roles g ON g.oid = m.roleid
+    JOIN pg_roles u ON u.oid = m.member
+    WHERE u.rolname = 'colordb_app';
+
+    IF memberships IS NOT NULL THEN
+        RAISE EXCEPTION 'colordb_app is a member of: %. It must belong to no role. Was it created in the Neon console?', memberships;
+    END IF;
+END $$;
 
 -- ---------------------------------------------------------------------------
 -- 2. The database: connect, and nothing else
