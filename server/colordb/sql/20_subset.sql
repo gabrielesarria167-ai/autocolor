@@ -86,8 +86,10 @@ CREATE TABLE colour.vehicle_colour (
     dual_tone  boolean  NOT NULL
 );
 
--- owner_key matches normalizeCode() in src/paints.js, so a customer typing
--- "C/TR: 1F7-0" off a door jamb still lands on 1F7.
+-- owner_key applies the same rule as normalizeCode() in src/paints.js: upper
+-- case, alphanumerics only. So "1f7", "1F7" and "1-F-7" are one key. It does
+-- not pull a code out of a longer label -- "C/TR: 1F7-0" normalises to
+-- CTR1F70, and matches nothing, exactly as findColour() does today.
 --
 -- Rows with no owner_color_code are dropped: the OEM code is what the customer
 -- reads, and a row without one cannot be searched for or shown.
