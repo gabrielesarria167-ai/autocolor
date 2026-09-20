@@ -101,16 +101,42 @@ case "$ADMIN_URL" in
     *)      ADMIN_URL="$ADMIN_URL?sslrootcert=system" ;;
 esac
 
+# The password comes out of the URL and goes into the environment, and the URL
+# psql is handed no longer carries it. An argument is visible in `ps` to every
+# process on this machine: a stray psql left over from an earlier push was
+# still showing the database owner's password and the application role's, in
+# full, on its command line. libpq percent-decodes a URI password, so the
+# decoding happens here too, or one containing a % would stop matching.
+eval "$(python3 - "$ADMIN_URL" <<'PYSPLIT'
+import shlex, sys, urllib.parse as u
+p = u.urlsplit(sys.argv[1])
+host = p.hostname or ''
+if p.port:
+    host += ':' + str(p.port)
+if p.username:
+    host = u.quote(p.username, safe='') + '@' + host
+# A keyword/value conninfo (host=... user=...) is not a URI and must be
+# passed through untouched; only a URI hides a password in its netloc.
+if p.scheme not in ('postgres', 'postgresql') or not p.password:
+    raise SystemExit(0)
+print('PGPASSWORD=' + shlex.quote(u.unquote(p.password or '')))
+print('ADMIN_URL=' + shlex.quote(u.urlunsplit((p.scheme, host, p.path, p.query, p.fragment))))
+PYSPLIT
+)"
+export PGPASSWORD
+# 80_neon_grants.sql reads this with \getenv, for the same reason.
+export AUTOCOLOR_COLORDB_APP_PASSWORD
+
 run() { "$PSQL" -v ON_ERROR_STOP=1 "$ADMIN_URL" "$@"; }
 
 echo "==> 50_neon_schema  (drops and recreates colour)"
 run -q -f sql/50_neon_schema.sql
-echo "==> 60_neon_load    (693,636 links; a few minutes over the network)"
+echo "==> 60_neon_load    (699,437 links; a few minutes over the network)"
 run -f sql/60_neon_load.sql
 echo "==> 70_neon_api     (the six functions)"
 run -q -f sql/70_neon_api.sql
 echo "==> 80_neon_grants  (the role, the revokes, the grants)"
-run -v app_pw="$AUTOCOLOR_COLORDB_APP_PASSWORD" -f sql/80_neon_grants.sql
+run -f sql/80_neon_grants.sql
 
 echo ""
 echo "Now prove it is boxed in, as the application role:"

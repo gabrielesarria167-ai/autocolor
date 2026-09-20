@@ -35,7 +35,8 @@ CREATE TABLE colour.colour (
     sw_name    text,
     finish     "char"   NOT NULL,   -- s solid | m metallic | p pearl | t tricoat | u unknown
     family     text     NOT NULL,   -- a FAMILIES id from src/paints.js
-    systems    smallint NOT NULL    -- 1 U9K | 2 BC8 | 4 America do Sul
+    hex        text     NOT NULL,   -- mixed from the formula by 35_hex.sql
+    systems    smallint NOT NULL    -- 1 U9K | 2 BC8 | 4 AdS | 8 the rest
 );
 
 CREATE TABLE colour.vehicle_colour (
@@ -43,8 +44,10 @@ CREATE TABLE colour.vehicle_colour (
     model_id   integer  REFERENCES colour.model (model_id),
     year_min   smallint,
     year_max   smallint,
-    owner_code text     NOT NULL,
-    owner_key  text     NOT NULL,
+    -- NULL for the 5,782 colours that carry no factory code at all: they are
+    -- looked up by Sherwin's own code instead. See 20_subset.sql.
+    owner_code text,
+    owner_key  text,
     color_code text     NOT NULL REFERENCES colour.colour (color_code),
     dual_tone  boolean  NOT NULL
 );

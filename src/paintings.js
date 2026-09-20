@@ -60,16 +60,26 @@
     }
 
     /* Una fila de la base, vestida con lo que el catálogo local sepa de ella.
-       La base no tiene ningún color de pantalla —ni hex, ni RGB, ni L*a*b*—,
-       así que la muestra sale de aquí o no sale. El acabado de la base es
-       deducido del nombre; el del catálogo está medido, así que ese manda. */
+
+       La muestra puede venir de dos sitios. El catálogo local la trae medida
+       de una plancha impresa, para 746 colores; la base la trae calculada de
+       la fórmula de tinte, para todos. La medida manda donde la hay, y la
+       página dice cuál de las dos está enseñando, porque no valen lo mismo.
+
+       El acabado igual: el de la base es deducido del nombre, el del catálogo
+       está medido, así que ese manda. */
     function fromDb(row, makeId) {
         var label = makeLabel(makeId);
         var brandId = SIDECAR_BY_LABEL[label] || "";
         var chip = brandId && PAINTS ? PAINTS.findColour(brandId, row.code) : null;
+        var measured = !!(chip && chip.hex);
         return {
             swCode: row.swCode,
-            code: row.code,
+            // Sin código de fábrica se enseña el de Sherwin, que es el único
+            // nombre que tiene: son 5.782 colores que antes no salían.
+            code: row.code || row.swCode,
+            // Los demás códigos con los que la marca vende esta misma pintura.
+            altCodes: row.altCodes || [],
             name: row.name,
             swName: row.swName && row.swName !== row.name ? row.swName : "",
             finish: (chip && chip.finish) || FINISH_OF[row.finish] || null,
@@ -79,11 +89,31 @@
             brandWide: !!row.brandWide,
             dualTone: !!row.dualTone,
             modelName: row.modelName || "",
-            hex: chip ? chip.hex : "",
+            hex: (measured ? chip.hex : row.hex) || "",
+            hexMeasured: measured,
             brand: label,
             brandId: brandId,
             makeId: makeId
         };
+    }
+
+    /* Los códigos de fábrica de una misma pintura, en una línea.
+
+       Jeep vende el mismo azul como KBX y como PBX. Antes la base devolvía
+       una fila por código y la parrilla enseñaba el mismo color dos veces;
+       ahora devuelve una sola con los dos, y se leen juntos.
+
+       Pero solo cuando de verdad son sinónimos. Hay colores que cargan diez
+       códigos —el rojo 234487 de Ford sale como 718, ASQC, MR, G1, VBN, K1 y
+       cinco más, según el modelo y el mercado— y entonces la lista ya no
+       explica nada: se enseña el que se buscó y ya. Las letras sueltas se
+       descartan igual, porque «VR847 · C» se lee como una errata. */
+    function codeLabel(colour) {
+        var alt = (colour.altCodes || []).filter(function (c) {
+            return String(c).length > 1;
+        });
+        if (!alt.length || alt.length > 2) return colour.code;
+        return [colour.code].concat(alt).join(" · ");
     }
 
     // Las letras que guarda la base, a los ids de FINISHES en src/paints.js.
@@ -419,7 +449,7 @@
             colourAlias.hidden = !colour.swName;
         }
         colourBrand.textContent = colour.brand;
-        colourCode.textContent = colour.code;
+        colourCode.textContent = codeLabel(colour);
         paintFinish();
 
         colourCard.hidden = false;
@@ -458,9 +488,10 @@
         // se la está mirando: un metálico no cabe en un rectángulo de color, y
         // quien compra por la muestra reclama después. La mayoría de los
         // colores de la base no tiene ninguna, y entonces la nota lo dice.
-        colourNote.textContent = note + (colour.hex
+        colourNote.textContent = note + (colour.hexMeasured
             ? " La muestra es referencial: el color se aprueba con plancha de prueba."
-            : " De este color no tenemos muestra medida: se aprueba con plancha de prueba.");
+            : " La muestra la calculamos de la fórmula, así que es orientativa:"
+              + " el color se aprueba con plancha de prueba.");
     }
 
     if (colourFinishPick) {
@@ -498,13 +529,24 @@
         if (!brandId || !PAINTS) return null;
         var found = PAINTS.findColour(brandId, code);
         if (!found) return null;
+        // findColour() también busca por los códigos alternos, así que puede
+        // devolver una ficha cuyo código principal no es el que se escribió.
+        // Se enseña el escrito: el cliente copió «KBX» de su etiqueta y ver
+        // «PBX» en su sitio parece que la página le cambió el código, no que
+        // la misma pintura se vende con los dos.
+        var typed = PAINTS.normalizeCode(code);
+        var swapped = PAINTS.normalizeCode(found.code) !== typed;
         // Sin swCode: este color salió del catálogo local, no de la base, y
         // el servidor no tiene nada que volver a resolver.
         return {
-            swCode: "", code: found.code, name: found.name, swName: "",
+            swCode: "",
+            code: swapped ? String(code).trim().toUpperCase() : found.code,
+            altCodes: swapped ? [found.code] : [],
+            name: found.name, swName: "",
             finish: found.finish, finishGuessed: false, family: found.family || "otro",
             years: found.years || null, brandWide: false, dualTone: false, modelName: "",
-            hex: found.hex, brand: found.brand, brandId: brandId, makeId: value
+            hex: found.hex, hexMeasured: !!found.hex,
+            brand: found.brand, brandId: brandId, makeId: value
         };
     }
 
@@ -818,7 +860,12 @@
             if (c.name.toLowerCase().indexOf(text) !== -1) return true;
             if (c.swName && c.swName.toLowerCase().indexOf(text) !== -1) return true;
             if (!q) return false;
-            return PAINTS.normalizeCode(c.code).indexOf(q) === 0;
+            if (PAINTS.normalizeCode(c.code).indexOf(q) === 0) return true;
+            // También por los otros códigos de la misma pintura: quien teclea
+            // «PBX» sobre la parrilla busca la ficha que encabeza «KBX».
+            return (c.altCodes || []).some(function (a) {
+                return PAINTS.normalizeCode(a).indexOf(q) === 0;
+            });
         });
 
         finderGrid.innerHTML = "";
@@ -838,7 +885,7 @@
 
             var code = document.createElement("span");
             code.className = "swatch-option__code";
-            code.textContent = colour.code;
+            code.textContent = codeLabel(colour);
 
             var name = document.createElement("span");
             name.className = "swatch-option__name";
@@ -1352,7 +1399,7 @@
 
         if (state.colour) {
             colourRows.push({ label: "Marca", value: state.colour.brand });
-            colourRows.push({ label: "Código", value: state.colour.code, code: true });
+            colourRows.push({ label: "Código", value: codeLabel(state.colour), code: true });
             colourRows.push({ label: "Color", value: state.colour.name });
             colourRows.push({ label: "Acabado", value: PAINTS.finishLabel(state.colour.finish) });
             if (state.reading) {

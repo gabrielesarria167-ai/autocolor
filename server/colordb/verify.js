@@ -135,6 +135,21 @@ async function main() {
         const page = await client.query('SELECT * FROM api.colours_for($1)', [toyota.make_id]);
         check('a page is never more than 61 rows', page.rows.length <= 61, `${page.rows.length} rows`);
 
+        // One tile per paint. The grid used to emit a row per factory code, so
+        // Jeep's JAZZ BLUE PEARL arrived twice -- once as KBX, once as PBX --
+        // and a page of 61 was not 61 colours.
+        const swCodes = new Set(page.rows.map((r) => r.sw_code));
+        check('a page of tiles is that many distinct colours',
+            swCodes.size === page.rows.length,
+            `${page.rows.length} rows, ${swCodes.size} colours`);
+
+        // Every colour carries a screen colour, mixed from its own formula by
+        // sql/35_hex.sql. A blank tile reads as a broken page.
+        const noHex = page.rows.filter((r) => !/^#[0-9a-f]{6}$/.test(r.hex || ''));
+        check('every colour has a hex to render',
+            noHex.length === 0,
+            noHex.length ? `${noHex.length} without one: ${noHex[0].oem_name}` : `${page.rows.length} of ${page.rows.length}`);
+
         for (const [label, code] of [['a one-character', 'A'], ['a wildcard', '%'], ['an empty', '']]) {
             await refuses(client, `${label} code is refused`,
                 `SELECT * FROM api.colour_by_code(${toyota.make_id}, '${code}')`, ['22023']);
@@ -149,6 +164,14 @@ async function main() {
         check('a code is normalised the way the page normalises it',
             plain.rows.length > 0 && messy.rows.length === plain.rows.length,
             plain.rows.length ? `1F7 and 1-f-7 both → ${plain.rows[0].oem_name}` : 'no rows for 1F7');
+
+        // Sherwin's own code is a second way in: 5,782 colours carry no factory
+        // code at all and were unreachable before.
+        const byOwn = await client.query('SELECT * FROM api.colour_by_code($1, $2)',
+            [toyota.make_id, plain.rows.length ? plain.rows[0].sw_code : '0']);
+        check('a Sherwin colour code also finds the colour',
+            plain.rows.length === 0 || byOwn.rows.some((r) => r.sw_code === plain.rows[0].sw_code),
+            plain.rows.length ? `${plain.rows[0].sw_code} → ${byOwn.rows.length} row(s)` : 'skipped');
 
         console.log('\nThe page keeps working');
         const labels = new Set(makes.map((m) => m.label));

@@ -53,7 +53,12 @@ mkdir -p export
 echo "==> 10_makes";  psql_db -f sql/10_makes.sql
 echo "==> 20_subset"; psql_db -f sql/20_subset.sql
 echo "==> 30_derive"; psql_db -f sql/30_derive.sql
+echo "==> 35_hex (mixes a screen colour from each formula)"; psql_db -f sql/35_hex.sql
 echo "==> 40_export"; "$PG_BIN/psql" -v ON_ERROR_STOP=1 -p "$PORT" -d "$DBNAME" -f sql/40_export.sql
+
+echo ""
+echo "==> reconcile-hex (turns a mixed colour back into the family its name states)"
+node "$HERE/reconcile-hex.js"
 
 echo ""
 echo "==> src/colourIndex.js"

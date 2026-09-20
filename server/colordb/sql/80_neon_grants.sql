@@ -1,7 +1,12 @@
 -- The hardening. Run last, after the tables have data and the functions exist.
 --
--- Needs the application role's password:
---     psql -v app_pw="..." -f sql/80_neon_grants.sql
+-- Needs the application role's password, and takes it from the environment:
+--     AUTOCOLOR_COLORDB_APP_PASSWORD=... psql -f sql/80_neon_grants.sql
+--
+-- From the environment and not from -v, because an argument is visible in the
+-- process list to every process on the machine. A `ps` on this laptop during
+-- an earlier push showed both this password and the database owner's, in full,
+-- on the psql command line.
 --
 -- CREATE THIS ROLE WITH SQL, NEVER IN THE NEON CONSOLE. A role created in the
 -- console is granted neon_superuser, which reads every table in the database
@@ -14,6 +19,19 @@
 -- governs only what is created after it.
 
 \set ON_ERROR_STOP on
+
+-- Set empty first: \getenv leaves the variable untouched when the environment
+-- does not define it, and an unset variable would reach the server as the
+-- literal text :'app_pw' and fail as a syntax error rather than as advice.
+\set app_pw ''
+\getenv app_pw AUTOCOLOR_COLORDB_APP_PASSWORD
+
+SELECT CASE WHEN :'app_pw' = '' THEN 1 ELSE 0 END AS pw_missing \gset
+\if :pw_missing
+\warn 'AUTOCOLOR_COLORDB_APP_PASSWORD is not set. push.sh reads it from .env;'
+\warn 'set it there, or export it, and run this again.'
+\quit
+\endif
 
 -- ---------------------------------------------------------------------------
 -- 1. The role

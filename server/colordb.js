@@ -204,14 +204,25 @@ async function ping(options) {
    search_path is empty on purpose.
    --------------------------------------------------------------------------- */
 
+/* One paint, and every factory code the make prints for it. The database
+ * returns them as an array because Jeep sells one blue as both KBX and PBX,
+ * and a row per code put the same tile on the grid twice. The first is the
+ * one that was searched for; the rest travel as `altCodes` so the page can
+ * show "KBX · PBX" rather than pretending the other does not exist.
+ *
+ * `code` is empty for the 5,782 colours that carry no factory code at all.
+ * The page falls back to the Sherwin code, which is the only name they have. */
 function colourRow(r) {
+    const codes = r.oem_codes || [];
     return {
         swCode: r.sw_code,
-        code: r.oem_code,
+        code: codes[0] || '',
+        altCodes: codes.slice(1),
         name: r.oem_name,
         swName: r.sw_name,
         finish: r.finish,
         family: r.family,
+        hex: r.hex || '',
         years: [r.year_min, r.year_max],
         brandWide: r.brand_wide,
         dualTone: r.dual_tone,
@@ -247,7 +258,8 @@ async function colourById(swCode) {
     const { rows } = await call('SELECT * FROM api.colour($1)', [swCode]);
     if (!rows.length) return null;
     const r = rows[0];
-    return { swCode: r.sw_code, name: r.oem_name, swName: r.sw_name, finish: r.finish, family: r.family };
+    return { swCode: r.sw_code, name: r.oem_name, swName: r.sw_name,
+             finish: r.finish, family: r.family, hex: r.hex || '' };
 }
 
 async function stats() {

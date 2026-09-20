@@ -80,11 +80,12 @@ CREATE OR REPLACE FUNCTION api.colours_for(
     p_from  integer DEFAULT 0)
 RETURNS TABLE (
     sw_code    text,
-    oem_code   text,
+    oem_codes  text[],
     oem_name   text,
     sw_name    text,
     finish     "char",
     family     text,
+    hex        text,
     year_min   smallint,
     year_max   smallint,
     brand_wide boolean,
@@ -108,7 +109,15 @@ BEGIN
     -- The year span becomes the widest any model had it, which is the honest
     -- answer to "when did this make sell this colour".
     RETURN QUERY
-    SELECT c.color_code, v.owner_code, c.oem_name, c.sw_name, c.finish, c.family,
+    SELECT c.color_code,
+           -- Every factory code this make prints for this one paint, not one
+           -- tile each. Jeep sells JAZZ BLUE PEARL as both KBX and PBX, and a
+           -- tile per code put the same blue on the grid twice and read as
+           -- though the page had changed the code the customer typed. Capped
+           -- at six: past that it is a label, not a list.
+           (array_agg(DISTINCT v.owner_code)
+              FILTER (WHERE v.owner_code IS NOT NULL))[1:6],
+           c.oem_name, c.sw_name, c.finish, c.family, c.hex,
            min(v.year_min), max(v.year_max),
            bool_and(v.model_id IS NULL), bool_or(v.dual_tone)
     FROM vehicle_colour v
@@ -125,7 +134,7 @@ BEGIN
            OR (v.year_min IS NULL AND v.year_max IS NULL)
            OR (p_year BETWEEN coalesce(v.year_min, -32768)::integer - 1
                           AND coalesce(v.year_max,  32767)::integer + 1))
-    GROUP BY c.color_code, v.owner_code, c.oem_name, c.sw_name, c.finish, c.family
+    GROUP BY c.color_code, c.oem_name, c.sw_name, c.finish, c.family, c.hex
     ORDER BY bool_and(v.model_id IS NULL), max(v.year_max) DESC NULLS LAST, c.oem_name
     OFFSET v_from LIMIT 61;
 END $$;
@@ -140,14 +149,21 @@ END $$;
 -- "1f7", "1F7" and "1-F-7" are one code. It does not dig a code out of a
 -- longer label: that would be a substring search, which is the enumeration
 -- primitive again.
+--
+-- It matches Sherwin's own colour code as well as the factory one. 5,782
+-- colours carry no factory code at all -- Ford's 30236, AZUL METALICO, among
+-- them -- and were unreachable by any route; and a shop reading a code off a
+-- mixing ticket rather than a door jamb has the Sherwin one in front of it.
+-- Factory matches still sort first, so the label on the car wins a collision.
 CREATE OR REPLACE FUNCTION api.colour_by_code(p_make integer, p_code text)
 RETURNS TABLE (
     sw_code    text,
-    oem_code   text,
+    oem_codes  text[],
     oem_name   text,
     sw_name    text,
     finish     "char",
     family     text,
+    hex        text,
     year_min   smallint,
     year_max   smallint,
     model_name text,
@@ -172,19 +188,41 @@ BEGIN
     -- answer with several rows -- a code reused across years, or two colours
     -- that share it -- and those are worth showing, so the customer picks.
     -- The same colour repeated per model is not.
+    -- Two steps on purpose. The first finds which colours the code names; the
+    -- second gathers every code each of those colours goes by, which the
+    -- first cannot do because it only ever selected the matching rows. Jeep
+    -- sells one blue as KBX and as PBX, and a customer who typed KBX should
+    -- see that confirmed -- with the other code beside it, not instead of it.
     RETURN QUERY
-    SELECT c.color_code, v.owner_code, c.oem_name, c.sw_name, c.finish, c.family,
+    WITH hit AS (
+        SELECT DISTINCT v.color_code
+        FROM vehicle_colour v
+        JOIN colour c ON c.color_code = v.color_code
+        WHERE v.group_id = p_make AND (v.owner_key = k OR c.color_code = k)
+        LIMIT 12
+    )
+    SELECT c.color_code,
+           -- The code that was typed first, then the others the same paint
+           -- goes by, so the customer sees their own label confirmed rather
+           -- than a synonym of it.
+           (coalesce(array_agg(DISTINCT v.owner_code)
+                       FILTER (WHERE v.owner_key = k), '{}')
+         || coalesce(array_agg(DISTINCT v.owner_code)
+                       FILTER (WHERE v.owner_code IS NOT NULL
+                                 AND v.owner_key IS DISTINCT FROM k), '{}'))[1:6],
+           c.oem_name, c.sw_name, c.finish, c.family, c.hex,
            min(v.year_min), max(v.year_max),
            -- The model of one of the rows, so the customer can recognise it.
            -- NULL when the colour is registered for the whole make.
            (array_agg(mo.name ORDER BY mo.name) FILTER (WHERE mo.name IS NOT NULL))[1],
            bool_and(v.model_id IS NULL), bool_or(v.dual_tone)
-    FROM vehicle_colour v
-    JOIN colour c ON c.color_code = v.color_code
+    FROM hit h
+    JOIN colour c ON c.color_code = h.color_code
+    JOIN vehicle_colour v ON v.group_id = p_make AND v.color_code = h.color_code
     LEFT JOIN model mo ON mo.model_id = v.model_id
-    WHERE v.group_id = p_make AND v.owner_key = k
-    GROUP BY c.color_code, v.owner_code, c.oem_name, c.sw_name, c.finish, c.family
-    ORDER BY max(v.year_max) DESC NULLS LAST, bool_and(v.model_id IS NULL)
+    GROUP BY c.color_code, c.oem_name, c.sw_name, c.finish, c.family, c.hex
+    ORDER BY bool_or(v.owner_key = k) DESC,
+             max(v.year_max) DESC NULLS LAST, bool_and(v.model_id IS NULL)
     LIMIT 12;
 END $$;
 
@@ -197,7 +235,8 @@ RETURNS TABLE (
     oem_name text,
     sw_name  text,
     finish   "char",
-    family   text)
+    family   text,
+    hex      text)
 LANGUAGE plpgsql STABLE SECURITY DEFINER
 SET search_path = colour, pg_catalog
 SET statement_timeout = '4s'
@@ -207,7 +246,7 @@ BEGIN
         RAISE EXCEPTION 'colour code required' USING ERRCODE = '22023';
     END IF;
     RETURN QUERY
-    SELECT c.color_code, c.oem_name, c.sw_name, c.finish, c.family
+    SELECT c.color_code, c.oem_name, c.sw_name, c.finish, c.family, c.hex
     FROM colour c WHERE c.color_code = p_code
     LIMIT 1;
 END $$;

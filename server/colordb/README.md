@@ -23,25 +23,32 @@ What is published, after the subset in `sql/`:
 
 | | Rows | Why |
 |---|---:|---|
-| `colour.vehicle_colour` | 693,636 | make/model/year + OEM code → colour code |
-| `colour.colour` | 68,717 | colour code → name, finish, family |
-| `colour.model` | 3,490 | the model list behind the page's second `<select>` |
+| `colour.vehicle_colour` | 699,437 | make/model/year + OEM code → colour code |
+| `colour.colour` | 81,425 | colour code → name, finish, family, hex |
+| `colour.model` | 4,348 | the model list behind the page's second `<select>` |
 | `colour.make` | 453 | make names, grouped into 383 brands and labelled |
 
-That is 25 MB of CSV and 73 MB on disk with its indexes, against Neon's free
-0.5 GB. The full bundle loads to ~1.2 GB, which is both over quota and far more
-than the page needs.
+That is 26 MB of CSV against Neon's free 0.5 GB. The full bundle loads to
+~1.2 GB, which is both over quota and far more than the page needs.
 
-**Three paint systems of 26.** 75 (Ultra 9K) and 79 (Ultra BC8) are 93% of the
-table between them; 41 (Ultra 9K América do Sul) is another 919 rows carrying
-214 colours found nowhere else, which matters for a shop selling in Peru. The
-other 23 are industrial, truck and legacy lines — Shertruck, Lazzudur, Legacy,
-Polane — that a body shop matching car paint never reaches for.
+**Every paint system, not three.** The first version of this subset kept only
+75 (Ultra 9K), 79 (Ultra BC8) and 41 (Ultra 9K América do Sul), on the grounds
+that the other 23 are industrial, truck and legacy lines a body shop never
+reaches for. That was wrong, and it cost 16,495 colours.
+
+Lazzudur (04), Ultrabase (44), Legacy (94) and Poliuretano (15) are the
+Brazilian automotive range, which for a shop in Peru is nearer the work than
+the two lines that were kept. Jeep's VR847 — GRANITE CRYSTAL MET. — is sold in
+04, 44 and 94 and nowhere else, so it did not exist at all; the Grand Cherokee's
+PSE was the same. Both were reported missing by the shop, which is how this was
+found.
 
 The paint system is a property of the *product*, not of the colour: the same
-colour appears once per system it is sold in. Dropping that dimension takes
-1,367,482 rows to 741,665, and folding the make aliases takes it to ~683,000.
-The systems survive as a bitmask on `colour.colour.systems`.
+colour appears once per system it is sold in, and that is what makes the raw
+table 1,446,130 rows for 84,117 colours. Dropping that dimension and folding
+the make aliases takes it to 699,437. Which lines a colour came from survives
+as a bitmask on `colour.colour.systems` — 1 U9K, 2 BC8, 4 América do Sul, 8 the
+rest — and `sql/35_hex.sql` reads it back to pick the right formula.
 
 ## Layout
 
@@ -91,25 +98,40 @@ Local queries only — none of this reaches Neon.
 in any of the ten tables. `solid_type` and `color_family` exist as columns but
 are empty on every row of systems 75, 79 and 41. So:
 
-- the **swatch** comes from `src/paintCatalog.js`, which has a measured chip for
-  528 colours — about 17% of what the page will show. The rest render as the
-  hatch `setSwatch()` already draws for a missing hex.
+- the **swatch** is mixed from the colour's own tinting formula, in
+  `sql/35_hex.sql`. 83,221 of 84,117 colours carry one, built from 223 named
+  pigments — AZUL MEDIO, VERMELHO OXIDO, PRETO INTENSO, PEROLA AZUL GALAXIA.
+  Name the pigments once and the mix follows: a weighted geometric mean in
+  linear light, because paint is subtractive and an arithmetic mean turns every
+  strong tint in a white base into a pastel. The recipe never leaves the build
+  machine; only the six resulting characters are exported, which keeps the
+  lookup-only decision intact.
+
+  It is an approximation of a Kubelka-Munk mix without the coefficients, so it
+  reads a transparent tint over a metallic ground as if it were the surface,
+  and a tricoat's ground coat as if it were the colour. `reconcile-hex.js`
+  turns those back into the family the name states, keeping the lightness and
+  saturation the formula produced; it moves about one colour in eight. Measured
+  against the scanned chips in `src/paintCatalog.js`, that takes the median
+  ΔE76 from 18.5 to 17.0, and pearls from 22.1 to 18.9.
+
+  Where the catalogue has a measured chip — 746 colours — that wins, and the
+  page says which of the two it is showing.
 - the **finish**, which multiplies the price in `src/paints.js`, is derived from
   the `MET` / `PEARL` / `MICA` / `NACRE` / `3C` markers in `colors.color_name`.
-  Of the 68,717 colours built, 41,266 carry a marker (metallic 41.6%, pearl
-  17.9%, tricoat 0.6%), 19,058 read as solid because they have a name and no
-  marker, and 8,393 have no name to read and stay unknown. Measured against the
+  Of the 81,425 colours built, 53,317 carry a marker (metallic 44.9%, pearl
+  19.8%, tricoat 0.8%) and 28,108 read as solid because they have a name and no
+  marker. Measured against the
   local catalogue where
   both know a colour, that agrees exactly 70% of the time and on the
   solid-vs-effect axis 89% of the time. It is a good guess and it is still a
   guess, which is why the colour card lets the customer correct it.
 - the **family** chips come from the same names, landing on a real family for
-  71% of colours; the rest fall to `otro`.
+  83.5% of colours; the rest fall to `otro`.
 
 ## Make names are not tidy
 
-453 makes appear in the three published systems, and they are neither unique nor
-all vehicles. FORD is seven names (`FORD`, `FORD USA`, `FORD ARGENTINA`,
+453 makes appear in the source, and they are neither unique nor all vehicles. FORD is seven names (`FORD`, `FORD USA`, `FORD ARGENTINA`,
 `FORD AUSTRALIA`, `FORD BRAZIL - ARGENTINA`, `FORD NEW ZEALAND`,
 `FORD SOUTH AFRICA`); MERCEDES is `MERCEDES` plus `MERCEDES TRUCKS`, while
 `MERCEDES BENZ` has no rows here at all. About 51 entries are not cars —

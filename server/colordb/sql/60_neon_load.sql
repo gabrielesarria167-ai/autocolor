@@ -1,7 +1,7 @@
 -- Load the export. Paths are relative: run with server/colordb as the working
 -- directory, which push.sh does.
 --
--- Indexes are created after the copy, not before: on 693,636 rows that is the
+-- Indexes are created after the copy, not before: on 699,437 rows that is the
 -- difference between a minute and several.
 
 \set ON_ERROR_STOP on

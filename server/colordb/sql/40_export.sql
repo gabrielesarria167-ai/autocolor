@@ -28,7 +28,7 @@ SELECT now(),
 
 \copy (SELECT make_id, db_name, group_id, label, is_vehicle, sort_key FROM colour.make ORDER BY make_id) TO 'export/make.csv' WITH (FORMAT csv, HEADER true)
 \copy (SELECT model_id, group_id, name FROM colour.model ORDER BY model_id) TO 'export/model.csv' WITH (FORMAT csv, HEADER true)
-\copy (SELECT color_code, oem_name, sw_name, finish, family, systems FROM colour.colour ORDER BY color_code) TO 'export/colour.csv' WITH (FORMAT csv, HEADER true)
+\copy (SELECT color_code, oem_name, sw_name, finish, family, hex, systems FROM colour.colour ORDER BY color_code) TO 'export/colour.csv' WITH (FORMAT csv, HEADER true)
 \copy (SELECT group_id, model_id, year_min, year_max, owner_code, owner_key, color_code, dual_tone FROM colour.vehicle_colour ORDER BY group_id, model_id NULLS LAST, color_code) TO 'export/vehicle_colour.csv' WITH (FORMAT csv, HEADER true)
 \copy (SELECT built_at, source_version, makes, models, colours, links FROM colour.meta) TO 'export/meta.csv' WITH (FORMAT csv, HEADER true)
 
@@ -41,6 +41,12 @@ UNION ALL SELECT 'not vehicles (RAL, PANTONE, FLEETOWNER...)', (SELECT count(*) 
 UNION ALL SELECT 'models',  models  FROM colour.meta
 UNION ALL SELECT 'colours', colours FROM colour.meta
 UNION ALL SELECT 'links',   links   FROM colour.meta;
+
+\echo ''
+\echo '=== where the screen colour came from ==='
+SELECT CASE WHEN hex IS NULL THEN 'none' ELSE 'mixed from the formula' END AS source,
+       count(*) AS colours
+FROM colour.colour GROUP BY 1 ORDER BY colours DESC;
 
 \echo ''
 \echo '=== finish, as derived ==='
