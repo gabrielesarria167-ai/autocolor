@@ -15,7 +15,10 @@
     "db:status": "./server/pgserver.sh status",
     "db:psql": "./server/pgserver.sh psql",
     "db:schema": "./server/pgserver.sh schema",
-    "db:migrate": "node server/migrate.js"
+    "db:migrate": "node server/migrate.js",
+    "colordb:load": "./server/colordb/load.sh",
+    "colordb:push": "./server/colordb/push.sh",
+    "colordb:verify": "node server/colordb/verify.js"
   },
   "dependencies": {
     "pg": "^8.13.1"

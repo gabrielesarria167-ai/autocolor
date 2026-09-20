@@ -23,13 +23,14 @@ What is published, after the subset in `sql/`:
 
 | | Rows | Why |
 |---|---:|---|
-| `colour.vehicle_colour` | ~683,000 | make/model/year + OEM code → colour code |
-| `colour.colour` | 68,791 | colour code → name, finish, family |
-| `colour.model` | ~3,540 | the model list behind the page's second `<select>` |
-| `colour.make` | 453 | make names, grouped and labelled |
+| `colour.vehicle_colour` | 693,636 | make/model/year + OEM code → colour code |
+| `colour.colour` | 68,717 | colour code → name, finish, family |
+| `colour.model` | 3,490 | the model list behind the page's second `<select>` |
+| `colour.make` | 453 | make names, grouped into 383 brands and labelled |
 
-That is 95-130 MB against Neon's free 0.5 GB. The full bundle loads to ~1.2 GB,
-which is both over quota and far more than the page needs.
+That is 25 MB of CSV and 73 MB on disk with its indexes, against Neon's free
+0.5 GB. The full bundle loads to ~1.2 GB, which is both over quota and far more
+than the page needs.
 
 **Three paint systems of 26.** 75 (Ultra 9K) and 79 (Ultra BC8) are 93% of the
 table between them; 41 (Ultra 9K América do Sul) is another 919 rows carrying
@@ -95,14 +96,15 @@ are empty on every row of systems 75, 79 and 41. So:
   hatch `setSwatch()` already draws for a missing hex.
 - the **finish**, which multiplies the price in `src/paints.js`, is derived from
   the `MET` / `PEARL` / `MICA` / `NACRE` / `3C` markers in `colors.color_name`.
-  Of 68,791 codes, 41,299 carry a marker, 19,022 have a name and no marker and
-  so read as solid, and 8,470 have no name at all and stay unknown. Measured
-  against the local catalogue where
+  Of the 68,717 colours built, 41,266 carry a marker (metallic 41.6%, pearl
+  17.9%, tricoat 0.6%), 19,058 read as solid because they have a name and no
+  marker, and 8,393 have no name to read and stay unknown. Measured against the
+  local catalogue where
   both know a colour, that agrees exactly 70% of the time and on the
   solid-vs-effect axis 89% of the time. It is a good guess and it is still a
   guess, which is why the colour card lets the customer correct it.
 - the **family** chips come from the same names, landing on a real family for
-  about 75% of codes.
+  71% of colours; the rest fall to `otro`.
 
 ## Make names are not tidy
 
@@ -122,6 +124,11 @@ The ten labels for the brands the shop sells must stay byte-identical to
 `BRAND_NAMES` in `src/paints.js`. `colourHex()` in `server/mail.js` matches the
 brand by display name to draw the swatch in the order email, and if a label
 drifts the email loses its chip silently. `verify.js` checks this.
+
+It also checks that 746 of the 777 sidecar colours still resolve to a database
+colour. That is the rate this grouping was measured to give — 96%, weakest on
+Subaru at 40 of 54 — so a regression in the make list shows up as a number
+rather than as a quietly emptier finder.
 
 ## Licence
 
