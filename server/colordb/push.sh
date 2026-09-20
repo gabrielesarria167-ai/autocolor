@@ -80,7 +80,28 @@ case "$AUTOCOLOR_COLORDB_ADMIN_URL" in
     *) echo "AUTOCOLOR_COLORDB_ADMIN_URL must carry sslmode=verify-full" >&2; exit 1 ;;
 esac
 
-run() { "$PSQL" -v ON_ERROR_STOP=1 "$AUTOCOLOR_COLORDB_ADMIN_URL" "$@"; }
+# psql and node want opposite things from the same sslmode, so this script
+# adds what psql needs rather than making anyone remember it.
+#
+# Under libpq, sslmode=verify-full looks for a root certificate at
+# ~/.postgresql/root.crt and fails when it is not there; sslrootcert=system
+# tells it to use the operating system's trust store instead, which is what
+# Neon's certificate chains to.
+#
+# node-postgres is the other way round: it verifies against its own CA bundle
+# with sslmode=verify-full alone, and sslrootcert=system makes it try to open a
+# FILE called "system" and throw ENOENT. So this belongs here, on the psql
+# side, and must never be copied into AUTOCOLOR_COLORDB_URL -- which is why
+# server/colordb.js rejects that variable outright when it carries one.
+ADMIN_URL="$AUTOCOLOR_COLORDB_ADMIN_URL"
+case "$ADMIN_URL" in
+    *sslrootcert=*) ;;                                  # the author chose one
+    *\ *=*) ADMIN_URL="$ADMIN_URL sslrootcert=system" ;;  # keyword form
+    *\?*)   ADMIN_URL="$ADMIN_URL&sslrootcert=system" ;;  # URL with a query
+    *)      ADMIN_URL="$ADMIN_URL?sslrootcert=system" ;;
+esac
+
+run() { "$PSQL" -v ON_ERROR_STOP=1 "$ADMIN_URL" "$@"; }
 
 echo "==> 50_neon_schema  (drops and recreates colour)"
 run -q -f sql/50_neon_schema.sql

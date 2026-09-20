@@ -83,6 +83,16 @@ function sslComplaint(raw) {
     }
     const root = url.searchParams.get('sslrootcert');
     if (root === 'disable') return 'sslrootcert=disable turns verification off again';
+    // psql needs sslrootcert=system to use the OS trust store; node does not,
+    // and pg-connection-string reads the value as a FILE NAME -- it would try
+    // to open one called "system" and throw ENOENT while the Pool is being
+    // built, before any of this could report it. Caught here so a URL copied
+    // from the push script disables the colour search instead of stopping the
+    // server from booting at all.
+    if (root === 'system') {
+        return 'sslrootcert=system is for psql; node verifies with its own roots, '
+            + 'so remove it from this URL';
+    }
     if (url.searchParams.get('ssl') === 'false') return 'ssl=false contradicts sslmode';
     return '';
 }
