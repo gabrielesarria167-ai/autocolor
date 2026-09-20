@@ -16,3 +16,10 @@ LAUNCH-CHECKLIST.md
 # seeded design canvas (rebuild with the design skill)
 design/*.html
 !design/*.dc.html
+
+# The Sherwin-Williams colour database. The bundle's 400 MB of CSV and the
+# ~110 MB of export built from it: they are the input to server/colordb/, not
+# part of the site, and the repository is public. Same rule as the 3D sources
+# above. See server/colordb/README.md.
+server/colordb/bundle/data/
+server/colordb/export/
