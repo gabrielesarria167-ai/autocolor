@@ -54,6 +54,7 @@ const {
     ping, describe, pool, DATABASE_URL,
 } = require('./db');
 const auth = require('./auth');
+const colordb = require('./colordb');
 const names = require('./names');
 const mail = require('./mail');
 const netcheck = require('./netcheck');
@@ -359,6 +360,13 @@ function validatePaintOrder(body) {
     // El color. Se exige en los dos caminos que lo resuelven en pantalla, y se
     // acepta vacío en el que lo resuelve el taller.
     const colorCode = text(body.colorCode, { max: 20, required: !inPerson, field: 'el código de color' });
+    // Opcional: sale de la base de colores, y un pedido resuelto con el
+    // catálogo local o en el taller no lo trae. Se comprueba la forma, no que
+    // exista: de eso se encarga la base, un paso más abajo.
+    const swCode = text(body.swCode, { max: 12, field: 'el código Sherwin' });
+    if (swCode && !/^[0-9A-Za-z-]{1,12}$/.test(swCode)) {
+        throw new BadRequest('El código de color no es válido.');
+    }
     const colorName = text(body.colorName, { max: 80, required: !inPerson, field: 'el nombre del color' });
     const brand = text(body.brand, { max: 40, required: !inPerson, field: 'la marca', agree: 'f' });
     if (body.finish || !inPerson) {
@@ -404,6 +412,7 @@ function validatePaintOrder(body) {
         brand,
         colorCode,
         colorName,
+        swCode: swCode || null,
         finish: body.finish || null,
         reading,
         size: inPerson ? null : body.size,
@@ -600,16 +609,68 @@ setInterval(() => {
     }
 }, WINDOW_MS).unref();
 
+// A minute-long window bounds a burst. It does not bound patience: twenty
+// requests a minute, kept up politely, is 28,800 a day. The colour catalogue is
+// the one thing here worth copying wholesale, so it gets two counters a burst
+// limit cannot give.
+const DAY_MS = 24 * 60 * 60 * 1000;
+const COLOUR_DAILY_PER_IP = Number(process.env.AUTOCOLOR_COLORDB_DAILY_IP) || 2_000;
+const COLOUR_DAILY_TOTAL = Number(process.env.AUTOCOLOR_COLORDB_DAILY_TOTAL) || 60_000;
+
+const colourDaily = new Map(); // clave -> { count, resetAt }
+let colourTotal = { count: 0, resetAt: Date.now() + DAY_MS };
+let colourCeilingLogged = false;
+
+// Devuelve '' si la petición pasa, o el motivo por el que no.
+function colourBudget(key) {
+    const now = Date.now();
+
+    if (now > colourTotal.resetAt) {
+        colourTotal = { count: 0, resetAt: now + DAY_MS };
+        colourCeilingLogged = false;
+    }
+    colourTotal.count += 1;
+    if (colourTotal.count > COLOUR_DAILY_TOTAL) {
+        // El renglón sale una vez al día y no una por petición: es una
+        // anomalía que hay que mirar, no un renglón de tráfico.
+        if (!colourCeilingLogged) {
+            colourCeilingLogged = true;
+            console.warn(`[colordb] techo diario alcanzado (${COLOUR_DAILY_TOTAL}).`
+                + ' El buscador de colores queda apagado hasta mañana.');
+        }
+        return 'ceiling';
+    }
+
+    const seen = colourDaily.get(key);
+    if (!seen || now > seen.resetAt) {
+        colourDaily.set(key, { count: 1, resetAt: now + DAY_MS });
+        return '';
+    }
+    seen.count += 1;
+    return seen.count > COLOUR_DAILY_PER_IP ? 'ip' : '';
+}
+
+setInterval(() => {
+    const now = Date.now();
+    for (const [key, seen] of colourDaily) {
+        if (now > seen.resetAt) colourDaily.delete(key);
+    }
+}, 60 * 60 * 1000).unref();
+
 /* -----------------------------------------------------------------------------
    Utilidades HTTP
 -------------------------------------------------------------------------- */
 
-function sendJson(res, status, payload) {
+// `cache` is optional and defaults to no-store, which is what every existing
+// call site wants: a quote, a request, a panel row. Only the colour catalogue
+// passes anything else, because only it is the same for everyone and does not
+// change between deploys.
+function sendJson(res, status, payload, cache) {
     const body = JSON.stringify(payload);
     res.writeHead(status, {
         'Content-Type': 'application/json; charset=utf-8',
         'Content-Length': Buffer.byteLength(body),
-        'Cache-Control': 'no-store',
+        'Cache-Control': cache || 'no-store',
     });
     res.end(body);
 }
@@ -838,6 +899,16 @@ async function serveStatic(req, res, pathname) {
 -------------------------------------------------------------------------- */
 
 const LOOKUP_PATH = /^\/api\/requests\/([0-9]{10})$/;
+
+const COLOUR_MODELS_PATH = /^\/api\/colours\/makes\/([0-9]{1,5})\/models$/;
+const COLOUR_ONE_PATH = /^\/api\/colours\/([0-9A-Za-z-]{1,12})$/;
+
+// Una hora para las dos listas que no cambian entre despliegues, cinco minutos
+// para los colores. `private` y no `public` en los colores a propósito: delante
+// hay Cloudflare, y una caché compartida serviría a quien esté copiando el
+// catálogo sin que ninguno de los contadores de arriba lo vea.
+const COLOUR_LIST_CACHE = 'public, max-age=3600';
+const COLOUR_ROW_CACHE = 'private, max-age=300';
 
 // Devuelve true si la petición ya quedó contestada (un preflight OPTIONS).
 function applyCors(req, res) {
@@ -1241,12 +1312,197 @@ async function handleStaff(req, res, pathname, ip) {
     return sendJson(res, 404, { error: 'Ruta no encontrada.' });
 }
 
+/* -----------------------------------------------------------------------------
+   Colores
+
+   El catálogo de Sherwin-Williams: 68.717 colores y 693.636 asociaciones
+   vehículo-color, en una base aparte y de sólo lectura. Ver
+   server/colordb/README.md.
+
+   Todo lo que sale de aquí es del catálogo, no del cliente: no hay nada que
+   proteger de una fuga de datos personales. Lo que hay que encarecer es
+   copiarlo entero, y eso se hace en tres sitios a la vez —los límites dentro
+   de las funciones de la base, los contadores de aquí, y que no exista
+   ninguna consulta que devuelva «todos los colores»—.
+-------------------------------------------------------------------------- */
+
+// Un entero de la cadena de consulta, o null si no lo es. Rechaza en vez de
+// redondear: `?make=12abc` es una petición mal formada, no la marca 12.
+function intParam(params, name, min, max) {
+    const raw = params.get(name);
+    if (raw === null || raw === '') return null;
+    if (!/^-?[0-9]{1,7}$/.test(raw)) return undefined;
+    const value = Number(raw);
+    if (value < min || value > max) return undefined;
+    return value;
+}
+
+async function handleColours(req, res, pathname, ip) {
+    if (req.method !== 'GET') {
+        return sendJson(res, 405, { error: 'Método no permitido.' });
+    }
+    // En un GET del propio sitio el navegador no manda Origin, así que la
+    // ausencia pasa. Lo que esto para es una página ajena leyendo el catálogo
+    // desde el navegador de otro; no para a curl, y no pretende hacerlo.
+    if (!isOwnOrigin(req)) {
+        return sendJson(res, 403, { error: 'Consulta los colores desde el sitio.' });
+    }
+    if (!colordb.isEnabled()) {
+        return sendJson(res, 503, {
+            error: 'El buscador de colores no está disponible ahora mismo.',
+        });
+    }
+
+    const key = rateKey(ip);
+    const budget = colourBudget(key);
+    if (budget === 'ceiling') {
+        return sendJson(res, 503, {
+            error: 'El buscador de colores no está disponible ahora mismo.',
+        });
+    }
+    if (budget === 'ip') {
+        return sendJson(res, 429, {
+            error: 'Has consultado muchos colores hoy. Escríbenos por WhatsApp y te ayudamos.',
+        });
+    }
+
+    const params = new URL(req.url, 'http://localhost').searchParams;
+
+    try {
+        if (pathname === '/api/colours/makes') {
+            if (!rateLimit(`colour:list:${key}`, 30)) {
+                return sendJson(res, 429, { error: 'Demasiadas consultas. Espera un minuto.' });
+            }
+            return sendJson(res, 200, { items: await colordb.makes() }, COLOUR_LIST_CACHE);
+        }
+
+        const models = COLOUR_MODELS_PATH.exec(pathname);
+        if (models) {
+            if (!rateLimit(`colour:list:${key}`, 30)) {
+                return sendJson(res, 429, { error: 'Demasiadas consultas. Espera un minuto.' });
+            }
+            return sendJson(res, 200,
+                { items: await colordb.models(Number(models[1])) }, COLOUR_LIST_CACHE);
+        }
+
+        if (pathname === '/api/colours/browse') {
+            if (!rateLimit(`colour:browse:${key}`, 20)) {
+                return sendJson(res, 429, { error: 'Demasiadas consultas. Espera un minuto.' });
+            }
+            const makeId = intParam(params, 'make', 1, 32767);
+            const modelId = intParam(params, 'model', 1, 2147483647);
+            const year = intParam(params, 'year', 1900, 2100);
+            const from = intParam(params, 'from', 0, 600);
+            // Siempre hace falta una marca: aquí no hay ninguna consulta que
+            // conteste «todos los colores», que es justo la que serviría para
+            // llevarse el catálogo.
+            if (!makeId) {
+                return sendJson(res, 400, { error: 'Elige la marca para ver sus colores.' });
+            }
+            if (modelId === undefined || year === undefined) {
+                return sendJson(res, 400, { error: 'El modelo o el año no son válidos.' });
+            }
+            // Se rechaza en vez de recortar. La función de la base recorta a
+            // 600 igual, pero contestar 200 con la última página otra vez
+            // dejaría a «ver más» dando vueltas sobre las mismas filas.
+            if (from === undefined) {
+                return sendJson(res, 400, {
+                    error: 'Afina el modelo o el año para ver el resto de colores.',
+                });
+            }
+            const page = await colordb.coloursFor({ makeId, modelId, year, from: from || 0 });
+            return sendJson(res, 200, page, COLOUR_ROW_CACHE);
+        }
+
+        if (pathname === '/api/colours/search') {
+            if (!rateLimit(`colour:code:${key}`, 20)) {
+                return sendJson(res, 429, { error: 'Demasiadas consultas. Espera un minuto.' });
+            }
+            const makeId = intParam(params, 'make', 1, 32767);
+            const code = String(params.get('code') || '');
+            if (!makeId) {
+                return sendJson(res, 400, { error: 'Elige la marca del vehículo.' });
+            }
+            // El mismo recorte que hace la función de la base, para no gastar
+            // un viaje en algo que va a rechazar igual.
+            const key2 = code.toUpperCase().replace(/[^A-Z0-9]/g, '');
+            if (key2.length < 2 || key2.length > 10) {
+                return sendJson(res, 400, { error: 'Escribe el código tal como viene en la etiqueta.' });
+            }
+            return sendJson(res, 200,
+                { items: await colordb.colourByCode(makeId, code) }, COLOUR_ROW_CACHE);
+        }
+
+        const one = COLOUR_ONE_PATH.exec(pathname);
+        if (one) {
+            if (!rateLimit(`colour:one:${key}`, 30)) {
+                return sendJson(res, 429, { error: 'Demasiadas consultas. Espera un minuto.' });
+            }
+            const colour = await colordb.colourById(one[1]);
+            if (!colour) return sendJson(res, 404, { error: 'No encontramos ese color.' });
+            return sendJson(res, 200, colour, COLOUR_ROW_CACHE);
+        }
+    } catch (err) {
+        // Una base caída es un 503 y se puede reintentar; cualquier otra cosa
+        // es un error nuestro y sube al 500 de siempre, que no cuenta nada.
+        if (err instanceof colordb.ColourDbUnavailable) {
+            return sendJson(res, 503, {
+                error: 'El buscador de colores no está disponible ahora mismo.',
+            });
+        }
+        throw err;
+    }
+
+    return sendJson(res, 404, { error: 'Ruta no encontrada.' });
+}
+
+/* El nombre del color lo dice la base, no el formulario.
+ *
+ * Cuando el pedido trae un swCode, se vuelve a resolver aquí antes de guardar.
+ * No es desconfianza del cliente: es que el correo y la orden de taller se leen
+ * como si fueran la base, y un campo de formulario que se quedó viejo —o que
+ * alguien cambió— acabaría impreso como si lo fuera.
+ *
+ * Lo que NO se toca: colorCode sigue siendo el código de fábrica que el cliente
+ * leyó en la etiqueta, y finish sigue siendo el que vio cuando se le cobró.
+ * Pisar el primero pondría «20246» donde el taller espera «1F7» y dejaría a
+ * colourHex() en mail.js sin encontrar la muestra; pisar el segundo cambiaría
+ * el precio después de cobrarlo.
+ *
+ * Si la base no está, el pedido pasa igual. Un color sin confirmar se vende; un
+ * pedido perdido, no.
+ */
+async function confirmColour(data) {
+    if (!data.swCode || !colordb.isEnabled()) return;
+    let colour;
+    try {
+        colour = await colordb.colourById(data.swCode);
+    } catch (err) {
+        console.warn(`[paint-orders] no se pudo confirmar el color ${data.swCode}: ${err.name}`);
+        return;
+    }
+    if (!colour) {
+        console.warn(`[paint-orders] swCode ${data.swCode} no existe en la base de colores`);
+        data.swCode = null;
+        return;
+    }
+    if (data.colorName !== colour.name) {
+        console.warn(`[paint-orders] el nombre del color no coincide para ${data.swCode}:`
+            + ` llegó "${data.colorName}", la base dice "${colour.name}"`);
+        data.colorName = colour.name;
+    }
+}
+
 async function handleApi(req, res, pathname) {
     const ip = clientIp(req);
     if (applyCors(req, res)) return;
 
     if (pathname.startsWith('/api/staff/')) {
         return handleStaff(req, res, pathname, ip);
+    }
+
+    if (pathname.startsWith('/api/colours')) {
+        return handleColours(req, res, pathname, ip);
     }
 
     if (req.method === 'POST' && pathname === '/api/requests') {
@@ -1293,6 +1549,7 @@ async function handleApi(req, res, pathname) {
             return sendJson(res, 429, { error: 'Demasiados pedidos. Espera un minuto.' });
         }
         const data = validatePaintOrder(await readJsonBody(req));
+        await confirmColour(data);
         const created = await createPaintOrder(data);
         console.log(`[paint-orders] nuevo pedido ${created.id} (${data.method}` +
             `${data.colorCode ? `, ${data.brand} ${data.colorCode}` : ''}` +
@@ -1469,6 +1726,28 @@ async function start() {
             console.log(`Panel del taller: apagado — falta ${faltan.join(' y ')}.`);
             console.log('  Escríbelo en el .env de la raíz (hay un .env.example al lado).');
         }
+        // La base de colores se comprueba AQUÍ y no en start(), al revés
+        // que la de solicitudes: aquella corre antes de abrir el puerto y
+        // mata el proceso si falla, porque sin ella no hay presupuesto ni
+        // panel. Los colores son una función de una página. Si esta base
+        // no está, la página cae al catálogo local y el sitio sigue
+        // vendiendo, así que un fallo aquí se cuenta y no se muere.
+        if (colordb.isEnabled()) {
+            colordb.ping({ attempts: 3 }).then(() => colordb.stats()).then((s) => {
+                const built = s ? new Date(s.built_at).toISOString().slice(0, 10) : '?';
+                console.log(`Base de colores: ${colordb.describe()}`);
+                console.log(`  ${Number(s.colours).toLocaleString('es-PE')} colores`
+                    + ` y ${Number(s.makes).toLocaleString('es-PE')} marcas, del ${built}.`);
+            }).catch((err) => {
+                console.error(`\nBase de colores: NO RESPONDE — ${err.message}`);
+                console.error('  El buscador contestará 503 y la página usará el catálogo local.');
+            });
+        } else {
+            console.log(`Base de colores: apagada — ${colordb.offMessage()}.`);
+            console.log('  El buscador de colores usará solo el catálogo local'
+                + ' (777 colores, 10 marcas).');
+        }
+
         // Sin cuenta de correo el sitio funciona igual y las solicitudes se
         // guardan; lo que no sale es el aviso. Se dice para que nadie se
         // quede esperando un correo que nunca se intentó mandar.

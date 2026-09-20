@@ -162,13 +162,13 @@ async function findRequest(id) {
 -------------------------------------------------------------------------- */
 
 const INSERT_PAINT_ORDER = `
-    INSERT INTO paint_orders (id, method, brand, color_code, color_name, finish,
+    INSERT INTO paint_orders (id, method, brand, color_code, color_name, sw_code, finish,
                               reading_l, reading_a, reading_b,
                               size, units, price,
                               company, ruc, first_name, last_name,
                               department, province, phone, email, notes)
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
-            $17, $18, $19, $20, $21)
+            $17, $18, $19, $20, $21, $22)
     RETURNING id, status, created_at
 `;
 
@@ -189,6 +189,7 @@ async function createPaintOrder(data) {
                 data.brand,
                 data.colorCode,
                 data.colorName,
+                data.swCode,
                 data.finish,
                 data.reading ? data.reading.L : null,
                 data.reading ? data.reading.a : null,

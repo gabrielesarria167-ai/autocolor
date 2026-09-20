@@ -121,6 +121,9 @@ ALTER TABLE requests ADD COLUMN IF NOT EXISTS mileage    integer
 ALTER TABLE requests ADD COLUMN IF NOT EXISTS color_code text;
 ALTER TABLE requests ADD COLUMN IF NOT EXISTS occupied_by text[] NOT NULL DEFAULT '{}';
 
+-- Igual que arriba: la base de colores llegó después de los primeros pedidos.
+ALTER TABLE paint_orders ADD COLUMN IF NOT EXISTS sw_code text;
+
 
 -- `occupied_by` used to be a single text column: a vehicle was held by one
 -- person or by nobody. Two of them paint it now, so it becomes an array and
@@ -256,6 +259,12 @@ CREATE TABLE IF NOT EXISTS paint_orders (
     brand       text,
     color_code  text,
     color_name  text,
+
+    -- Sherwin's own colour id, when the colour came from the colour database
+    -- rather than from the page's local catalogue. color_code stays the OEM
+    -- code the customer reads off the label -- that is the one the shop and
+    -- the customer talk about -- and this is the one that finds the formula.
+    sw_code     text,
     finish      text        CHECK (finish IN ('solido', 'metalico', 'perlado', 'tricapa')),
 
     -- The CIELAB reading the customer typed in, when they measured the colour
