@@ -51,7 +51,7 @@ const {
     createRequest, findRequest, listRequests, listOccupied, updateRequestStatus,
     occupyRequest, releaseRequest, createPaintOrder,
     listWorkerNotes, findWorkerNote, setWorkerNote, clearWorkerNote,
-    ping, describe, pool, DATABASE_URL,
+    ping, describe, pool, DATABASE_URL, unreachable,
 } = require('./db');
 const auth = require('./auth');
 const colordb = require('./colordb');
@@ -1624,6 +1624,25 @@ const server = http.createServer(async (req, res) => {
     } catch (err) {
         if (err instanceof HttpError) {
             sendJson(res, err.status, { error: err.message });
+            return;
+        }
+        // Una base que no responde no es un fallo del programa, y decir lo
+        // mismo de las dos cosas le cuesta un pedido al taller: el cliente lee
+        // «no pudimos procesar la solicitud», entiende que lo ha hecho mal y se
+        // va. La base gestionada se duerme y tarda en despertar (ver connect()
+        // en server/db.js, que ya reintenta tres veces antes de llegar aquí),
+        // así que esto es una espera, no una avería, y se dice como tal.
+        //
+        // 503 y no 500 también para el registro: un 500 hay que ir a mirarlo,
+        // un 503 contra una base que duerme se explica solo.
+        if (unreachable(err)) {
+            console.error('[db] no responde:', err.message);
+            if (!res.headersSent) {
+                sendJson(res, 503, {
+                    error: 'La base de datos no responde en este momento. Espera un minuto y'
+                        + ' vuelve a intentarlo; no se ha guardado nada todavía.',
+                });
+            }
             return;
         }
         // El detalle queda en el log del servidor; al cliente solo le llega que

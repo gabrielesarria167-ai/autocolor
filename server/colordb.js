@@ -205,7 +205,15 @@ function transient(err) {
     const code = err && err.code ? String(err.code) : '';
     if (TRANSIENT_CODES.has(code)) return true;
     // pg and pg-pool report these as plain Errors with no code.
-    return /connection timeout|timeout expired|connection terminated|socket hang up/i
+    // Tres redacciones distintas para lo mismo, y hay que nombrar las tres:
+    // pg-pool dice "timeout exceeded when trying to connect" cuando se agota
+    // esperando una conexión libre —que es justo lo que pasa con la base
+    // dormida—, el Client de pg dice "timeout expired", y "Connection
+    // terminated due to connection timeout" viene de un tercer sitio. Ninguna
+    // trae code. Lo que NO puede entrar aquí es "timeout" a secas: eso también
+    // dice "canceling statement due to statement timeout" (57014), que es una
+    // consulta lenta o un error nuestro, no una base que no está.
+    return /timeout exceeded|timeout expired|connection timeout|connection terminated|socket hang up/i
         .test(err && err.message ? err.message : '');
 }
 

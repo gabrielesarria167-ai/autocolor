@@ -81,6 +81,79 @@ const INSERT_REQUEST = `
     RETURNING id, status, created_at
 `;
 
+/* La base gestionada se duerme, y despertarla tarda más que conectarse.
+ *
+ * Neon suspende el cómputo cuando nadie le pregunta nada —que para el sitio de
+ * un taller es casi todo el día— y la primera conexión después de eso paga el
+ * arranque entera. ping() ya lo sabía y reintentaba cuatro veces AL ARRANCAR;
+ * las consultas de después no reintentaban ninguna. Así que el primer cliente
+ * de la mañana pulsaba «Confirmar pedido», la conexión se agotaba mientras la
+ * base despertaba, y la excepción salía por el catch general como un 500
+ * genérico: «No pudimos procesar la solicitud». El pedido no se guardaba y no
+ * quedaba dicho en ninguna parte que la culpa fuera de la base.
+ *
+ * Lo que se reintenta es SOLO conseguir la conexión, nunca la consulta. Esa
+ * distinción es la que hace que esto sea seguro para un INSERT: si
+ * pool.connect() falla, no se envió nada, y volver a pedir conexión no puede
+ * duplicar un pedido. Si la conexión se cae con la consulta ya enviada, no se
+ * reintenta: más vale un error que dos pedidos iguales con dos códigos
+ * distintos, porque el segundo lo prepara el taller y lo paga alguien.
+ */
+const UNREACHABLE_CODES = new Set([
+    'ENOTFOUND', 'EAI_AGAIN', 'ETIMEDOUT', 'ECONNRESET', 'ECONNREFUSED',
+    'EHOSTUNREACH', 'ENETUNREACH', 'EPIPE',
+    // La base se apagó, se está apagando, o todavía está arrancando.
+    '57P01', '57P02', '57P03',
+]);
+
+function unreachable(err) {
+    const code = err && err.code ? String(err.code) : '';
+    if (UNREACHABLE_CODES.has(code)) return true;
+    // Clase 08: toda la familia de «connection exception» de Postgres.
+    if (code.startsWith('08')) return true;
+    // pg y pg-pool dan estas como Error pelado, sin code.
+    // Tres redacciones distintas para lo mismo, y hay que nombrar las tres:
+    // pg-pool dice "timeout exceeded when trying to connect" cuando se agota
+    // esperando una conexión libre —que es justo lo que pasa con la base
+    // dormida—, el Client de pg dice "timeout expired", y "Connection
+    // terminated due to connection timeout" viene de un tercer sitio. Ninguna
+    // trae code. Lo que NO puede entrar aquí es "timeout" a secas: eso también
+    // dice "canceling statement due to statement timeout" (57014), que es una
+    // consulta lenta o un error nuestro, no una base que no está.
+    return /timeout exceeded|timeout expired|connection timeout|connection terminated|socket hang up/i
+        .test(err && err.message ? err.message : '');
+}
+
+const CONNECT_ATTEMPTS = 3;
+
+/* Conseguir una conexión, esperando a que la base despierte si hace falta.
+ * Las esperas suben —400ms, 800ms— porque lo que se espera es un arranque, no
+ * un paquete perdido, y sumadas al connectionTimeoutMillis de arriba dan al
+ * cómputo bastante más de medio minuto para levantarse. */
+async function connect() {
+    for (let attempt = 1; ; attempt++) {
+        try {
+            return await pool.connect();
+        } catch (err) {
+            if (!unreachable(err) || attempt >= CONNECT_ATTEMPTS) throw err;
+            console.warn(`[db] ${err.code || 'sin conexión'} al conectar`
+                + ` (intento ${attempt} de ${CONNECT_ATTEMPTS}); la base puede estar despertando`);
+            await new Promise((resolve) => setTimeout(resolve, 400 * attempt));
+        }
+    }
+}
+
+/* El reemplazo de pool.query() en todo este archivo: consigue la conexión con
+ * reintentos y lanza la consulta una sola vez. */
+async function query(text, values) {
+    const client = await connect();
+    try {
+        return await client.query(text, values);
+    } finally {
+        client.release();
+    }
+}
+
 const UNIQUE_VIOLATION = '23505';
 const ID_ATTEMPTS = 5;
 
@@ -96,7 +169,7 @@ async function createRequest(data) {
     for (let attempt = 1; attempt <= ID_ATTEMPTS; attempt++) {
         const id = generateId();
         try {
-            const { rows } = await pool.query(INSERT_REQUEST, [
+            const { rows } = await query(INSERT_REQUEST, [
                 id,
                 data.brand,
                 data.model,
@@ -131,7 +204,7 @@ async function createRequest(data) {
  * contacto de nadie.
  */
 async function findRequest(id) {
-    const { rows } = await pool.query(
+    const { rows } = await query(
         `SELECT id, brand, model, vehicle, first_name, last_name, status
            FROM requests
           WHERE id = $1`,
@@ -183,7 +256,7 @@ async function createPaintOrder(data) {
     for (let attempt = 1; attempt <= ID_ATTEMPTS; attempt++) {
         const id = generateId();
         try {
-            const { rows } = await pool.query(INSERT_PAINT_ORDER, [
+            const { rows } = await query(INSERT_PAINT_ORDER, [
                 id,
                 data.method,
                 data.brand,
@@ -235,7 +308,7 @@ const FINISHED = ['entregado', 'cancelado'];
 
 async function listRequests(options) {
     const status = (options || {}).status || null;
-    const { rows } = await pool.query(
+    const { rows } = await query(
         `SELECT id, created_at, first_name, last_name, phone, brand, model,
                 plate, quality, status, occupied_by, vehicle, parts
            FROM requests
@@ -290,7 +363,7 @@ async function listRequests(options) {
  * only goes up.
  */
 async function listOccupied() {
-    const { rows } = await pool.query(
+    const { rows } = await query(
         `SELECT id, created_at, brand, model, plate, status, occupied_by
            FROM requests
           WHERE cardinality(occupied_by) > 0
@@ -338,7 +411,7 @@ async function listOccupied() {
 // can no longer blame a holder read by a second query after someone else had
 // already changed it.
 async function updateRequestStatus(id, status, viewerId) {
-    const { rows } = await pool.query(
+    const { rows } = await query(
         `WITH cur AS (
              SELECT id, occupied_by FROM requests WHERE id = $1 FOR UPDATE
          ), upd AS (
@@ -389,7 +462,7 @@ const MAX_HOLDERS = 2;
  */
 async function occupyRequest(id, workerId) {
     // Same single-statement shape as updateRequestStatus, for the same reason.
-    const { rows } = await pool.query(
+    const { rows } = await query(
         `WITH cur AS (
              SELECT id, occupied_by FROM requests WHERE id = $1 FOR UPDATE
          ), upd AS (
@@ -424,7 +497,7 @@ async function occupyRequest(id, workerId) {
  * ('not_found', or 'forbidden' with the codes of the people holding it).
  */
 async function releaseRequest(id, workerId) {
-    const { rows } = await pool.query(
+    const { rows } = await query(
         `WITH cur AS (
              SELECT id, occupied_by FROM requests WHERE id = $1 FOR UPDATE
          ), upd AS (
@@ -454,7 +527,7 @@ async function releaseRequest(id, workerId) {
 
 /** Every note, for the boss's monitor. A handful of rows: no LIMIT needed. */
 async function listWorkerNotes() {
-    const { rows } = await pool.query(
+    const { rows } = await query(
         'SELECT worker_id, note, written_by, updated_at FROM worker_notes'
     );
     return rows.map(mapNote);
@@ -462,7 +535,7 @@ async function listWorkerNotes() {
 
 /** One worker's note, or null. This is what rides along to their own profile. */
 async function findWorkerNote(workerId) {
-    const { rows } = await pool.query(
+    const { rows } = await query(
         `SELECT worker_id, note, written_by, updated_at
            FROM worker_notes
           WHERE worker_id = $1`,
@@ -481,7 +554,7 @@ async function findWorkerNote(workerId) {
  * the first note forever, and the profile shows that date.
  */
 async function setWorkerNote(workerId, note, writtenBy) {
-    const { rows } = await pool.query(
+    const { rows } = await query(
         `INSERT INTO worker_notes (worker_id, note, written_by)
               VALUES ($1, $2, $3)
          ON CONFLICT (worker_id) DO UPDATE
@@ -496,7 +569,7 @@ async function setWorkerNote(workerId, note, writtenBy) {
 
 /** Takes the note away. Deleting one that is not there is not an error. */
 async function clearWorkerNote(workerId) {
-    await pool.query('DELETE FROM worker_notes WHERE worker_id = $1', [workerId]);
+    await query('DELETE FROM worker_notes WHERE worker_id = $1', [workerId]);
 }
 
 function mapNote(row) {
@@ -556,5 +629,5 @@ module.exports = {
     createPaintOrder,
     occupyRequest, releaseRequest,
     listWorkerNotes, findWorkerNote, setWorkerNote, clearWorkerNote,
-    ping, describe, pool, DATABASE_URL,
+    ping, describe, pool, DATABASE_URL, unreachable,
 };
