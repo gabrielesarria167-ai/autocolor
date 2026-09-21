@@ -736,6 +736,26 @@
         el.classList.toggle("swatch--none", !hex);
     }
 
+    /* Los seis botes, pintados del color elegido.
+
+       Se llama cada vez que se entra al paso, no solo al construir las
+       tarjetas: se puede volver atrás y cambiar de color, y entonces los botes
+       tienen que cambiar con él. Sin color que enseñar se rayan, igual que la
+       muestra de la ficha. */
+    function paintSizeJars() {
+        if (!sizeCards) return;
+        var hex = state.colour && state.colour.hex ? state.colour.hex : "";
+        Array.prototype.forEach.call(sizeCards.querySelectorAll(".size-card__jar"),
+            function (jar) {
+                if (hex) {
+                    jar.style.setProperty("--jar", hex);
+                } else {
+                    jar.style.removeProperty("--jar");
+                }
+                jar.classList.toggle("swatch--none", !hex);
+            });
+    }
+
     function fillFinderModels() {
         if (!finderModel) return;
         var makeId = brandSelect.value;
@@ -1163,6 +1183,7 @@
         if (!sizeCards || !PAINTS) return;
         if (sizeCards.childElementCount > 0) {
             refreshSizePrices();
+            paintSizeJars();
             return;
         }
 
@@ -1215,6 +1236,8 @@
             card.addEventListener("click", function () { selectSize(size.id); });
             sizeCards.appendChild(card);
         });
+
+        paintSizeJars();
     }
 
     function refreshSizePrices() {

@@ -4569,24 +4569,60 @@ body.wizard {
     margin-bottom: 10px;
 }
 
+/* El bote va pintado del color elegido, porque es lo que lleva dentro: el
+   cliente ve su color en los seis tamaños y no tiene que acordarse de cuál
+   eligió dos pasos atrás.
+
+   Todo el relieve son capas translúcidas sobre --jar, nunca tonos calculados.
+   Un negro aclarado y un blanco oscurecido hay que calcularlos por separado y
+   siempre se rompe alguno; el blanco y el negro con alfa caen igual de bien
+   sobre cualquier color, que aquí son 28.562. Y se quedan por debajo de 0,18
+   a propósito: el bote tiene que parecer un bote, pero el color que enseña
+   sigue siendo el color, no una versión suya más bonita. */
 .size-card__jar {
     display: block;
     width: calc(16px + var(--fill) * 22px);
     height: calc(18px + var(--fill) * 40px);
-    background: var(--surface-tint);
-    border: 1px solid var(--border-strong);
-    /* La tapa: el mismo borde, más grueso arriba. */
+    background:
+        /* la luz entra por la izquierda y el bote es redondo */
+        linear-gradient(90deg,
+            rgba(255, 255, 255, 0.17) 0%,
+            rgba(255, 255, 255, 0.05) 34%,
+            rgba(0, 0, 0, 0.03) 64%,
+            rgba(0, 0, 0, 0.11) 100%),
+        /* y el fondo del bote queda en sombra */
+        linear-gradient(180deg, rgba(255, 255, 255, 0.09) 0%, rgba(0, 0, 0, 0.11) 100%),
+        var(--jar, var(--surface-tint));
+    /* El borde se pinta encima del fondo, así que un negro translúcido da el
+       canto y la tapa del mismo color, un punto más oscuros, sin tener que
+       saber cuál es el color. */
+    border: 1px solid rgba(0, 0, 0, 0.24);
     border-top-width: 3px;
-    transition: background 0.2s var(--ease-out), border-color 0.2s var(--ease-out);
+    border-top-color: rgba(0, 0, 0, 0.34);
+    /* Un hilo claro bajo la tapa. Sobre un color claro la tapa ya se separa
+       sola por el borde oscuro; sobre un negro no, y sin esto el bote de negro
+       es un rectángulo sin tapa. */
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.34);
+    transition: background 0.2s var(--ease-out), border-color 0.2s var(--ease-out),
+        box-shadow 0.2s var(--ease-out);
+}
+
+/* Sin color que enseñar se raya, igual que la muestra de la ficha: un bote
+   pintado de un color inventado es justo lo que el cliente se creería. */
+.size-card__jar.swatch--none {
+    box-shadow: none;
 }
 
 .size-card:hover .size-card__jar {
-    border-color: var(--text-faint);
+    border-color: rgba(0, 0, 0, 0.42);
+    border-top-color: rgba(0, 0, 0, 0.52);
 }
 
+/* El elegido ya se marca en la tarjeta —borde y anillo—, así que el bote solo
+   se perfila: si además cambiara de color, el color dejaría de ser el dato. */
 .size-card.is-selected .size-card__jar {
-    background: var(--brand-soft);
-    border-color: var(--ink);
+    border-color: rgba(0, 0, 0, 0.55);
+    border-top-color: rgba(0, 0, 0, 0.66);
 }
 
 .size-card__fraction {
