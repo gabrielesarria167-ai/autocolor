@@ -78,6 +78,7 @@
     var car3dModule = null;  // cached import() of the viewer module
     var car3dRetries = 0;    // bumped per failed import, to get a fresh URL
     var car3dMountId = 0;    // guards against a superseded mount finishing last
+    var car3dImportRetried = false; // one automatic retry of the import, then the checklist
 
     var menuToggle = document.getElementById("menuToggle");
     var navPanel = document.getElementById("navPanel");
@@ -332,6 +333,7 @@
             // (the customer went back and changed vehicle while this import
             // was still in flight), so this one has nothing left to mount.
             if (mountId !== car3dMountId) return;
+            car3dImportRetried = false;
             car3d = mod.mountCar3D({
                 vehicle: vehicle,
                 canvasEl: canvasEl,
@@ -355,6 +357,33 @@
             car3dRetries++;
             car3dVehicle = null;
             console.error("[repair] Could not load the 3D viewer:", err);
+
+            // One automatic retry before the checklist. The failure this
+            // catches is almost always a dropped fetch of three.js or of the
+            // module itself, and asking again a moment later usually works —
+            // whereas waiting for the customer to leave step 3 and come back,
+            // which is what used to trigger the retry, is something nobody
+            // does on their own. The delay is so the retry does not go out
+            // down the same connection that just died; car3dRetries, already
+            // bumped above, is what gives it a URL the browser's module map
+            // has not written off.
+            if (!car3dImportRetried) {
+                car3dImportRetried = true;
+                setTimeout(function () {
+                    // A newer mount (the customer changed vehicle while we
+                    // waited) already owns the canvas — it does its own
+                    // import, and the flag goes back so that one still gets
+                    // its own retry instead of inheriting this one's.
+                    if (mountId !== car3dMountId) {
+                        car3dImportRetried = false;
+                        return;
+                    }
+                    ensureCar3D(vehicle);
+                }, 600);
+                return;
+            }
+
+            car3dImportRetried = false;
             showCar3DError("No se pudo cargar el visor 3D. Elige las piezas en la lista de abajo.");
             openPartsPicker();
         });

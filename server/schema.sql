@@ -121,9 +121,6 @@ ALTER TABLE requests ADD COLUMN IF NOT EXISTS mileage    integer
 ALTER TABLE requests ADD COLUMN IF NOT EXISTS color_code text;
 ALTER TABLE requests ADD COLUMN IF NOT EXISTS occupied_by text[] NOT NULL DEFAULT '{}';
 
--- Igual que arriba: la base de colores llegó después de los primeros pedidos.
-ALTER TABLE paint_orders ADD COLUMN IF NOT EXISTS sw_code text;
-
 
 -- `occupied_by` used to be a single text column: a vehicle was held by one
 -- person or by nobody. Two of them paint it now, so it becomes an array and
@@ -317,14 +314,26 @@ CREATE TABLE IF NOT EXISTS paint_orders (
 CREATE INDEX IF NOT EXISTS paint_orders_status_created_at_idx
     ON paint_orders (status, created_at DESC);
 
--- Mismo trigger que `requests`, por lo mismo: cambiar el estado a mano desde
--- psql no debe dejar la fecha desactualizada.
+-- Every migration of `paint_orders` lives here, below the CREATE TABLE above,
+-- and not up with the ones for `requests`. On a new database the table does
+-- not exist yet when those run, and an ALTER against a table that is not
+-- there aborts the whole file -- ON_ERROR_STOP in pgserver.sh, one implicit
+-- transaction in migrate.js. That left a fresh database holding `requests`
+-- and nothing else: no `paint_orders`, no `worker_notes` and no trigger, so
+-- every matizado order answered 500 because the table to store it in had
+-- never been created.
+
+-- The colour database arrived after the first orders did.
+ALTER TABLE paint_orders ADD COLUMN IF NOT EXISTS sw_code text;
+
 -- 'model' came after the table did: a base created before it still has the
 -- three-value CHECK, which Postgres named paint_orders_method_check.
 ALTER TABLE paint_orders DROP CONSTRAINT IF EXISTS paint_orders_method_check;
 ALTER TABLE paint_orders ADD CONSTRAINT paint_orders_method_check
     CHECK (method IN ('code', 'model', 'reading', 'in_person'));
 
+-- Mismo trigger que `requests`, por lo mismo: cambiar el estado a mano desde
+-- psql no debe dejar la fecha desactualizada.
 DROP TRIGGER IF EXISTS paint_orders_touch_updated_at ON paint_orders;
 CREATE TRIGGER paint_orders_touch_updated_at
     BEFORE UPDATE ON paint_orders

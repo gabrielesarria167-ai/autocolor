@@ -759,110 +759,199 @@ export function mountCar3D(options) {
   // reload — see ensureCar3D() in repair.js.
   let loadFailed = false;
 
+  /* -----------------------------------------------------------------------
+     Loading the GLB, with one fallback attempt
+
+     These are 9–13 MB files, and the failure that actually shows up is not a
+     404 — it is a transfer that never gets going, or that stops halfway. The
+     error callback never fires for that one: three's FileLoader has no
+     timeout, so a request the network dropped silently leaves the overlay
+     reading «Cargando modelo 3D…» for as long as the customer is willing to
+     wait, and step 3 cannot be completed because no panel is clickable.
+
+     So two things watch the download. The error callback catches the loud
+     failures, and a watchdog catches the quiet one: it is re-armed on every
+     progress event, so what trips it is bytes that STOP arriving, not bytes
+     that arrive slowly. Either way the model is fetched a second time before
+     the viewer gives up and hands the customer the checklist.
+
+     The retry has to ask for a URL nobody has written off yet. FileLoader
+     keeps an in-flight table keyed by URL (`loading[url]`) and hands a second
+     request for the same URL the callbacks of the first one — which is the
+     stalled request we are trying to get away from — and a browser that
+     already failed the fetch can answer the repeat from that failure without
+     touching the network. The query string is what makes it a new request; it
+     never reaches disk, because the static server routes on the path alone.
+
+     The first model to arrive wins, whichever attempt it belonged to: a slow
+     first attempt that lands after the retry started is still a loaded car,
+     and throwing it away to wait for a second copy would be the wrong trade.
+  ----------------------------------------------------------------------- */
+  const MODEL_ATTEMPTS = 2;
+  const MODEL_STALL_MS = 15000;
+
+  let modelReady = false;   // a GLB has been accepted into the scene
+  let attempts = 0;
+  let stallTimer = null;
+
+  function clearStallTimer() {
+    if (stallTimer === null) return;
+    clearTimeout(stallTimer);
+    stallTimer = null;
+  }
+
+  function armStallTimer() {
+    clearStallTimer();
+    stallTimer = setTimeout(() => {
+      stallTimer = null;
+      if (destroyed || modelReady) return;
+      console.warn(`[car3d] the model stopped advancing after ${MODEL_STALL_MS} ms:`, vehicle);
+      retryOrFail(new Error('La descarga del modelo 3D se quedó parada.'));
+    }, MODEL_STALL_MS);
+  }
+
+  function retryOrFail(err) {
+    if (destroyed || modelReady) return;
+    clearStallTimer();
+    if (attempts < MODEL_ATTEMPTS) {
+      console.warn('[car3d] retrying the model:', vehicle, err && err.message);
+      startLoad();
+      return;
+    }
+    loadFailed = true;
+    console.error('[car3d] GLTFLoader error:', err);
+    showError(loadErrorText);
+    if (typeof onLoadError === 'function') onLoadError();
+  }
+
   const loader = new GLTFLoader();
   loader.setMeshoptDecoder(MeshoptDecoder);
-  loader.load(
-    model.url,
-    (gltf) => {
-      if (destroyed) return;
-      const root = gltf.scene;
-      scene.add(root);
 
-      for (const name of model.hiddenNodes) {
-        const stray = root.getObjectByName(name);
-        if (stray) stray.visible = false;
-      }
-
-      root.updateMatrixWorld(true);
-
-      const box = new THREE.Box3().setFromObject(root);
-      box.getCenter(center);
-      const size = box.getSize(new THREE.Vector3());
-      lengthFB = extentAlong(FRONT_AXIS, size);
-      widthLR = extentAlong(LEFT_AXIS, size);
-      heightUD = extentAlong(UP_AXIS, size);
-
-      // Clipping planes from the model's own bounding sphere. The wagon is
-      // authored in centimetres and is ~475 units long, so the fixed planes
-      // that suited the SUV would clip it away entirely.
-      const radius = size.length() / 2;
-      camera.near = Math.max(radius * 0.01, 0.01);
-      camera.far = radius * 20;
-      camera.updateProjectionMatrix();
-
-      // Every model's paint material is authored as a dull primer grey with
-      // no colour texture, so it's overridden at runtime. Walk every material
-      // once (dedup via a Set) so a shared material is corrected exactly once.
-      const paintMaterials = new Set();
-      root.traverse((obj) => {
-        if (obj.isMesh && obj.material) {
-          const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-          for (const mat of mats) {
-            if (mat && mat.name === model.paintMaterial) paintMaterials.add(mat);
-          }
-        }
-        if (obj.isMesh && obj.geometry && !obj.geometry.attributes.normal) {
-          obj.geometry.computeVertexNormals();
-        }
-      });
-      for (const mat of paintMaterials) {
-        mat.color.setRGB(model.bodyColor[0], model.bodyColor[1], model.bodyColor[2]);
-        clampMaterial(mat);
-        mat.needsUpdate = true;
-      }
-
-      // Runs after the bulk pass, which is deliberately indiscriminate: it
-      // recolours the shared paint material itself, so every mesh using it
-      // turns body colour. This puts the black cladding back.
-      applyTrimNodes(root);
-
-      // Collect raycast targets from the ORIGINAL meshes only, before any
-      // overlay is attached, so overlays can never be picked and occlusion
-      // (wheels, mirrors, glass, trim) still works for hover and click.
-      root.traverse((obj) => { if (obj.isMesh && obj.visible) pickable.push(obj); });
-
-      for (const id of model.parts) {
-        const mesh = resolvePaintMesh(root, id);
-        if (!mesh) {
-          console.warn('[car3d] Could not resolve paintable panel:', vehicle, id);
-          continue;
-        }
-        applyFinish(mesh, id);
-        const hoverOverlay = makeOverlay(mesh, HOVER_COLOR, HOVER_OPACITY);
-        const selectedOverlay = makeOverlay(mesh, SELECTED_COLOR, SELECTED_OPACITY);
-        overlayFor.set(mesh, { hoverOverlay, selectedOverlay, id });
-        selectedOverlay.visible = isPartSelected(id);
-      }
-
-      computePresets();
-      placeCamera(presets.front);
-      currentView = 'front';
-      syncViewButtons();
-      requestRender();
-      // The turntable can only start once the model has been measured, which
-      // is what gives it a radius to ride at.
-      if (spin) startSpin();
-
-      if (overlayEl) overlayEl.classList.add('hidden');
-    },
-    (xhr) => {
-      if (destroyed || !loadingLabelEl) return;
-      if (xhr.total) {
-        const pct = Math.min(100, Math.round((xhr.loaded / xhr.total) * 100));
-        if (progressBarEl) progressBarEl.style.width = pct + '%';
-        loadingLabelEl.textContent = `Cargando modelo 3D… ${pct}%`;
-      } else {
-        loadingLabelEl.textContent = `Cargando modelo 3D… ${formatBytes(xhr.loaded)}`;
-      }
-    },
-    (err) => {
-      if (destroyed) return;
-      loadFailed = true;
-      console.error('[car3d] GLTFLoader error:', err);
-      showError(loadErrorText);
-      if (typeof onLoadError === 'function') onLoadError();
+  function startLoad() {
+    const attempt = ++attempts;
+    const url = attempt === 1 ? model.url : `${model.url}?reintento=${attempt}`;
+    if (attempt > 1 && loadingLabelEl) {
+      loadingLabelEl.hidden = false;
+      loadingLabelEl.textContent = 'Reintentando la carga del modelo 3D…';
+      if (progressBarEl) progressBarEl.style.width = '0%';
     }
-  );
+    armStallTimer();
+    loader.load(url, onModelLoaded, onModelProgress, onModelError);
+  }
+
+  function onModelError(err) {
+    if (destroyed) return;
+    retryOrFail(err);
+  }
+
+  function onModelProgress(xhr) {
+    if (destroyed || modelReady) return;
+    // Everything is here: the last chunk of a transfer that announced its
+    // size disarms the watchdog, because what comes next is meshopt decoding
+    // and parsing — seconds of silence on a file this big, and none of it a
+    // stall. Anything earlier re-arms it and starts the count again.
+    if (xhr.total && xhr.loaded >= xhr.total) clearStallTimer();
+    else armStallTimer();
+
+    if (!loadingLabelEl) return;
+    if (xhr.total) {
+      const pct = Math.min(100, Math.round((xhr.loaded / xhr.total) * 100));
+      if (progressBarEl) progressBarEl.style.width = pct + '%';
+      loadingLabelEl.textContent = `Cargando modelo 3D… ${pct}%`;
+    } else {
+      loadingLabelEl.textContent = `Cargando modelo 3D… ${formatBytes(xhr.loaded)}`;
+    }
+  }
+
+  startLoad();
+
+  function onModelLoaded(gltf) {
+    // `modelReady` and not an attempt number: the losing attempt of a race
+    // is whichever one arrives second, and it is dropped here rather than
+    // added to a scene that already has a car in it.
+    if (destroyed || modelReady) return;
+    modelReady = true;
+    clearStallTimer();
+    const root = gltf.scene;
+    scene.add(root);
+
+    for (const name of model.hiddenNodes) {
+      const stray = root.getObjectByName(name);
+      if (stray) stray.visible = false;
+    }
+
+    root.updateMatrixWorld(true);
+
+    const box = new THREE.Box3().setFromObject(root);
+    box.getCenter(center);
+    const size = box.getSize(new THREE.Vector3());
+    lengthFB = extentAlong(FRONT_AXIS, size);
+    widthLR = extentAlong(LEFT_AXIS, size);
+    heightUD = extentAlong(UP_AXIS, size);
+
+    // Clipping planes from the model's own bounding sphere. The wagon is
+    // authored in centimetres and is ~475 units long, so the fixed planes
+    // that suited the SUV would clip it away entirely.
+    const radius = size.length() / 2;
+    camera.near = Math.max(radius * 0.01, 0.01);
+    camera.far = radius * 20;
+    camera.updateProjectionMatrix();
+
+    // Every model's paint material is authored as a dull primer grey with
+    // no colour texture, so it's overridden at runtime. Walk every material
+    // once (dedup via a Set) so a shared material is corrected exactly once.
+    const paintMaterials = new Set();
+    root.traverse((obj) => {
+      if (obj.isMesh && obj.material) {
+        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+        for (const mat of mats) {
+          if (mat && mat.name === model.paintMaterial) paintMaterials.add(mat);
+        }
+      }
+      if (obj.isMesh && obj.geometry && !obj.geometry.attributes.normal) {
+        obj.geometry.computeVertexNormals();
+      }
+    });
+    for (const mat of paintMaterials) {
+      mat.color.setRGB(model.bodyColor[0], model.bodyColor[1], model.bodyColor[2]);
+      clampMaterial(mat);
+      mat.needsUpdate = true;
+    }
+
+    // Runs after the bulk pass, which is deliberately indiscriminate: it
+    // recolours the shared paint material itself, so every mesh using it
+    // turns body colour. This puts the black cladding back.
+    applyTrimNodes(root);
+
+    // Collect raycast targets from the ORIGINAL meshes only, before any
+    // overlay is attached, so overlays can never be picked and occlusion
+    // (wheels, mirrors, glass, trim) still works for hover and click.
+    root.traverse((obj) => { if (obj.isMesh && obj.visible) pickable.push(obj); });
+
+    for (const id of model.parts) {
+      const mesh = resolvePaintMesh(root, id);
+      if (!mesh) {
+        console.warn('[car3d] Could not resolve paintable panel:', vehicle, id);
+        continue;
+      }
+      applyFinish(mesh, id);
+      const hoverOverlay = makeOverlay(mesh, HOVER_COLOR, HOVER_OPACITY);
+      const selectedOverlay = makeOverlay(mesh, SELECTED_COLOR, SELECTED_OPACITY);
+      overlayFor.set(mesh, { hoverOverlay, selectedOverlay, id });
+      selectedOverlay.visible = isPartSelected(id);
+    }
+
+    computePresets();
+    placeCamera(presets.front);
+    currentView = 'front';
+    syncViewButtons();
+    requestRender();
+    // The turntable can only start once the model has been measured, which
+    // is what gives it a radius to ride at.
+    if (spin) startSpin();
+
+    if (overlayEl) overlayEl.classList.add('hidden');
+  }
 
   /* -----------------------------------------------------------------------
      Pointer interaction: hover (throttled) + click-to-toggle. Selection
@@ -1031,6 +1120,9 @@ export function mountCar3D(options) {
     destroy() {
       destroyed = true;
       stopSpin();
+      // The watchdog outlives the viewer otherwise, and fires a retry for a
+      // vehicle nobody is looking at any more.
+      clearStallTimer();
       if (renderQueued !== null) cancelAnimationFrame(renderQueued);
       if (resizeObserver) resizeObserver.disconnect();
       else window.removeEventListener('resize', onResize);
