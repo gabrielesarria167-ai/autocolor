@@ -85,7 +85,13 @@
             finish: (chip && chip.finish) || FINISH_OF[row.finish] || null,
             finishGuessed: !(chip && chip.finish),
             family: row.family || "otro",
-            years: row.years && row.years[0] !== null ? row.years : null,
+            // Un extremo puede faltar por separado: la base deja year_max en
+            // NULL cuando el color sigue vendiéndose, y year_min cuando no
+            // consta desde cuándo. Se guardan los dos tal cual y finderMeta()
+            // decide cómo leerlos; descartar el par entero porque falte uno
+            // tiraba un dato que sí se tiene.
+            years: row.years && (row.years[0] !== null || row.years[1] !== null)
+                ? row.years : null,
             brandWide: !!row.brandWide,
             dualTone: !!row.dualTone,
             modelName: row.modelName || "",
@@ -623,6 +629,14 @@
                 // Un mismo código de fábrica puede tener varias versiones, por
                 // año o por modelo. Se muestran en la rejilla para que elija
                 // quien sí sabe cuál es su coche.
+                //
+                // Salvo cuando el coche es de dos tonos: entonces no son
+                // versiones entre las que elegir, son las dos pinturas que
+                // lleva encima, y decirle «elige la de tu año» a quien tiene
+                // que matizar las dos es mandarle a la mitad del trabajo.
+                var twoTone = items.length > 1 && items.every(function (c) {
+                    return c.dualTone;
+                });
                 showColour(items[0], null);
                 finderState.rows = items;
                 finderState.hasMore = false;
@@ -632,8 +646,12 @@
                     finderToggle.setAttribute("aria-expanded", "true");
                 }
                 renderFinder();
-                finderNote.textContent = "El código «" + code.toUpperCase() + "» tiene " +
-                    items.length + " versiones. Elige la de tu modelo o año.";
+                finderNote.textContent = twoTone
+                    ? "El código «" + code.toUpperCase() + "» es de un coche de dos"
+                      + " tonos: son " + items.length + " pinturas distintas. Elige la"
+                      + " que vas a matizar."
+                    : "El código «" + code.toUpperCase() + "» tiene " +
+                      items.length + " versiones. Elige la de tu modelo o año.";
             })
             .catch(function (err) {
                 if (mine !== searchToken) return;
@@ -933,9 +951,17 @@
         var bits = [];
         if (colour.finish) bits.push(PAINTS.finishLabel(colour.finish));
         if (colour.years) {
-            bits.push(colour.years[0] === colour.years[1]
-                ? String(colour.years[0])
-                : colour.years[0] + "–" + colour.years[1]);
+            var from = colour.years[0];
+            var to = colour.years[1];
+            // «2012–null» salía tal cual en la baldosa cuando faltaba un
+            // extremo, que es lo que pasa siempre que el color sigue en venta.
+            if (from !== null && to !== null) {
+                bits.push(from === to ? String(from) : from + "–" + to);
+            } else if (from !== null) {
+                bits.push("desde " + from);
+            } else if (to !== null) {
+                bits.push("hasta " + to);
+            }
         }
         if (colour.dualTone) bits.push("bitono");
         return bits.join(" · ");

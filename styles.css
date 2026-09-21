@@ -4464,11 +4464,16 @@ body.wizard {
 }
 
 .swatch-option__code {
+    /* La línea lleva ahora el código de fábrica y el de Sherwin —«KBX · PBX ·
+       92514»— y la baldosa mide 118px. Se parte por los separadores como se
+       parte el nombre, en vez de desbordar la caja. */
+    max-width: 100%;
     font-family: var(--font-label);
     font-variant-numeric: tabular-nums;
     font-size: 0.85rem;
     font-weight: 600;
     letter-spacing: 0.04em;
+    overflow-wrap: anywhere;
 }
 
 .swatch-option__name {
