@@ -112,8 +112,19 @@
         var alt = (colour.altCodes || []).filter(function (c) {
             return String(c).length > 1;
         });
-        if (!alt.length || alt.length > 2) return colour.code;
-        return [colour.code].concat(alt).join(" · ");
+        var parts = alt.length && alt.length <= 2
+            ? [colour.code].concat(alt)
+            : [colour.code];
+        // Y al final el de Sherwin, siempre. Es el código con el que se pide
+        // la pintura en el mostrador, vale para las trece marcas y es el único
+        // que tienen los colores sin código de fábrica —ahí ya va el primero,
+        // y por eso se mira antes de añadirlo—. Va desnudo, sin «SW» delante,
+        // porque el buscador de arriba lo acepta tal cual y quien lo copie de
+        // la pantalla tiene que poder pegarlo sin quitarle nada.
+        if (colour.swCode && parts.indexOf(colour.swCode) === -1) {
+            parts.push(colour.swCode);
+        }
+        return parts.join(" · ");
     }
 
     // Las letras que guarda la base, a los ids de FINISHES en src/paints.js.
@@ -861,6 +872,9 @@
             if (c.swName && c.swName.toLowerCase().indexOf(text) !== -1) return true;
             if (!q) return false;
             if (PAINTS.normalizeCode(c.code).indexOf(q) === 0) return true;
+            // Y por el de Sherwin, que es el que se lee en la etiqueta de la
+            // lata y el que la parrilla acaba de enseñar.
+            if (c.swCode && PAINTS.normalizeCode(c.swCode).indexOf(q) === 0) return true;
             // También por los otros códigos de la misma pintura: quien teclea
             // «PBX» sobre la parrilla busca la ficha que encabeza «KBX».
             return (c.altCodes || []).some(function (a) {

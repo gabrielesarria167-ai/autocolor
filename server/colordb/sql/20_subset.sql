@@ -16,8 +16,15 @@
 -- (GRANITE CRYSTAL MET.) exists in 04, 44 and 94 and nowhere else, and so did
 -- not exist at all; the Grand Cherokee's PSE was the same. So: keep them all,
 -- and record which line a colour came from rather than deciding for the shop.
+--
+-- The join to colour.make is what makes this the thirteen brands' subset and
+-- not the whole extract's: a make that is not in the allow-list has no row
+-- there, so its rows never reach a colour, a model or a link. Every table
+-- below is built from this view alone, so no colour can survive without a
+-- brand that sells it.
 CREATE TEMP VIEW src AS
 SELECT v.*,
+       m.group_id,
        CASE v.paint_system_number
            WHEN '75' THEN 1    -- ULTRA 9K
            WHEN '79' THEN 2    -- ULTRA BC8
@@ -25,9 +32,10 @@ SELECT v.*,
            ELSE 8              -- Lazzudur, Ultrabase, Legacy, Shertruck, ...
        END AS system_bit
 FROM vehicle_color_lookup v
+JOIN colour.make m ON m.db_name = v.make
 -- Codes with neither a description here nor a name in colors are nameless, and
 -- a nameless colour is a blank tile in the grid and a blank line in the order
--- email. They are the only rows this view drops.
+-- email. They are the only rows this view drops that a kept brand owns.
 WHERE v.color_description IS NOT NULL
    OR EXISTS (SELECT 1 FROM colors c
                WHERE c.color_id = v.color_code AND c.color_name IS NOT NULL);
@@ -46,10 +54,8 @@ CREATE TABLE colour.model (
 -- Distinct within the group, not within the make: FORD and FORD USA both list
 -- a Mustang, and the page shows one Ford.
 INSERT INTO colour.model (model_id, group_id, name)
-SELECT row_number() OVER (ORDER BY m.group_id, s.model), m.group_id, s.model
-FROM (SELECT DISTINCT make, model FROM src WHERE model IS NOT NULL) s
-JOIN colour.make m ON m.db_name = s.make
-GROUP BY m.group_id, s.model;
+SELECT row_number() OVER (ORDER BY s.group_id, s.model), s.group_id, s.model
+FROM (SELECT DISTINCT group_id, model FROM src WHERE model IS NOT NULL) s;
 
 -- ---------------------------------------------------------------------------
 -- Colours
@@ -105,15 +111,14 @@ CREATE TABLE colour.vehicle_colour (
 -- not pull a code out of a longer label -- "C/TR: 1F7-0" normalises to
 -- CTR1F70, and matches nothing, exactly as findColour() does today.
 --
--- 24,999 rows carry no OEM code at all, and 5,782 colours have no row that
--- does. Those used to be dropped, which made the colour unreachable by any
--- route -- Ford's 30236 (AZUL METALICO) among them. They are kept with a NULL
--- owner code instead: api.colour_by_code also matches Sherwin's own code, so
--- the colour is still findable, and the tile shows that code when there is no
--- factory one to show.
+-- Rows that carry no OEM code at all are kept with a NULL owner code rather
+-- than dropped, which is what used to make a colour unreachable by any route
+-- -- Ford's 30236 (AZUL METALICO) among them. api.colour_by_code also matches
+-- Sherwin's own code, so the colour is still findable, and the tile shows that
+-- code when there is no factory one to show.
 INSERT INTO colour.vehicle_colour
 SELECT DISTINCT
-       m.group_id,
+       s.group_id,
        mo.model_id,
        s.year_min,
        s.year_max,
@@ -122,22 +127,46 @@ SELECT DISTINCT
        s.color_code,
        s.color_position = 'Dual Tone'
 FROM src s
-JOIN colour.make m ON m.db_name = s.make
-LEFT JOIN colour.model mo ON mo.group_id = m.group_id AND mo.name = s.model;
+LEFT JOIN colour.model mo ON mo.group_id = s.group_id AND mo.name = s.model;
 
--- A model row must belong to the same group as its link, or the finder would
--- offer a model under the wrong brand.
+-- ---------------------------------------------------------------------------
+-- What must hold before 30_derive touches any of it
+-- ---------------------------------------------------------------------------
+
 DO $$
 DECLARE bad int;
 BEGIN
+    -- A model row must belong to the same group as its link, or the finder
+    -- would offer a model under the wrong brand.
     SELECT count(*) INTO bad FROM colour.vehicle_colour v
     JOIN colour.model mo ON mo.model_id = v.model_id
     WHERE mo.group_id <> v.group_id;
     IF bad > 0 THEN RAISE EXCEPTION '% links point at a model of another make', bad; END IF;
+
+    -- Every colour is sold by at least one of the thirteen. Building both
+    -- tables from `src` alone is what guarantees it; this says so out loud, so
+    -- that a later edit which widens one and not the other fails here rather
+    -- than shipping tiles no brand can reach.
+    SELECT count(*) INTO bad FROM colour.colour c
+    WHERE NOT EXISTS (SELECT 1 FROM colour.vehicle_colour v
+                       WHERE v.color_code = c.color_code);
+    IF bad > 0 THEN RAISE EXCEPTION '% colours have no brand that sells them', bad; END IF;
+
+    -- And every link lands on a colour that exists. The foreign key says this
+    -- too; it is here because the count is the useful half of the message.
+    SELECT count(*) INTO bad FROM colour.vehicle_colour v
+    WHERE NOT EXISTS (SELECT 1 FROM colour.colour c WHERE c.color_code = v.color_code);
+    IF bad > 0 THEN RAISE EXCEPTION '% links point at a colour that does not exist', bad; END IF;
+
+    -- Nothing from outside the thirteen leaked in through a join.
+    SELECT count(*) INTO bad FROM colour.vehicle_colour v
+    WHERE NOT EXISTS (SELECT 1 FROM colour.make m
+                       WHERE m.make_id = v.group_id AND m.make_id = m.group_id);
+    IF bad > 0 THEN RAISE EXCEPTION '% links hang off something that is not a brand', bad; END IF;
 END $$;
 
 CREATE INDEX vc_code_idx  ON colour.vehicle_colour (group_id, owner_key);
 CREATE INDEX vc_model_idx ON colour.vehicle_colour (group_id, model_id, year_max DESC);
--- Looking a colour up by Sherwin's own code, for the 5,782 that have no
+-- Looking a colour up by Sherwin's own code, for the colours that carry no
 -- factory code and for anyone who reads one off a mixing ticket.
 CREATE INDEX vc_sw_idx    ON colour.vehicle_colour (group_id, color_code);

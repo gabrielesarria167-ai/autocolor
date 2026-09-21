@@ -115,8 +115,16 @@ BEGIN
            -- tile per code put the same blue on the grid twice and read as
            -- though the page had changed the code the customer typed. Capped
            -- at six: past that it is a label, not a list.
-           (array_agg(DISTINCT v.owner_code)
-              FILTER (WHERE v.owner_code IS NOT NULL))[1:6],
+           -- Codes of one letter go last. 1,063 colours carry one -- Jeep's
+           -- GRANITE CRYSTAL is "C" as well as VR847 -- and 932 of those have
+           -- a real code too. DISTINCT sorts the array by value, so without
+           -- this the stray letter sorts to the front and becomes the code the
+           -- tile shows. The 131 that have nothing longer still show it: a
+           -- poor code beats no code.
+           (coalesce(array_agg(DISTINCT v.owner_code)
+                       FILTER (WHERE length(v.owner_code) > 1), '{}')
+         || coalesce(array_agg(DISTINCT v.owner_code)
+                       FILTER (WHERE length(v.owner_code) = 1), '{}'))[1:6],
            c.oem_name, c.sw_name, c.finish, c.family, c.hex,
            min(v.year_min), max(v.year_max),
            bool_and(v.model_id IS NULL), bool_or(v.dual_tone)
@@ -205,10 +213,17 @@ BEGIN
            -- The code that was typed first, then the others the same paint
            -- goes by, so the customer sees their own label confirmed rather
            -- than a synonym of it.
+           -- Typed first, then the real alternates, then the one-letter
+           -- ones. The third rank matters when the code that was typed is
+           -- Sherwin's rather than the factory's: nothing matches the first
+           -- filter then, and "C" would lead for want of anything ranking it.
            (coalesce(array_agg(DISTINCT v.owner_code)
                        FILTER (WHERE v.owner_key = k), '{}')
          || coalesce(array_agg(DISTINCT v.owner_code)
-                       FILTER (WHERE v.owner_code IS NOT NULL
+                       FILTER (WHERE length(v.owner_code) > 1
+                                 AND v.owner_key IS DISTINCT FROM k), '{}')
+         || coalesce(array_agg(DISTINCT v.owner_code)
+                       FILTER (WHERE length(v.owner_code) = 1
                                  AND v.owner_key IS DISTINCT FROM k), '{}'))[1:6],
            c.oem_name, c.sw_name, c.finish, c.family, c.hex,
            min(v.year_min), max(v.year_max),

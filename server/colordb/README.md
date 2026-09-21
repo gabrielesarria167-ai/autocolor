@@ -9,6 +9,10 @@ It is the source of colour identification for the matizado page
 colours, 10 brands, US model years 2010-2018 — which stays on as a sidecar for
 the one thing this database does not have: a colour you can put on a screen.
 
+**Thirteen brands are published, not all 383.** Toyota, Chevrolet, Ford,
+Nissan, BMW, Audi, Mercedes-Benz, Subaru, Jeep, Fiat, Volkswagen, Kia and
+Mitsubishi — the ones the shop sells. See *Thirteen brands* below.
+
 ## What goes to Neon, and what never leaves this machine
 
 **Only the vehicle→colour lookup is published.** `formulas`,
@@ -23,12 +27,12 @@ What is published, after the subset in `sql/`:
 
 | | Rows | Why |
 |---|---:|---|
-| `colour.vehicle_colour` | 699,437 | make/model/year + OEM code → colour code |
-| `colour.colour` | 81,425 | colour code → name, finish, family, hex |
-| `colour.model` | 4,348 | the model list behind the page's second `<select>` |
-| `colour.make` | 453 | make names, grouped into 383 brands and labelled |
+| `colour.vehicle_colour` | 232,306 | make/model/year + OEM code → colour code |
+| `colour.colour` | 28,562 | colour code → name, finish, family, hex |
+| `colour.model` | 1,441 | the model list behind the page's second `<select>` |
+| `colour.make` | 27 | make names, grouped into the 13 brands and labelled |
 
-That is 26 MB of CSV against Neon's free 0.5 GB. The full bundle loads to
+That is 9 MB of CSV against Neon's free 0.5 GB. The full bundle loads to
 ~1.2 GB, which is both over quota and far more than the page needs.
 
 **Every paint system, not three.** The first version of this subset kept only
@@ -57,7 +61,7 @@ bundle/       the extract, exactly as generated. Do not edit.
   0[1-4]_*.sql  schema, load, indexes, verify
   README.it.md  the original Italian documentation, kept as provenance
   data/         400 MB of CSV — gitignored
-sql/          10-40 build the subset locally; 50-80 publish and harden it
+sql/          10-45 build the subset locally; 50-80 publish and harden it
 export/       the subset's CSVs, the only thing that goes to Neon — gitignored
 load.sh       local build      (npm run colordb:load)
 push.sh       Neon load+harden (npm run colordb:push)
@@ -99,7 +103,8 @@ in any of the ten tables. `solid_type` and `color_family` exist as columns but
 are empty on every row of systems 75, 79 and 41. So:
 
 - the **swatch** is mixed from the colour's own tinting formula, in
-  `sql/35_hex.sql`. 83,221 of 84,117 colours carry one, built from 223 named
+  `sql/35_hex.sql`. 28,095 of the 28,562 published colours carry one, and the
+  rest fall back to a representative tone for their family. It is built from 223 named
   pigments — AZUL MEDIO, VERMELHO OXIDO, PRETO INTENSO, PEROLA AZUL GALAXIA.
   Name the pigments once and the mix follows: a weighted geometric mean in
   linear light, because paint is subtractive and an arithmetic mean turns every
@@ -119,38 +124,99 @@ are empty on every row of systems 75, 79 and 41. So:
   page says which of the two it is showing.
 - the **finish**, which multiplies the price in `src/paints.js`, is derived from
   the `MET` / `PEARL` / `MICA` / `NACRE` / `3C` markers in `colors.color_name`.
-  Of the 81,425 colours built, 53,317 carry a marker (metallic 44.9%, pearl
-  19.8%, tricoat 0.8%) and 28,108 read as solid because they have a name and no
-  marker. Measured against the
+  Of the 28,562 colours published, most carry a marker (metallic 51.8%, pearl
+  22.2%, tricoat 0.4%) and the rest read as solid because they have a name and
+  no marker. Measured against the
   local catalogue where
   both know a colour, that agrees exactly 70% of the time and on the
   solid-vs-effect axis 89% of the time. It is a good guess and it is still a
   guess, which is why the colour card lets the customer correct it.
 - the **family** chips come from the same names, landing on a real family for
-  83.5% of colours; the rest fall to `otro`.
+  85.8% of colours; the rest fall to `otro`. German writes a colour as one word
+  — TORNADOROT, ACAPULCOBLAU, ACHATGRAU, IMOLAGELB — so the rules in
+  `sql/30_derive.sql` match those four as compound suffixes and not only as
+  bare words. Without that, 1,684 German colours read as `otro`, and thirteen
+  of them were dropped outright for having no family tone to fall back on.
 
-## Make names are not tidy
+## Thirteen brands
 
-453 makes appear in the source, and they are neither unique nor all vehicles. FORD is seven names (`FORD`, `FORD USA`, `FORD ARGENTINA`,
-`FORD AUSTRALIA`, `FORD BRAZIL - ARGENTINA`, `FORD NEW ZEALAND`,
-`FORD SOUTH AFRICA`); MERCEDES is `MERCEDES` plus `MERCEDES TRUCKS`, while
-`MERCEDES BENZ` has no rows here at all. About 51 entries are not cars —
-RAL, PANTONE, SIKKENS, VALSPAR, COLOR MAP and 31 national FLEETOWNER rows.
+The shop sells Toyota, Chevrolet, Ford, Nissan, BMW, Audi, Mercedes-Benz,
+Subaru, Jeep, Fiat, Volkswagen, Kia and Mitsubishi. Those are the only brands
+published. The extract holds 383 others — Lada, Wartburg, Zastava, RAL,
+PANTONE, a Pantone fan deck and sixty national FLEETOWNER books — and a body
+shop in Peru will never mix any of them, while a search for a short code could
+land on one.
 
-`sql/20_makes.sql` holds the grouping and the labels as an explicit list, not a
-pattern. A regex is worse here: it works until the day the source adds
-`FORD FLEET` and quietly folds it into Ford. A list is auditable and someone has
-to mean it.
+`sql/10_makes.sql` holds the list. It is an allow-list, not a pattern: a make
+is published because somebody wrote it down, or it is not published. A regex
+works until the day the source adds `FORD FLEET` and quietly folds it into
+Ford.
 
-The ten labels for the brands the shop sells must stay byte-identical to
-`BRAND_NAMES` in `src/paints.js`. `colourHex()` in `server/mail.js` matches the
-brand by display name to draw the swatch in the order email, and if a label
-drifts the email loses its chip silently. `verify.js` checks this.
+**One brand is several names.** The source spells a brand once per market, so
+Ford is seven names (`FORD`, `FORD USA`, `FORD ARGENTINA`, `FORD AUSTRALIA`,
+`FORD BRAZIL - ARGENTINA`, `FORD NEW ZEALAND`, `FORD SOUTH AFRICA`),
+Volkswagen three and Mercedes-Benz two. 27 names fold onto 13 brands. Which
+name leads a brand is stated in the file rather than left to the alphabet,
+which would otherwise elect `BEIJING JEEP` to speak for Jeep.
 
-It also checks that 746 of the 777 sidecar colours still resolve to a database
-colour. That is the rate this grouping was measured to give — 96%, weakest on
-Subaru at 40 of 54 — so a regression in the make list shows up as a number
-rather than as a quietly emptier finder.
+**What is deliberately left out**, because each looks like an oversight and is
+not: the sibling marques — Lexus and Scion (Toyota), Infiniti and Datsun
+(Nissan), Dodge, Ram and Chrysler (Jeep's group), Alfa Romeo, Lancia and
+Abarth (Fiat's), Seat and Skoda (Volkswagen's), Smart (Mercedes) — and the
+truck and motorcycle arms, `BMW MOTOR`, `MERCEDES TRUCKS` and
+`VOLKSWAGEN TRUCK`. They are separate code spaces. Adding one back is a line in
+`brand` in `sql/10_makes.sql` and a rebuild.
+
+A guard in the same file fails the build if the extract ever spells one of the
+thirteen a way that is in neither list — a new `FORD EUROPE`, a
+`MITSUBISHI FUSO` — so a new spelling is an error message rather than a brand
+that is quietly half its size.
+
+The labels for the ten brands the sidecar also knows must stay byte-identical
+to `BRAND_NAMES` in `src/paints.js`. `colourHex()` in `server/mail.js` matches
+the brand by display name to draw the swatch in the order email, and if a label
+drifts the email loses its chip silently. `verify.js` checks this, and checks
+that 746 of the 777 sidecar colours still resolve to a database colour, so a
+regression in the make list shows up as a number rather than as a quietly
+emptier finder.
+
+## Two-tone cars keep their code
+
+A `CC:` row is not a paint. It is a cross-reference naming two others —
+`CC: TOY 8W7 / MAZ 41W` — for a car painted two colours, and there are 5,134
+of them across the thirteen brands.
+
+They have no formula of their own, so no swatch, and one of them answering a
+search reads as a bug: a Ford customer typing AE used to be shown
+`CC: TOY 6M1 / TOY 192` above GRABBER BLUE MET. So they were deleted.
+
+But the code on the door jamb of a two-tone car *is* the code on the `CC:` row
+— Toyota's D15, Nissan's 2H8 — and it appears nowhere else in the extract.
+Deleting the row took the code with it, and 4,141 codes a customer could read
+off a car answered "no encontramos ese color".
+
+`sql/36_cleanup.sql` reads the reference instead: both halves are looked up by
+brand token and factory code, and the customer's code is attached to the real
+paints it stands for, flagged `dual_tone`. 5,098 of the 5,134 resolve. What is
+left is 29 codes whose components are not in this catalogue at all.
+
+## Nothing falls off the edge quietly
+
+`sql/45_audit.sql` runs before the export and compares the extract against what
+was made of it. It fails the build if the extract prints a code the catalogue
+cannot answer, if a brand that sells a surviving colour has lost its link to
+it, if a model that still has colours has gone from the list, or if a colour
+belongs to no brand in the allow-list.
+
+It exists because of a bug that produced no error at all: `sql/10_makes.sql`
+used to build its make list from paint systems 75, 79 and 41 only, so
+`SUBARU JAPAO` — which appears in none of them — had no row there, and the join
+in `sql/20_subset.sql` silently dropped every link it had.
+
+Of the 33,650 colours the thirteen brands offer, 28,562 are published, 5,086
+are cross-references rather than paints, and 2 have neither a formula to mix
+nor a colour word in the name to fall back on. Of the codes the extract prints,
+29 answer nothing.
 
 ## Licence
 

@@ -39,17 +39,27 @@ FROM named n WHERE n.color_code = c.color_code;
 --
 -- First match wins, so the order is the specificity order: a GRIS PERLE is
 -- grey before it is anything else.
+--
+-- German writes a colour name as one word -- TORNADOROT, ACAPULCOBLAU,
+-- ACHATGRAU, IMOLAGELB -- and the word-boundary guards below used to miss
+-- every one of them, which left 1,627 German colours in 'otro' with no chip to
+-- filter by and, for thirteen of them, no family tone to fall back on when the
+-- formula would not mix, so they were dropped from the catalogue outright.
+-- Hence the [A-Z] prefix forms: they match the suffix of a compound and not a
+-- bare word, so they add ACHATGRAU without letting GRAU loose inside unrelated
+-- text. WEISS, SCHWARZ, BRAUN, GRUEN and SILBER never had the guard and were
+-- always matching as suffixes; this makes the other four behave the same.
 UPDATE colour.colour c SET family = CASE
-    WHEN n.txt ~* 'WHITE|BLANC|BIANCO|BRANCO|WEISS|\yWEIS\y'                     THEN 'blanco'
+    WHEN n.txt ~* 'WHITE|BLANC|BIANCO|BRANCO|WEISS|\yWEIS\y|\yIVORY|MARFIL|\yAVORIO' THEN 'blanco'
     WHEN n.txt ~* 'BLACK|NEGRO|\yNERO\y|PRETO|SCHWARZ|\yNOIR\y'                  THEN 'negro'
     WHEN n.txt ~* 'SILVER|PLATA|PLATEAD|ARGENT|PRATA|SILBER'                     THEN 'plata'
-    WHEN n.txt ~* 'GREY|GRAY|\yGRIS\y|GRIGIO|CINZA|\yGRAU\y'                     THEN 'gris'
-    WHEN n.txt ~* 'RED|ROJO|ROSSO|VERMELH|\yROT\y|ROUGE|BURGUND|BORDO|GRANATE|CARMIN|\yRUBI' THEN 'rojo'
-    WHEN n.txt ~* 'BLUE|AZUL|\yBLU\y|\yBLAU\y|\yBLEU\y|TURQ|CYAN|CELESTE|\yAQUA'  THEN 'azul'
+    WHEN n.txt ~* 'GREY|GRAY|\yGRIS\y|GRIGIO|CINZA|\yGRAU\y|[A-Z]GRAU\y'         THEN 'gris'
+    WHEN n.txt ~* 'RED|ROJO|ROSSO|VERMELH|\yROT\y|[A-Z]ROT\y|ROUGE|BURGUND|BORDO|GRANATE|CARMIN|\yRUBI|\yVINHO|\yVINO\y' THEN 'rojo'
+    WHEN n.txt ~* 'BLUE|AZUL|\yBLU\y|\yBLAU\y|[A-Z]BLAU\y|\yBLEU\y|TURQ|CYAN|CELESTE|\yAQUA' THEN 'azul'
     WHEN n.txt ~* 'GREEN|VERDE|GRUEN|GR.N|\yVERT\y|\yOLIV'                        THEN 'verde'
-    WHEN n.txt ~* 'YELLOW|AMARILL|GIALLO|AMARELO|\yGELB\y|JAUNE|GOLD|DORAD|\yORO\y|\yOURO\y' THEN 'amarillo'
-    WHEN n.txt ~* 'ORANGE|NARANJ|ARANCIO|LARANJA'                                 THEN 'naranja'
-    WHEN n.txt ~* 'BROWN|MARRON|MARRONE|\yBRUN|BEIGE|BRAUN|BRONZ|BRONCE|\yTAN\y|\yCAFE|CHOCOLAT|CASTANH|\yARENA\y|\ySAND\y|CHAMPAGNE' THEN 'marron'
+    WHEN n.txt ~* 'YELLOW|AMARILL|GIALLO|AMARELO|\yGELB\y|[A-Z]GELB\y|JAUNE|GOLD|DORAD|\yORO\y|\yOURO\y' THEN 'amarillo'
+    WHEN n.txt ~* 'ORANGE|NARANJ|ARANCIO|LARANJA|\yDAMASCO|\yAPRIKOSEN?\y'        THEN 'naranja'
+    WHEN n.txt ~* 'BROWN|MARRON|MARRONE|\yBRUN|BEIGE|BRAUN|BRONZ|BRONCE|\yTAN\y|\yCAFE|CHOCOLAT|CASTANH|\yARENA\y|\ySAND\y|CHAMPAGNE|\yOCRE|\yOCHRE|\yCASHEW' THEN 'marron'
     WHEN n.txt ~* 'PURPLE|VIOLET|VIOLA|MORADO|\yLILA|\yROXO|MAGENTA|\yPINK\y|\yROSA\y|\yROSE\y|FUCSIA|FUCHSIA' THEN 'morado'
     ELSE 'otro'
 END

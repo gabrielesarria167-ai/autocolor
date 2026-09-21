@@ -289,35 +289,3 @@ BEGIN
     WHERE hex IS NOT NULL AND hex !~ '^#[0-9a-f]{6}$';
     IF bad > 0 THEN RAISE EXCEPTION '% colours have a hex the page cannot render', bad; END IF;
 END $$;
-
--- ---------------------------------------------------------------------------
--- Colours that are not colours
--- ---------------------------------------------------------------------------
-
--- A "CC:" row is not a paint. It is a cross-reference naming two others --
--- "CC: TOY 8G4 / TOY 168" -- for a two-tone car, and it is 8,373 of the 8,375
--- colours that reach this point with no hex to show.
---
--- A few hundred of them do carry a formula, and a Sherwin name with it. Those
--- are real colours wearing a reference as a label, so they keep the colour and
--- lose the label: "CC: SUB 433 / SUB 943" becomes HOT PEPPER RED MET. Before
--- this, a Ford customer searching AE was answered with
--- "CC: TOY 6M1 / TOY 192" above GRABBER BLUE MET., which is a Toyota
--- reference, is not a name, and is not what is on the car.
-UPDATE colour.colour
-SET oem_name = sw_name
-WHERE oem_name ~ '^CC[: ]' AND sw_name IS NOT NULL AND sw_name !~ '^CC[: ]';
-
--- The rest have nothing left to show: no colour, or no name a customer could
--- read. Their links go first, or the foreign key holds them.
-DELETE FROM colour.vehicle_colour v
-USING colour.colour c
-WHERE c.color_code = v.color_code
-  AND (c.hex IS NULL OR c.oem_name ~ '^CC[: ]');
-
-DELETE FROM colour.colour WHERE hex IS NULL OR oem_name ~ '^CC[: ]';
-
-\echo ''
-\echo '=== what was dropped as unrenderable ==='
-SELECT (SELECT count(*) FROM colour.colour)         AS colours_left,
-       (SELECT count(*) FROM colour.vehicle_colour) AS links_left;

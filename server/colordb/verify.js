@@ -173,6 +173,56 @@ async function main() {
             plain.rows.length === 0 || byOwn.rows.some((r) => r.sw_code === plain.rows[0].sw_code),
             plain.rows.length ? `${plain.rows[0].sw_code} → ${byOwn.rows.length} row(s)` : 'skipped');
 
+        // The catalogue is the thirteen brands the shop named and nobody else.
+        // Lada, Wartburg, RAL and sixty FLEETOWNER country books used to be in
+        // here; a search for a code could land on one of them.
+        const SOLD = ['Toyota', 'Chevrolet', 'Ford', 'Nissan', 'BMW', 'Audi',
+            'Mercedes-Benz', 'Subaru', 'Jeep', 'Fiat', 'Volkswagen', 'Kia',
+            'Mitsubishi'];
+        const labels13 = makes.map((m) => m.label).sort();
+        const strays = labels13.filter((l) => SOLD.indexOf(l) === -1);
+        const absent = SOLD.filter((l) => labels13.indexOf(l) === -1);
+        check('the catalogue is exactly the thirteen brands',
+            strays.length === 0 && absent.length === 0,
+            strays.length || absent.length
+                ? `extra: ${strays.join(', ') || 'none'}; missing: ${absent.join(', ') || 'none'}`
+                : `${labels13.length} brands`);
+
+        // A two-tone car's code appears in the extract only inside a
+        // cross-reference -- "CC: TOY 8W7 / MAZ 41W" -- and those rows are not
+        // paints and are not shipped. sql/36_cleanup.sql reads the reference
+        // and hangs the customer's code on the real paints instead, which is
+        // 4,141 codes that used to answer nothing at all.
+        const twoTone = await client.query('SELECT * FROM api.colour_by_code($1, $2)',
+            [toyota.make_id, 'D15']);
+        check('a two-tone code answers with the paints it stands for',
+            twoTone.rows.length >= 2 && twoTone.rows.every((r) => r.dual_tone)
+                && twoTone.rows.every((r) => !/^CC[: ]/.test(r.oem_name)),
+            twoTone.rows.length
+                ? twoTone.rows.map((r) => r.oem_name).join(' + ')
+                : 'no rows for D15');
+
+        // No cross-reference is being sold as if it were a paint.
+        let ccSeen = 0;
+        for (const m of makes) {
+            const rows = (await client.query('SELECT * FROM api.colours_for($1)', [m.make_id])).rows;
+            ccSeen += rows.filter((r) => /^CC[: ]/.test(r.oem_name || '')).length;
+        }
+        check('no tile is a cross-reference rather than a colour', ccSeen === 0,
+            `${ccSeen} on the first page of ${makes.length} brands`);
+
+        // The code a tile leads with is a code somebody could read off a car.
+        // 1,063 colours also carry a one-letter code, and because array_agg
+        // sorts by value that letter used to sort to the front and become the
+        // label -- "C" where VR847 belonged.
+        const leadsWithALetter = page.rows.filter(
+            (r) => (r.oem_codes || []).length > 1 && String(r.oem_codes[0]).length === 1);
+        check('a tile does not lead with a stray one-letter code',
+            leadsWithALetter.length === 0,
+            leadsWithALetter.length
+                ? `${leadsWithALetter.length}, e.g. ${leadsWithALetter[0].oem_codes.join(' ')}`
+                : `${page.rows.length} tiles`);
+
         console.log('\nThe page keeps working');
         const labels = new Set(makes.map((m) => m.label));
         const missing = Object.values(paints.BRAND_NAMES).filter((n) => !labels.has(n));

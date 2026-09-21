@@ -1,12 +1,28 @@
--- Makes: one row per make name the source uses, grouped and labelled.
+-- Makes: the thirteen brands the shop sells, and nothing else.
 --
 -- Run against the local build database, after the bundle's 01-04. Nothing
 -- here reaches Neon directly; 40_export.sql ships the result.
 --
--- Three paint systems of 26: 75 (Ultra 9K) and 79 (Ultra BC8) are 93% of the
--- table, and 41 (Ultra 9K America do Sul) adds 214 colours found nowhere else,
--- which matters for a shop selling in Peru. The rest are industrial, truck and
--- legacy lines a body shop matching car paint never reaches for.
+-- This used to be the other way round: every make in the extract was kept,
+-- 383 of them, and a short override list renamed and grouped the ones that
+-- mattered. That meant the catalogue carried Lada, Wartburg, Zastava, sixty
+-- FLEETOWNER country books and a Pantone fan deck, none of which a body shop
+-- in Peru will ever mix -- and it meant a wrong brand could swallow a search.
+-- So the list is now an allow-list: a make is here because somebody wrote it
+-- down, or it is not in the catalogue at all.
+--
+-- Note what is NOT here, because each is a real decision and not an oversight:
+--
+--   * The luxury and sibling marques -- Lexus and Scion (Toyota), Infiniti and
+--     Datsun (Nissan), Dodge, Ram and Chrysler (Jeep's group), Alfa Romeo,
+--     Lancia and Abarth (Fiat's), Seat and Skoda (Volkswagen's), Smart
+--     (Mercedes). They are separate brands with separate code spaces, and the
+--     shop named thirteen.
+--   * Trucks and motorcycles: BMW MOTOR, MERCEDES TRUCKS, VOLKSWAGEN TRUCK,
+--     CHEV. TRUCK. A Mercedes lorry's codes are not a Mercedes car's, and a
+--     customer looking for a saloon should not read past them.
+--
+-- Adding any of them back is one line in `brand` below and a rebuild.
 
 \set ON_ERROR_STOP on
 
@@ -16,206 +32,134 @@ CREATE SCHEMA colour;
 CREATE TABLE colour.make (
     make_id    smallint PRIMARY KEY,
     db_name    text     NOT NULL UNIQUE,  -- exactly as the source spells it
-    group_id   smallint NOT NULL,         -- makes that are one brand to a customer
+    group_id   smallint NOT NULL,         -- the brand this make is shown as
     label      text     NOT NULL,         -- what the page shows
-    is_vehicle boolean  NOT NULL,         -- false for RAL, PANTONE, FLEETOWNER...
-    sort_key   smallint NOT NULL          -- the ten the shop sells come first
+    is_vehicle boolean  NOT NULL,         -- always true now; kept for the API
+    sort_key   smallint NOT NULL          -- the order the shop named them in
 );
 
--- Defaults first: every make is its own group, labelled by initcap, a vehicle.
--- make_id is assigned by name so a rebuild of the same extract is reproducible.
-INSERT INTO colour.make (make_id, db_name, group_id, label, is_vehicle, sort_key)
-SELECT row_number() OVER (ORDER BY make)::smallint,
-       make,
-       row_number() OVER (ORDER BY make)::smallint,
-       initcap(make),
-       true,
-       100
-FROM (SELECT DISTINCT make FROM vehicle_color_lookup
-       WHERE paint_system_number IN ('75', '79', '41')) s;
-
--- The overrides, as an explicit list rather than a pattern. A pattern works
--- until the day the source adds FORD FLEET and quietly folds it into Ford; a
--- list is auditable and somebody had to mean it. Columns: the source's name,
--- the group it belongs to (NULL: its own), the label (NULL: keep initcap),
--- whether it is a vehicle at all, and the sort key.
+-- One row per name the source uses. `lead` marks the one whose make_id the
+-- whole brand groups onto -- explicit, because the alphabet would elect
+-- BEIJING JEEP to speak for Jeep.
 --
--- Cars are kept apart from their truck and motorcycle arms on purpose: they
--- are different code spaces, and a customer looking for a Volvo car should not
--- have to read past the lorries.
-CREATE TEMP TABLE override (
-    db_name text, group_of text, label text, is_vehicle boolean, sort_key smallint
+-- The source spells one brand several ways because the data came from several
+-- markets: seven Fords, three Volkswagens. They are one brand to a customer.
+CREATE TEMP TABLE brand (
+    sort_key smallint, label text, db_name text, lead boolean
 );
-INSERT INTO override VALUES
-    ('TOYOTA', NULL, 'Toyota', true, 1),
-    ('CHEVROLET', NULL, 'Chevrolet', true, 2),
-    ('FORD', NULL, 'Ford', true, 3),
-    ('SUBARU', NULL, 'Subaru', true, 4),
-    ('NISSAN', NULL, 'Nissan', true, 5),
-    ('BMW', NULL, 'BMW', true, 6),
-    ('AUDI', NULL, 'Audi', true, 7),
-    ('MERCEDES', NULL, 'Mercedes-Benz', true, 8),
-    ('FIAT', NULL, 'Fiat', true, 9),
-    ('JEEP', NULL, 'Jeep', true, 10),
-    ('FORD USA', 'FORD', NULL, true, 100),
-    ('FORD ARGENTINA', 'FORD', NULL, true, 100),
-    ('FORD BRAZIL - ARGENTINA', 'FORD', NULL, true, 100),
-    ('FORD SOUTH AFRICA', 'FORD', NULL, true, 100),
-    ('FORD AUSTRALIA', 'FORD', NULL, true, 100),
-    ('FORD NEW ZEALAND', 'FORD', NULL, true, 100),
-    ('CHEVROLET EUROPE', 'CHEVROLET', NULL, true, 100),
-    ('TOYOTA SOUTH AFRICA', 'TOYOTA', NULL, true, 100),
-    ('MERCEDES BENZ', 'MERCEDES', NULL, true, 100),
-    ('VOLKSWAGEN', NULL, 'Volkswagen', true, 100),
-    ('VOLKSWAGEN BRAZIL', 'VOLKSWAGEN', NULL, true, 100),
-    ('VOLKSWAGEN / AUDI', NULL, 'Volkswagen / Audi', true, 100),
-    ('GEN. MOTORS USA', NULL, 'General Motors', true, 100),
-    ('GEN. MOTORS  HOLDEN (AUS)', 'GEN. MOTORS USA', NULL, true, 100),
-    ('GEN. MOTORS NEW ZEALAND', 'GEN. MOTORS USA', NULL, true, 100),
-    ('CHRYSLER USA', NULL, 'Chrysler', true, 100),
-    ('CHRYSLER FRANCE', 'CHRYSLER USA', NULL, true, 100),
-    ('CHRYSLER UK', 'CHRYSLER USA', NULL, true, 100),
-    ('CHRYSLER', 'CHRYSLER USA', NULL, true, 100),
-    ('KIA', NULL, 'Kia', true, 100),
-    ('KIA MOTORS', 'KIA', NULL, true, 100),
-    ('MG', NULL, 'MG', true, 100),
-    ('MG > 2008', 'MG', NULL, true, 100),
-    ('RENAULT', NULL, 'Renault', true, 100),
-    ('RENAULT RVI', NULL, 'Renault Trucks', true, 100),
-    ('RENAULT TRUCKS', 'RENAULT RVI', NULL, true, 100),
-    ('MERCEDES TRUCKS', NULL, 'Mercedes-Benz Trucks', true, 100),
-    ('VOLVO', NULL, 'Volvo', true, 100),
-    ('VOLVO TRUCKS', NULL, 'Volvo Trucks', true, 100),
-    ('HONDA', NULL, 'Honda', true, 100),
-    ('HONDA MOTOR', NULL, 'Honda Motos', true, 100),
-    ('BMW MOTOR', NULL, 'BMW Motos', true, 100),
-    ('SUZUKI', NULL, 'Suzuki', true, 100),
-    ('SUZUKI MOTOR', NULL, 'Suzuki Motos', true, 100),
-    ('TRIUMPH', NULL, 'Triumph', true, 100),
-    ('TRIUMPH MOTOR', NULL, 'Triumph Motos', true, 100),
-    ('PIAGGIO CARS', NULL, 'Piaggio', true, 100),
-    ('PIAGGIO MOTOR', NULL, 'Piaggio Motos', true, 100),
-    ('DS', NULL, 'DS', true, 100),
-    ('HSV', NULL, 'HSV', true, 100),
-    ('DAF', NULL, 'DAF', true, 100),
-    ('BYD', NULL, 'BYD', true, 100),
-    ('KGM', NULL, 'KGM', true, 100),
-    ('LEVC', NULL, 'LEVC', true, 100),
-    ('NIO', NULL, 'NIO', true, 100),
-    ('JAC', NULL, 'JAC', true, 100),
-    ('JDM', NULL, 'JDM', true, 100),
-    ('BAIC', NULL, 'BAIC', true, 100),
-    ('ONVO', NULL, 'ONVO', true, 100),
-    ('LDV', NULL, 'LDV', true, 100),
-    ('BAW', NULL, 'BAW', true, 100),
-    ('FSO', NULL, 'FSO', true, 100),
-    ('OYAK', NULL, 'OYAK', true, 100),
-    ('DFSK', NULL, 'DFSK', true, 100),
-    ('GAZ', NULL, 'GAZ', true, 100),
-    ('TVR', NULL, 'TVR', true, 100),
-    ('XEV', NULL, 'XEV', true, 100),
-    ('AION', NULL, 'AION', true, 100),
-    ('CMC', NULL, 'CMC', true, 100),
-    ('TOGG', NULL, 'TOGG', true, 100),
-    ('ROX', NULL, 'ROX', true, 100),
-    ('ICAR', NULL, 'ICAR', true, 100),
-    ('NETA', NULL, 'NETA', true, 100),
-    ('FUDI', NULL, 'FUDI', true, 100),
-    ('ZAP', NULL, 'ZAP', true, 100),
-    ('IKCO', NULL, 'IKCO', true, 100),
-    ('GWM', NULL, 'GWM', true, 100),
-    ('WEY', NULL, 'WEY', true, 100),
-    ('UMM', NULL, 'UMM', true, 100),
-    ('UNIC', NULL, 'UNIC', true, 100),
-    ('ORA', NULL, 'ORA', true, 100),
-    ('EVO', NULL, 'EVO', true, 100),
-    ('DR', NULL, 'DR', true, 100),
-    ('COS', NULL, 'COS', true, 100),
-    ('KYC', NULL, 'KYC', true, 100),
-    ('AITO', NULL, 'AITO', true, 100),
-    ('UAZ', NULL, 'UAZ', true, 100),
-    ('COLOR MAP', NULL, NULL, false, 900),
-    ('COLOR MAP 18', NULL, NULL, false, 900),
-    ('COLOR TOOLS FAN DECK', NULL, NULL, false, 900),
-    ('FLEET AUSTRALIA ARB', NULL, NULL, false, 900),
-    ('FLEET AUSTRALIA KITCHEN', NULL, NULL, false, 900),
-    ('FLEET COLORS  GENERAL', NULL, NULL, false, 900),
-    ('FLEETOWNER AUSTRALIA', NULL, NULL, false, 900),
-    ('FLEETOWNER BELGIE', NULL, NULL, false, 900),
-    ('FLEETOWNER BRAZIL', NULL, NULL, false, 900),
-    ('FLEETOWNER BRUNEI', NULL, NULL, false, 900),
-    ('FLEETOWNER CHINA', NULL, NULL, false, 900),
-    ('FLEETOWNER CZECH REP', NULL, NULL, false, 900),
-    ('FLEETOWNER DENMARK', NULL, NULL, false, 900),
-    ('FLEETOWNER DIV.', NULL, NULL, false, 900),
-    ('FLEETOWNER FINLAND', NULL, NULL, false, 900),
-    ('FLEETOWNER FRANCE', NULL, NULL, false, 900),
-    ('FLEETOWNER GERMANY', NULL, NULL, false, 900),
-    ('FLEETOWNER GLOBAL', NULL, NULL, false, 900),
-    ('FLEETOWNER INDIA', NULL, NULL, false, 900),
-    ('FLEETOWNER INDONESIA', NULL, NULL, false, 900),
-    ('FLEETOWNER ITALY', NULL, NULL, false, 900),
-    ('FLEETOWNER KOREA', NULL, NULL, false, 900),
-    ('FLEETOWNER MALAYSIA', NULL, NULL, false, 900),
-    ('FLEETOWNER NEDERLAND', NULL, NULL, false, 900),
-    ('FLEETOWNER NEW ZEALAND', NULL, NULL, false, 900),
-    ('FLEETOWNER PHILIPPINES', NULL, NULL, false, 900),
-    ('FLEETOWNER POLAND', NULL, NULL, false, 900),
-    ('FLEETOWNER SINGAPORE', NULL, NULL, false, 900),
-    ('FLEETOWNER SLOVAKIA', NULL, NULL, false, 900),
-    ('FLEETOWNER SLOVENIA', NULL, NULL, false, 900),
-    ('FLEETOWNER SPAIN', NULL, NULL, false, 900),
-    ('FLEETOWNER SWEDEN', NULL, NULL, false, 900),
-    ('FLEETOWNER SWITZERLAND', NULL, NULL, false, 900),
-    ('FLEETOWNER TURKEY', NULL, NULL, false, 900),
-    ('FLEETOWNER U.K.', NULL, NULL, false, 900),
-    ('FLEETOWNER USA', NULL, NULL, false, 900),
-    ('GENERAL COM. VEHICLES', NULL, NULL, false, 900),
-    ('GENERAL INDUSTRY COLORS', NULL, NULL, false, 900),
-    ('GENERAL INDUSTRY USA', NULL, NULL, false, 900),
-    ('NCS', NULL, NULL, false, 900),
-    ('PANTONE (PMS)', NULL, NULL, false, 900),
-    ('PANTONE PMS FLEETOWNER', NULL, NULL, false, 900),
-    ('RAL', NULL, NULL, false, 900),
-    ('RAL DESIGN', NULL, NULL, false, 900),
-    ('RAL EFFECT', NULL, NULL, false, 900),
-    ('SIKKENS ACC', NULL, NULL, false, 900),
-    ('SIKKENS STANDARD', NULL, NULL, false, 900),
-    ('VALSPAR AUTOM. STANDARDS', NULL, NULL, false, 900),
-    ('VALSPAR COMPETITOR D', NULL, NULL, false, 900),
-    ('VALSPAR COMPETITOR S', NULL, NULL, false, 900),
-    ('VALSPAR MOTOR COLOURS', NULL, NULL, false, 900),
-    ('VALSPAR PANTONE (PMS)', NULL, NULL, false, 900);
+INSERT INTO brand (sort_key, label, db_name, lead) VALUES
+    ( 1, 'Toyota',        'TOYOTA',                  true),
+    ( 1, 'Toyota',        'TOYOTA SOUTH AFRICA',     false),
+    ( 2, 'Chevrolet',     'CHEVROLET',               true),
+    ( 2, 'Chevrolet',     'CHEVROLET EUROPE',        false),
+    ( 3, 'Ford',          'FORD',                    true),
+    ( 3, 'Ford',          'FORD USA',                false),
+    ( 3, 'Ford',          'FORD ARGENTINA',          false),
+    ( 3, 'Ford',          'FORD BRAZIL - ARGENTINA', false),
+    ( 3, 'Ford',          'FORD SOUTH AFRICA',       false),
+    ( 3, 'Ford',          'FORD AUSTRALIA',          false),
+    ( 3, 'Ford',          'FORD NEW ZEALAND',        false),
+    ( 4, 'Nissan',        'NISSAN',                  true),
+    ( 5, 'BMW',           'BMW',                     true),
+    ( 6, 'Audi',          'AUDI',                    true),
+    ( 7, 'Mercedes-Benz', 'MERCEDES',                true),
+    ( 7, 'Mercedes-Benz', 'MERCEDES BENZ',           false),
+    ( 8, 'Subaru',        'SUBARU',                  true),
+    -- Three rows and one colour, and only in the Brazilian paint lines. It was
+    -- invisible until this file stopped building the make list from systems
+    -- 75, 79 and 41 alone: a make that appears in no other line had no row
+    -- here, so 20_subset's join dropped every link it had.
+    ( 8, 'Subaru',        'SUBARU JAPAO',            false),
+    ( 9, 'Jeep',          'JEEP',                    true),
+    ( 9, 'Jeep',          'BEIJING JEEP',            false),
+    (10, 'Fiat',          'FIAT',                    true),
+    (11, 'Volkswagen',    'VOLKSWAGEN',              true),
+    (11, 'Volkswagen',    'VOLKSWAGEN BRAZIL',       false),
+    -- Row for row identical to VOLKSWAGEN BRAZIL, and every colour in it is
+    -- already under AUDI. Listed anyway so that a future extract that makes
+    -- them differ does not quietly lose the difference; SELECT DISTINCT in
+    -- 20_subset means carrying it costs nothing today.
+    (11, 'Volkswagen',    'VOLKSWAGEN / AUDI',       false),
+    (12, 'Kia',           'KIA',                     true),
+    (12, 'Kia',           'KIA MOTORS',              false),
+    (13, 'Mitsubishi',    'MITSUBISHI',              true);
 
--- Every override must name a make that exists, or the extract changed under us.
+-- Deliberate omissions, written down so the guard below can tell them from an
+-- oversight. A name here is a name somebody decided not to sell.
+CREATE TEMP TABLE excluded (db_name text, why text);
+INSERT INTO excluded VALUES
+    ('BMW MOTOR',        'motorcycles: a different code space'),
+    ('MERCEDES TRUCKS',  'lorries, not cars'),
+    ('VOLKSWAGEN TRUCK', 'lorries, not cars');
+
+-- ---------------------------------------------------------------------------
+-- Guards. All three run before anything is built.
+-- ---------------------------------------------------------------------------
+
+-- Every name in the allow-list must exist in this extract, or the extract
+-- changed under us and a brand is now silently half its size.
 DO $$
 DECLARE missing text;
 BEGIN
-    SELECT string_agg(o.db_name, ', ') INTO missing
-    FROM override o LEFT JOIN colour.make m USING (db_name)
-    WHERE m.make_id IS NULL;
+    SELECT string_agg(b.db_name, ', ' ORDER BY b.db_name) INTO missing
+    FROM brand b
+    WHERE NOT EXISTS (SELECT 1 FROM vehicle_color_lookup v WHERE v.make = b.db_name);
     IF missing IS NOT NULL THEN
-        RAISE EXCEPTION 'overrides name makes that are not in this extract: %', missing;
+        RAISE EXCEPTION 'allow-list names makes that are not in this extract: %', missing;
     END IF;
 END $$;
 
-UPDATE colour.make m SET
-    label      = coalesce(o.label, m.label),
-    is_vehicle = o.is_vehicle,
-    sort_key   = o.sort_key
-FROM override o WHERE o.db_name = m.db_name;
+-- Exactly one leader per brand, or the grouping has no fixed point.
+DO $$
+DECLARE bad text;
+BEGIN
+    SELECT string_agg(label || ' (' || n || ')', ', ') INTO bad
+    FROM (SELECT label, count(*) FILTER (WHERE lead) AS n FROM brand GROUP BY label) s
+    WHERE n <> 1;
+    IF bad IS NOT NULL THEN
+        RAISE EXCEPTION 'brands without exactly one lead row: %', bad;
+    END IF;
+END $$;
+
+-- The one that earns its keep. If the extract ever grows a FORD EUROPE or a
+-- MITSUBISHI FUSO, this fails the build rather than letting the new spelling
+-- fall off the edge of the catalogue unannounced. Word boundaries, so
+-- FLEETOWNER SLOVAKIA does not answer to KIA.
+DO $$
+DECLARE strays text;
+BEGIN
+    SELECT string_agg(s.make, ', ' ORDER BY s.make) INTO strays
+    FROM (SELECT DISTINCT make FROM vehicle_color_lookup) s
+    WHERE s.make ~ ('\m(' || 'TOYOTA|CHEVROLET|FORD|NISSAN|BMW|AUDI|MERCEDES'
+                           || '|SUBARU|JEEP|FIAT|VOLKSWAGEN|KIA|MITSUBISHI' || ')\M')
+      AND NOT EXISTS (SELECT 1 FROM brand    b WHERE b.db_name = s.make)
+      AND NOT EXISTS (SELECT 1 FROM excluded e WHERE e.db_name = s.make);
+    IF strays IS NOT NULL THEN
+        RAISE EXCEPTION E'this extract spells one of the thirteen brands a way nobody has ruled on: %\n'
+            'Add it to brand (to sell it) or to excluded (not to), in sql/10_makes.sql.', strays;
+    END IF;
+END $$;
+
+-- ---------------------------------------------------------------------------
+-- Build
+-- ---------------------------------------------------------------------------
+
+-- make_id is assigned by name, so rebuilding the same extract gives the same
+-- ids and an export can be diffed against the one before it.
+INSERT INTO colour.make (make_id, db_name, group_id, label, is_vehicle, sort_key)
+SELECT row_number() OVER (ORDER BY b.db_name)::smallint,
+       b.db_name,
+       0,                -- set below, once every row has an id
+       b.label, true, b.sort_key
+FROM brand b;
 
 UPDATE colour.make m SET group_id = leader.make_id
-FROM override o JOIN colour.make leader ON leader.db_name = o.group_of
-WHERE o.db_name = m.db_name AND o.group_of IS NOT NULL;
+FROM brand b
+JOIN brand lb      ON lb.label = b.label AND lb.lead
+JOIN colour.make leader ON leader.db_name = lb.db_name
+WHERE b.db_name = m.db_name;
 
--- A group's label is its leader's. Members keep their own row (the join needs
--- it) but never show it, so make them agree rather than leaving a stale value.
-UPDATE colour.make m SET label = leader.label, sort_key = leader.sort_key
-FROM colour.make leader
-WHERE m.group_id = leader.make_id AND m.make_id <> leader.make_id;
-
--- A group leader must be its own group, or api.makes() would drop the group.
+-- A group leader must be its own group, or api.makes() would drop the brand.
 DO $$
 DECLARE orphans int;
 BEGIN
@@ -225,6 +169,14 @@ BEGIN
     IF orphans > 0 THEN
         RAISE EXCEPTION '% makes point at a group whose leader is itself grouped', orphans;
     END IF;
+END $$;
+
+-- Thirteen groups, no more and no fewer.
+DO $$
+DECLARE n int;
+BEGIN
+    SELECT count(*) INTO n FROM colour.make WHERE make_id = group_id;
+    IF n <> 13 THEN RAISE EXCEPTION 'expected 13 brands, built %', n; END IF;
 END $$;
 
 CREATE INDEX make_group_idx ON colour.make (group_id);
