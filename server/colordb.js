@@ -169,6 +169,10 @@ const OUTAGE_CODES = new Set(['57P01', '57P02', '57P03', '53300', '53400', '3D00
 /* Failures where the connection was never made, so nothing ran on the server
  * and asking again is both safe and likely to work.
  *
+ * Retrying is safe for every one of them: this module only ever reads, and it
+ * reads in a session the grants have already made read-only, so running a
+ * query twice cannot do anything a caller has to know about.
+ *
  * DNS is the one that actually bit us: this machine briefly stopped resolving
  * the Neon host, every lookup failed, and because pg-pool's own timeout error
  * carries no `code` and does not say "timeout expired", classify() did not
@@ -184,6 +188,17 @@ const TRANSIENT_CODES = new Set([
     'EHOSTUNREACH',
     'ENETUNREACH',
     'EPIPE',
+    // Neon parks the compute when nobody has asked it anything, and wakes it
+    // on the next connection. A pooled connection that was open across the
+    // nap comes back 57P01 ("terminating connection due to administrator
+    // command"), and one that arrives while it is still waking gets 57P03.
+    // Both were already treated as an outage, so the page fell back to the
+    // 777-colour local catalogue -- correct, and a waste: the second attempt
+    // lands on a woken server and returns the real answer. Seen twice in a
+    // row running colordb:verify against an idle database.
+    '57P01',         // admin shutdown: the server closed this connection
+    '57P02',         // crash shutdown
+    '57P03',         // cannot connect now: the server is still starting up
 ]);
 
 function transient(err) {
