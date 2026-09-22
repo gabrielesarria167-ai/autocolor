@@ -139,14 +139,13 @@
     var FINISH_OF = { s: "solido", m: "metalico", p: "perlado", t: "tricapa", u: null };
 
     var state = {
-        // 'code' | 'reading' | 'in_person' — cómo se identificó el color.
+        // 'code' | 'in_person' — cómo se identificó el color.
         method: "code",
         // El color encontrado, con su marca, código, nombre y acabado. En el
         // camino del taller se queda en null y así viaja al servidor.
         colour: null,
-        // La medición que se escribió en la lectura digital, para poder
-        // contarla en el resumen y en el correo: es lo que el taller usará
-        // para ajustar la fórmula.
+        // Se conserva por compatibilidad con el servidor, que aún acepta una
+        // lectura CIELAB; la página ya no la pide, así que viaja siempre null.
         reading: null,
         // Whether the colour was picked from the finder's list rather than
         // read off the label. It travels as method 'model', so the shop
@@ -175,17 +174,12 @@
     var methodTabs = Array.prototype.slice.call(document.querySelectorAll(".method-tabs .view-tab"));
     var methodPanels = {
         code: document.getElementById("methodPanelCode"),
-        reading: document.getElementById("methodPanelReading"),
         in_person: document.getElementById("methodPanelShop")
     };
 
     var brandSelect = document.getElementById("colorBrand");
     var codeInput = document.getElementById("colorCode");
     var codeSearchBtn = document.getElementById("colorSearch");
-    var readingL = document.getElementById("readingL");
-    var readingA = document.getElementById("readingA");
-    var readingB = document.getElementById("readingB");
-    var readingSearchBtn = document.getElementById("readingSearch");
 
     var colourCard = document.getElementById("colourCard");
     var colourSwatch = document.getElementById("colourSwatch");
@@ -287,13 +281,10 @@
             if (state.colour && !state.colour.finish) {
                 first = colourFinishPick ? colourFinishPick.querySelector(".finish-chip") : null;
                 setStepHint("Elige el acabado para poder cotizar el color.");
-            } else if (state.method === "code") {
+            } else {
                 need(!!brandSelect.value, brandSelect);
                 need(codeInput.value.trim() !== "", codeInput);
                 setStepHint("Busca tu código de color para continuar.");
-            } else {
-                first = readingL;
-                setStepHint("Busca la coincidencia de tu lectura para continuar.");
             }
         } else if (step === 2) {
             first = sizeCards.querySelector(".size-card");
@@ -431,9 +422,19 @@
         if (colourAlias) colourAlias.hidden = true;
         if (colourFinishPick) colourFinishPick.hidden = true;
         if (colourMiss) colourMiss.hidden = true;
-        // the grid's selection mark follows the card. renderFinder() and not
-        // requestFinder(): this only repaints what is loaded.
-        if (finder && !finder.hidden) renderFinder();
+        if (finderState.pinned) {
+            // The finder was pinned to the versions of a code that no longer
+            // matches (the field was edited or cleared). Drop them and go back
+            // to the brand's own colours, so the list is reachable again
+            // instead of stuck on the old variants.
+            finderState.pinned = false;
+            if (finder && !finder.hidden) resetFinderPaging();
+            else { finderState.rows = []; finderState.hasMore = false; }
+        } else if (finder && !finder.hidden) {
+            // the grid's selection mark follows the card. renderFinder() and
+            // not requestFinder(): this only repaints what is loaded.
+            renderFinder();
+        }
     }
 
     function showColour(colour, quality) {
@@ -550,7 +551,7 @@
 
     function missMessage(brandName, code) {
         return "No tenemos «" + code.toUpperCase() + "» entre los colores de " + brandName +
-            ". Revisa el código en la etiqueta, o usa la lectura digital o el taller: " +
+            ". Revisa el código en la etiqueta, o tráelo al taller: " +
             "los colores que no están en la lista los preparamos midiendo la pieza.";
     }
 
@@ -622,6 +623,7 @@
                 finderState.rows = items;
                 finderState.hasMore = false;
                 finderState.error = "";
+                finderState.pinned = true;
                 if (finder && finder.hidden) {
                     finder.hidden = false;
                     finderToggle.setAttribute("aria-expanded", "true");
@@ -708,7 +710,9 @@
     var finderGrid = document.getElementById("finderGrid");
     var finderMore = document.getElementById("finderMore");
     var finderWiden = document.getElementById("finderWiden");
-    var finderState = { family: "", from: 0, rows: [], hasMore: false, error: "" };
+    // `pinned` marks the grid as holding a code's versions (from searchByCode)
+    // rather than a browse, so clearing the code can put the browse back.
+    var finderState = { family: "", from: 0, rows: [], hasMore: false, error: "", pinned: false };
 
     function setSwatch(el, hex) {
         // A colour with no chip in the guides gets a hatch, not a guessed
@@ -973,7 +977,7 @@
         var brandName = makeLabel(brandSelect.value);
         if (finderState.rows.length === 0) {
             return "No encontramos colores de " + brandName + " para esa combinación." +
-                " Prueba otro año o quita el modelo, o usa la lectura digital o el taller.";
+                " Prueba otro año o quita el modelo, o tráelo al taller.";
         }
         if (shown === 0) return "Ningún color de los cargados coincide con el filtro.";
 
@@ -1011,6 +1015,7 @@
         finderState.rows = [];
         finderState.hasMore = false;
         finderState.error = "";
+        finderState.pinned = false;
         requestFinder();
     }
 
@@ -1081,67 +1086,6 @@
     } else if (finderToggle) {
         finderToggle.hidden = true;
     }
-
-    // Lectura digital: tres números, el catálogo ordenado por distancia y el
-    // primero enseñado con lo cerca que queda.
-    function parseReading(input, min, max) {
-        var raw = input.value.trim().replace(",", ".");
-        if (raw === "") return null;
-        var value = Number(raw);
-        if (!isFinite(value) || value < min || value > max) return null;
-        return value;
-    }
-
-    function searchByReading() {
-        if (!PAINTS) return;
-        var L = parseReading(readingL, 0, 100);
-        var a = parseReading(readingA, -128, 128);
-        var b = parseReading(readingB, -128, 128);
-
-        [[readingL, L], [readingA, a], [readingB, b]].forEach(function (pair) {
-            setFieldValidity(pair[0], null, pair[1] !== null);
-        });
-
-        if (L === null || a === null || b === null) {
-            showMiss("Revisa los tres valores: L* va de 0 a 100, y a* y b* de -128 a 128.");
-            var firstBad = L === null ? readingL : (a === null ? readingA : readingB);
-            firstBad.focus();
-            return;
-        }
-
-        var reading = { L: L, a: a, b: b };
-        var matches = PAINTS.nearest(reading, 1);
-        if (matches.length === 0) {
-            showMiss("No pudimos comparar la lectura con el catálogo. Tráenos la pieza y la medimos aquí.");
-            return;
-        }
-
-        state.reading = reading;
-        var match = matches[0];
-        showColour(match, PAINTS.matchQuality(match.delta));
-        // Lo que se le promete a quien mide con su propio equipo: el catálogo
-        // da un punto de partida, no una fórmula aprobada.
-        colourNote.textContent = "ΔE " + match.delta.toFixed(1) + " respecto de tu lectura. " +
-            "Partimos de esta fórmula y la ajustamos con plancha de prueba antes de entregar.";
-    }
-
-    if (readingSearchBtn) readingSearchBtn.addEventListener("click", searchByReading);
-
-    [readingL, readingA, readingB].forEach(function (input) {
-        if (!input) return;
-        input.addEventListener("input", function () {
-            // Números con signo y un decimal: lo que entrega el equipo.
-            var cleaned = input.value.replace(/[^0-9.,-]/g, "");
-            if (cleaned !== input.value) input.value = cleaned;
-            clearColour();
-        });
-        input.addEventListener("keydown", function (e) {
-            if (e.key === "Enter") {
-                e.preventDefault();
-                searchByReading();
-            }
-        });
-    });
 
     /* ---------------------------------------------------------------------
        Paso 2 — el envase
@@ -1372,7 +1316,6 @@
     var METHOD_LABELS = {
         code: "Por código de color",
         model: "Elegido por modelo y año",
-        reading: "Lectura digital",
         in_person: "Lectura en el taller"
     };
 
@@ -1389,13 +1332,6 @@
             colourRows.push({ label: "Código", value: codeLabel(state.colour), code: true });
             colourRows.push({ label: "Color", value: state.colour.name });
             colourRows.push({ label: "Acabado", value: PAINTS.finishLabel(state.colour.finish) });
-            if (state.reading) {
-                colourRows.push({
-                    label: "Tu lectura",
-                    value: "L* " + state.reading.L + " · a* " + state.reading.a + " · b* " + state.reading.b,
-                    code: true
-                });
-            }
             swatch = document.createElement("span");
             swatch.className = "summary__swatch";
             setSwatch(swatch, state.colour.hex);
@@ -1614,10 +1550,6 @@
         brandSelect.value = "";
         brandSelect.classList.add("is-placeholder");
         codeInput.value = "";
-        [readingL, readingA, readingB].forEach(function (input) {
-            input.value = "";
-            setFieldValidity(input, null, true);
-        });
 
         Array.prototype.forEach.call(sizeCards.querySelectorAll(".size-card"), function (card) {
             card.classList.remove("is-selected");
