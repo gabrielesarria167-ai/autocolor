@@ -700,6 +700,14 @@ function paintCustomerMessage(created, data) {
             : ['Recibimos tu pedido de matizado. Preparamos la fórmula y te avisamos',
                'en cuanto esté lista para recoger.']),
         '',
+        // El paso siguiente lo damos nosotros: escribimos por WhatsApp dentro
+        // de 24 h para coordinar la cita o la entrega y afinar los detalles.
+        ...(inPerson
+            ? ['Te escribimos por WhatsApp dentro de las próximas 24 horas para',
+               'coordinar la cita y ver los detalles.']
+            : ['Te escribimos por WhatsApp dentro de las próximas 24 horas para',
+               'coordinar la entrega y ver los detalles.']),
+        '',
     ];
 
     // Sin color ni envase todavía, el bloque no puede llamarse «tu pedido»: lo

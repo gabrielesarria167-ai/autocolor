@@ -1546,11 +1546,17 @@
     function showSuccess(id) {
         if (successCode) successCode.textContent = id || "";
         if (successLead) {
-            successLead.textContent = skipsQuantity()
-                ? "Te esperamos en el taller con el vehículo o la pieza. Te enviamos el código por correo a " +
-                  emailInput.value.trim() + "."
-                : "Estamos preparando tu matizado. Te enviamos el código por correo a " +
-                  emailInput.value.trim() + ".";
+            var isVisit = skipsQuantity();
+            var lead = isVisit
+                ? "Te esperamos en el taller con el vehículo o la pieza."
+                : "Estamos preparando tu matizado.";
+            // Lo que de verdad cierra el pedido: dentro de 24 h escribimos por
+            // WhatsApp al teléfono para coordinar la cita o la entrega.
+            lead += " Te escribimos por WhatsApp dentro de 24 h para coordinar " +
+                (isVisit ? "la cita" : "la entrega") + " y los detalles.";
+            var email = emailInput.value.trim();
+            if (email) lead += " También te enviamos el código por correo a " + email + ".";
+            successLead.textContent = lead;
         }
 
         progressNav.hidden = true;

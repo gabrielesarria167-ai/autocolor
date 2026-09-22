@@ -702,8 +702,8 @@ function paintCustomerHtml(created, data, ctx) {
             <div class="c-ink" style="font-family:${DISPLAY}; font-size:32px; line-height:40px; color:${INK}; font-weight:500; padding-top:14px;">${escapeHtml(headline)}</div>
             <div class="c-body" style="font-family:${FONT}; font-size:16px; line-height:26px; color:${BODY}; padding-top:14px;">
               ${inPerson
-                ? 'Trae el vehículo o una pieza suelta y medimos el color con el espectrofotómetro delante de ti. Con el color aprobado decidimos ahí mismo el envase y el precio.'
-                : 'Preparamos la fórmula y te avisamos en cuanto esté lista para recoger. El color se aprueba con plancha de prueba antes de entregarlo.'}
+                ? 'Trae el vehículo o una pieza suelta y medimos el color con el espectrofotómetro delante de ti. Con el color aprobado decidimos ahí mismo el envase y el precio. Te escribimos por WhatsApp dentro de las próximas 24&nbsp;horas para coordinar la cita y ver los detalles.'
+                : 'Preparamos la fórmula y te avisamos en cuanto esté lista para recoger. El color se aprueba con plancha de prueba antes de entregarlo. Te escribimos por WhatsApp dentro de las próximas 24&nbsp;horas para coordinar la entrega y ver los detalles.'}
             </div>
           </td>
         </tr>
