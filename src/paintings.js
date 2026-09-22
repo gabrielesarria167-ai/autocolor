@@ -1442,10 +1442,18 @@
             if (total !== null) summaryTotal.textContent = PAINTS.formatSoles(total);
         }
         if (summaryLegal) {
+            // El aviso del envío depende de si dejaron correo: el WhatsApp
+            // siempre sale (el teléfono es obligatorio), el correo solo si lo
+            // escribieron. «código de la visita» / «código del pedido» según
+            // haya precio o no.
+            var hasEmail = emailInput.value.trim() !== "";
+            var codeWord = total === null ? "de la visita" : "del pedido";
+            var send = "Al confirmar te escribimos por WhatsApp dentro de 24 h con el código " +
+                codeWord + (hasEmail ? ", y te lo enviamos también por correo" : "") + ".";
             summaryLegal.textContent = total === null
-                ? "Al confirmar te enviamos el código de la visita por correo y quedas en nuestra agenda."
-                : "Precio referencial, sin IGV. Al confirmar te enviamos el código del pedido por correo; " +
-                  "el taller cierra el precio al matizar el color.";
+                ? send + " Quedas en nuestra agenda."
+                : "Precio referencial, sin IGV. " + send +
+                  " El taller cierra el precio al matizar el color.";
         }
     }
 
