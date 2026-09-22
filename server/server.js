@@ -337,7 +337,6 @@ const MAX_UNITS = 20;
 // mande un número absurdo al campo que el mostrador va a leer como «esto se le
 // prometió en pantalla».
 const MAX_PAINT_PRICE = 100_000;
-const RUC_RE = /^(10|15|17|20)[0-9]{9}$/;
 
 /** Un valor de la lectura CIELAB, o null si el pedido no trae medición. */
 function labValue(value, { min, max, field }) {
@@ -396,16 +395,13 @@ function validatePaintOrder(body) {
     const price = inPerson ? null
         : integer(body.price, { min: 0, max: MAX_PAINT_PRICE, field: 'el precio' });
 
-    const ruc = text(body.ruc, { max: 11, required: true, field: 'el RUC' });
-    if (!RUC_RE.test(ruc)) throw new BadRequest('El RUC no es válido.');
-
     const phone = text(body.phone, { max: 20, required: true, field: 'el teléfono' });
     if (!PHONE_RE.test(phone)) throw new BadRequest('El teléfono debe tener 9 dígitos.');
 
-    // Obligatorio y no opcional como en `requests`: el código del pedido sale
-    // por correo, y sin él el cliente se queda sin su comprobante.
-    const email = text(body.email, { max: 254, required: true, field: 'el email' });
-    if (!EMAIL_RE.test(email)) throw new BadRequest('El email no es válido.');
+    // Opcional: si lo dejan, ahí mandamos el código del pedido; si no, el
+    // taller se lo entrega por WhatsApp con el teléfono, que sí es obligatorio.
+    const email = text(body.email, { max: 254, field: 'el email' });
+    if (email && !EMAIL_RE.test(email)) throw new BadRequest('El email no es válido.');
 
     return {
         method: body.method,
@@ -418,14 +414,14 @@ function validatePaintOrder(body) {
         size: inPerson ? null : body.size,
         units,
         price,
-        company: text(body.company, { max: 120, required: true, field: 'la razón social', agree: 'f' }),
-        ruc,
+        company: text(body.company, { max: 120, required: true, field: 'el nombre del taller' }),
+        ruc: null,
         firstName: text(body.firstName, { max: 80, required: true, field: 'el nombre' }),
         lastName: text(body.lastName, { max: 80, required: true, field: 'el apellido' }),
-        department: text(body.department, { max: 80, required: true, field: 'el departamento' }),
-        province: text(body.province, { max: 80, required: true, field: 'la provincia', agree: 'f' }),
+        department: null,
+        province: null,
         phone,
-        email,
+        email: email || null,
         notes: text(body.notes, { max: 2000, field: 'las notas', agree: 'fp' }),
     };
 }

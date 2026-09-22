@@ -210,12 +210,8 @@
 
     var companyForm = document.getElementById("companyForm");
     var companyName = document.getElementById("companyName");
-    var companyRuc = document.getElementById("companyRuc");
-    var companyRucError = document.getElementById("companyRucError");
     var firstNameInput = document.getElementById("firstName");
     var lastNameInput = document.getElementById("lastName");
-    var departmentSelect = document.getElementById("department");
-    var provinceSelect = document.getElementById("province");
     var phoneInput = document.getElementById("phone");
     var phoneError = document.getElementById("phoneError");
     var emailInput = document.getElementById("email");
@@ -231,11 +227,6 @@
     var PHONE_PATTERN = /^[0-9]{9}$/;
     var EMAIL_DISALLOWED = /[^a-zA-Z0-9._%+@-]/g;
     var EMAIL_PATTERN = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-    // RUC peruano: once dígitos que empiezan por el tipo de contribuyente. 20
-    // es el de las personas jurídicas —lo normal aquí—, pero 10, 15 y 17
-    // también compran, así que se aceptan los cuatro y se rechaza el resto,
-    // que es un número que SUNAT no emitiría.
-    var RUC_PATTERN = /^(10|15|17|20)[0-9]{9}$/;
 
     /* ---------------------------------------------------------------------
        Pie del asistente: el botón dice qué falta en vez de apagarse
@@ -270,13 +261,10 @@
         if (step === 2) return !!state.size;
         if (step === 3) {
             return companyName.value.trim() !== "" &&
-                RUC_PATTERN.test(companyRuc.value) &&
                 firstNameInput.value.trim() !== "" &&
                 lastNameInput.value.trim() !== "" &&
-                !!departmentSelect.value &&
-                !!provinceSelect.value &&
                 PHONE_PATTERN.test(phoneInput.value) &&
-                EMAIL_PATTERN.test(emailInput.value);
+                (emailInput.value === "" || EMAIL_PATTERN.test(emailInput.value));
         }
         return true;
     }
@@ -312,21 +300,14 @@
             setStepHint("Elige un envase para continuar.");
         } else if (step === 3) {
             need(companyName.value.trim() !== "", companyName);
-            var rucOk = RUC_PATTERN.test(companyRuc.value);
-            setFieldValidity(companyRuc, companyRucError, rucOk,
-                "Ingresa los 11 dígitos del RUC, por ejemplo 20123456789.");
-            need(rucOk, companyRuc);
             need(firstNameInput.value.trim() !== "", firstNameInput);
             need(lastNameInput.value.trim() !== "", lastNameInput);
-            need(!!departmentSelect.value, departmentSelect);
-            need(!!provinceSelect.value, provinceSelect);
             var phoneOk = PHONE_PATTERN.test(phoneInput.value);
             setFieldValidity(phoneInput, phoneError, phoneOk, "Ingresa " + PHONE_DIGITS + " dígitos después de +51.");
             need(phoneOk, phoneInput);
-            var emailOk = EMAIL_PATTERN.test(emailInput.value);
-            setFieldValidity(emailInput, emailError, emailOk, emailInput.value === ""
-                ? "Escribe tu email: ahí te enviamos el código del pedido."
-                : "Ingresa un email válido, por ejemplo nombre@dominio.com.");
+            var emailOk = emailInput.value === "" || EMAIL_PATTERN.test(emailInput.value);
+            setFieldValidity(emailInput, emailError, emailOk,
+                "Ingresa un email válido, por ejemplo nombre@dominio.com.");
             need(emailOk, emailInput);
             setStepHint("Completa los datos marcados para continuar.");
         }
@@ -1302,63 +1283,6 @@
        Paso 3 — la empresa
        --------------------------------------------------------------------- */
 
-    function sortEs(list) {
-        return list.slice().sort(function (a, b) { return a.localeCompare(b, "es"); });
-    }
-
-    function populateProvinceOptions(department) {
-        if (!provinceSelect) return;
-        provinceSelect.innerHTML = '<option value="" selected disabled hidden>Selecciona tu provincia</option>';
-        provinceSelect.disabled = !department;
-        provinceSelect.classList.add("is-placeholder");
-        if (!department || typeof PERU_DEPARTMENTS === "undefined") return;
-        sortEs(PERU_DEPARTMENTS[department] || []).forEach(function (name) {
-            var opt = document.createElement("option");
-            opt.value = name;
-            opt.textContent = name;
-            provinceSelect.appendChild(opt);
-        });
-    }
-
-    if (departmentSelect && typeof PERU_DEPARTMENTS !== "undefined") {
-        sortEs(Object.keys(PERU_DEPARTMENTS)).forEach(function (department) {
-            var opt = document.createElement("option");
-            opt.value = department;
-            opt.textContent = department;
-            departmentSelect.appendChild(opt);
-        });
-        populateProvinceOptions("");
-
-        departmentSelect.addEventListener("change", function () {
-            departmentSelect.classList.toggle("is-placeholder", departmentSelect.value === "");
-            populateProvinceOptions(departmentSelect.value);
-            refreshConfirm();
-        });
-    }
-
-    if (provinceSelect) {
-        provinceSelect.addEventListener("change", function () {
-            provinceSelect.classList.toggle("is-placeholder", provinceSelect.value === "");
-            refreshConfirm();
-        });
-    }
-
-    if (companyRuc) {
-        companyRuc.addEventListener("input", function () {
-            var digits = companyRuc.value.replace(/\D/g, "").slice(0, 11);
-            if (digits !== companyRuc.value) companyRuc.value = digits;
-            if (companyRuc.closest(".field").classList.contains("field--invalid") && RUC_PATTERN.test(digits)) {
-                setFieldValidity(companyRuc, companyRucError, true);
-            }
-            refreshConfirm();
-        });
-        companyRuc.addEventListener("blur", function () {
-            if (companyRuc.value === "") return;
-            setFieldValidity(companyRuc, companyRucError, RUC_PATTERN.test(companyRuc.value),
-                "Ingresa los 11 dígitos del RUC, por ejemplo 20123456789.");
-        });
-    }
-
     if (phoneInput) {
         phoneInput.addEventListener("input", function () {
             var digits = phoneInput.value.replace(/\D/g, "").slice(0, PHONE_DIGITS);
@@ -1504,11 +1428,8 @@
 
         // La empresa ---------------------------------------------------
         summaryBox.appendChild(summaryBlock("La empresa", 3, [
-            { label: "Razón social", value: companyName.value.trim() },
-            { label: "RUC", value: companyRuc.value.trim(), code: true },
+            { label: "Nombre taller", value: companyName.value.trim() },
             { label: "Contacto", value: firstNameInput.value.trim() + " " + lastNameInput.value.trim() },
-            { label: "Zona", value: provinceSelect.value && departmentSelect.value
-                ? provinceSelect.value + ", " + departmentSelect.value : "" },
             { label: "Teléfono", value: "+51 " + phoneInput.value, code: true },
             { label: "Email", value: emailInput.value.trim() },
             { label: "Notas", value: notesInput.value.trim() }
@@ -1575,11 +1496,8 @@
             // el servidor no lo recalcula y la página lo llama referencial.
             price: skipsQuantity() ? null : orderTotalAmount(),
             company: companyName.value,
-            ruc: companyRuc.value,
             firstName: firstNameInput.value,
             lastName: lastNameInput.value,
-            department: departmentSelect.value,
-            province: provinceSelect.value,
             phone: "+51" + phoneInput.value.replace(/\D/g, ""),
             email: emailInput.value,
             notes: notesInput.value
@@ -1694,17 +1612,13 @@
         renderOrderBar();
 
         companyForm.reset();
-        [companyRuc, phoneInput, emailInput].forEach(function (input) {
+        [phoneInput, emailInput].forEach(function (input) {
             var field = input.closest(".field");
             if (field) field.classList.remove("field--invalid");
             input.removeAttribute("aria-invalid");
         });
-        companyRucError.hidden = true;
         phoneError.hidden = true;
         emailError.hidden = true;
-        departmentSelect.value = "";
-        departmentSelect.classList.add("is-placeholder");
-        populateProvinceOptions("");
         setSubmitError("");
         if (successCode) successCode.textContent = "··········";
 

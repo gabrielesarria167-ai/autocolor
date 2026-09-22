@@ -15,7 +15,6 @@
     <link rel="apple-touch-icon" href="../imgs/brand/apple-touch-icon.png">
     <link rel="stylesheet" href="../styles.css">
     <script src="../src/config.js" defer></script>
-    <script src="../src/cities.js" defer></script>
     <script src="../src/carModels.js" defer></script>
     <script src="../src/colourIndex.js" defer></script>
     <script src="../src/paintCatalog.js" defer></script>
@@ -354,13 +353,13 @@
              Paso 3 — la empresa
 
              El pedido lo hace un taller, una concesionaria o una
-             empresa, así que el RUC no es un extra: es lo que permite
-             emitir la factura y lo que identifica al comprador cuando
-             el mismo taller manda a dos personas distintas.
+             empresa. Basta el nombre del taller y un contacto: con eso
+             se prepara el matizado y se sabe a quién llamar cuando está
+             listo. El teléfono es obligatorio; el email quedó opcional.
              ========================================================== -->
         <section class="step" data-step="3" hidden>
             <h1>¿A nombre de quién va el pedido?</h1>
-            <p class="step__subtitle">Con estos datos preparamos el matizado y emitimos la factura.</p>
+            <p class="step__subtitle">Con estos datos preparamos el matizado y te avisamos cuando esté listo.</p>
 
             <form class="company-form" id="companyForm" novalidate>
                 <section class="data-card">
@@ -377,18 +376,10 @@
                         Empresa
                     </h2>
 
-                    <div class="field-row field-row--wide">
-                        <div class="field">
-                            <label for="companyName">Razón social</label>
-                            <input type="text" id="companyName" maxlength="120" placeholder="Ej. Taller Los Andes S.A.C."
-                                autocomplete="organization" required>
-                        </div>
-                        <div class="field">
-                            <label for="companyRuc">RUC</label>
-                            <input type="text" id="companyRuc" inputmode="numeric" maxlength="11" placeholder="20123456789"
-                                autocomplete="off" spellcheck="false" required aria-describedby="companyRucError">
-                            <p class="field__error" id="companyRucError" role="alert" hidden></p>
-                        </div>
+                    <div class="field">
+                        <label for="companyName">Nombre taller</label>
+                        <input type="text" id="companyName" maxlength="120" placeholder="Ej. Taller Los Andes"
+                            autocomplete="organization" required>
                     </div>
                 </section>
 
@@ -419,21 +410,6 @@
 
                     <div class="field-row field-row--wide">
                         <div class="field">
-                            <label for="department">Departamento</label>
-                            <select id="department" autocomplete="address-level1" class="is-placeholder" required>
-                                <option value="" selected disabled hidden>Selecciona tu departamento</option>
-                            </select>
-                        </div>
-                        <div class="field">
-                            <label for="province">Provincia</label>
-                            <select id="province" autocomplete="address-level2" class="is-placeholder" disabled required>
-                                <option value="" selected disabled hidden>Selecciona tu provincia</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="field-row field-row--wide">
-                        <div class="field">
                             <label for="phone">Teléfono</label>
                             <div class="phone-input">
                                 <span class="phone-input__prefix" aria-hidden="true">+51</span>
@@ -444,9 +420,9 @@
                             <p class="field__error" id="phoneError" role="alert" hidden></p>
                         </div>
                         <div class="field">
-                            <label for="email">Email</label>
+                            <label for="email">Email <span class="field__optional">(opcional)</span></label>
                             <input type="email" id="email" autocomplete="email"
-                                pattern="[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}" required
+                                pattern="[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}"
                                 aria-describedby="emailError">
                             <p class="field__error" id="emailError" role="alert" hidden></p>
                         </div>

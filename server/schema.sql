@@ -283,18 +283,18 @@ CREATE TABLE IF NOT EXISTS paint_orders (
     -- counter knows what was promised on screen.
     price       integer     CHECK (price >= 0),
 
-    -- Quien compra. La razón social y el RUC son los de la factura, así que
-    -- el RUC lleva escrito su formato: once dígitos, de los tipos que emite
-    -- SUNAT (10, 15, 17 personas naturales; 20 jurídicas).
+    -- Quien compra. Basta el nombre del taller: el matizado se prepara y se
+    -- entrega en el mostrador, y la factura la cierra el taller aparte. El RUC
+    -- ya no se pide, pero la columna queda (nullable) para los pedidos viejos.
     company     text        NOT NULL CHECK (length(btrim(company)) > 0),
-    ruc         text        NOT NULL CHECK (ruc ~ '^(10|15|17|20)[0-9]{9}$'),
+    ruc         text,
 
     first_name  text        NOT NULL CHECK (length(btrim(first_name)) > 0),
     last_name   text        NOT NULL CHECK (length(btrim(last_name)) > 0),
     department  text,
     province    text,
     phone       text        NOT NULL,   -- +51 y 9 dígitos, como en `requests`
-    email       text        NOT NULL,
+    email       text,
     notes       text,
 
     -- Cinco estados y no los once de `requests`: un matizado se recibe, se
@@ -331,6 +331,15 @@ ALTER TABLE paint_orders ADD COLUMN IF NOT EXISTS sw_code text;
 ALTER TABLE paint_orders DROP CONSTRAINT IF EXISTS paint_orders_method_check;
 ALTER TABLE paint_orders ADD CONSTRAINT paint_orders_method_check
     CHECK (method IN ('code', 'model', 'reading', 'in_person'));
+
+-- El formulario dejó de pedir RUC y volvió opcional el email: basta el nombre
+-- del taller y el teléfono. En una base creada antes, `ruc` y `email` seguían
+-- siendo NOT NULL y `ruc` cargaba su CHECK de formato, así que un pedido sin
+-- esos datos daba error al guardar. Se aflojan aquí; las columnas quedan para
+-- los pedidos viejos que sí los traían.
+ALTER TABLE paint_orders DROP CONSTRAINT IF EXISTS paint_orders_ruc_check;
+ALTER TABLE paint_orders ALTER COLUMN ruc DROP NOT NULL;
+ALTER TABLE paint_orders ALTER COLUMN email DROP NOT NULL;
 
 -- Mismo trigger que `requests`, por lo mismo: cambiar el estado a mano desde
 -- psql no debe dejar la fecha desactualizada.
