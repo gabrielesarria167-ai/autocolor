@@ -674,6 +674,39 @@ function swatchBox(hex, code, name) {
             </table>`;
 }
 
+/**
+ * La muestra en grande, para el correo del cliente: una banda del color a todo
+ * el ancho con el código, el nombre y el acabado debajo. Es donde más importa
+ * que el color se vea —era lo que salía en blanco cuando venía de la base
+ * nueva— así que ocupa su propio bloque en vez de un cuadro de 64 px.
+ *
+ * Sin hex la banda se cambia por un aviso, y el bloque se arma igual.
+ */
+function swatchHero(hex, code, name, finish) {
+    const band = hex
+        ? `<td height="120" bgcolor="${escapeHtml(hex)}" style="height:120px; background-color:${escapeHtml(hex)}; font-size:0; line-height:0;">&nbsp;</td>`
+        : `<td height="120" align="center" valign="middle" bgcolor="#f3f4f7" style="height:120px; background-color:#f3f4f7; font-family:${FONT}; font-size:13px; line-height:18px; color:${MUTED};">La muestra de este color se aprueba en el taller</td>`;
+    const chip = finish
+        ? `<td align="right" valign="middle" style="font-family:${LABEL}; font-size:11px; letter-spacing:1.5px; color:${MUTED}; text-transform:uppercase; white-space:nowrap;">${escapeHtml(finish)}</td>`
+        : '';
+    return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid ${LINE};">
+              <tr>${band}</tr>
+              <tr>
+                <td style="border-top:1px solid ${LINE}; padding:16px 20px;">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                    <tr>
+                      <td valign="middle">
+                        <div class="c-ink" style="font-family:${LABEL}; font-size:20px; line-height:24px; letter-spacing:1.5px; color:${INK}; font-weight:bold;">${escapeHtml(code)}</div>
+                        <div class="c-body" style="font-family:${FONT}; font-size:16px; line-height:22px; color:${BODY}; padding-top:3px;">${escapeHtml(name)}</div>
+                      </td>
+                      ${chip}
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>`;
+}
+
 function paintCustomerHtml(created, data, ctx) {
     const name = ctx.oneLine(data.firstName);
     const inPerson = data.method === 'in_person';
@@ -683,7 +716,7 @@ function paintCustomerHtml(created, data, ctx) {
         : (name ? `${name}, estamos preparando tu matizado.` : 'Estamos preparando tu matizado.');
 
     const summary = summaryRows([
-        { label: 'Empresa', value: ctx.oneLine(data.company) },
+        { label: 'Nombre taller', value: ctx.oneLine(data.company) },
         { label: 'Color', value: inPerson ? 'Se mide en el taller' : ctx.colourName(data) },
         { label: 'Acabado', value: ctx.finishLabel(data.finish) },
         { label: 'Envase', value: ctx.orderLine(data) },
@@ -710,7 +743,7 @@ function paintCustomerHtml(created, data, ctx) {
 ${data.colorCode ? `
         <tr>
           <td class="px" style="padding:28px 48px 0 48px;">
-            ${swatchBox(hex, `${ctx.oneLine(data.brand)} ${ctx.oneLine(data.colorCode)}`.trim(), ctx.oneLine(data.colorName))}
+            ${swatchHero(hex, `${ctx.oneLine(data.brand)} ${ctx.oneLine(data.colorCode)}`.trim(), ctx.oneLine(data.colorName), ctx.finishLabel(data.finish))}
             <div class="c-muted" style="font-family:${FONT}; font-size:13px; line-height:20px; color:${MUTED}; padding-top:12px;">La muestra es referencial: una pantalla no reproduce un metálico ni un perlado.</div>
           </td>
         </tr>` : ''}
@@ -780,8 +813,7 @@ function paintShopHtml(created, data, ctx) {
     const hex = ctx.colourHex(data);
 
     const contactRows = detailRows([
-        { label: 'Empresa', value: ctx.oneLine(data.company) },
-        { label: 'RUC', value: ctx.oneLine(data.ruc), html: `<span style="font-family:${LABEL}; letter-spacing:1px;">${escapeHtml(ctx.oneLine(data.ruc))}</span>` },
+        { label: 'Nombre taller', value: ctx.oneLine(data.company) },
         { label: 'Contacto', value: fullName },
         {
             label: 'Teléfono',
@@ -793,7 +825,6 @@ function paintShopHtml(created, data, ctx) {
             value: email,
             html: `<a href="mailto:${escapeHtml(email)}" style="color:${ACCENT}; text-decoration:none;">${escapeHtml(email)}</a>`,
         },
-        { label: 'Zona', value: ctx.zoneLabel(data) },
     ]);
 
     const orderRows = detailRows([

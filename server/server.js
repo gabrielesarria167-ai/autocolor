@@ -1487,6 +1487,11 @@ async function confirmColour(data) {
             + ` llegó "${data.colorName}", la base dice "${colour.name}"`);
         data.colorName = colour.name;
     }
+    // La muestra del correo. Antes colourHex() la buscaba en el catálogo local
+    // (server/paintCatalog.js, ~777 colores), así que un color de los 693k de
+    // la base salía sin muestra. Aquí ya tenemos la fila de la base, con su hex,
+    // así que lo guardamos para que el correo lo pinte sin volver a buscar.
+    data.hex = colour.hex || '';
 }
 
 async function handleApi(req, res, pathname) {

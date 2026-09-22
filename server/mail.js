@@ -664,14 +664,20 @@ function readingLabel(reading) {
 }
 
 /**
- * El hex de la muestra. No es una columna del pedido: sale del catálogo, y
- * hace falta buscar la marca por su nombre porque es el nombre —y no el id—
- * lo que se guarda y lo que viaja en el correo.
+ * El hex de la muestra.
  *
- * Vacío cuando el color no está en el catálogo o no hay color todavía; el
- * correo se arma igual, sin muestra.
+ * Primero el que el servidor ya resolvió contra la base de colores al confirmar
+ * el pedido (confirmColour en server/server.js deja data.hex): es la muestra
+ * del color exacto que el cliente eligió, incluidos los 693k colores de la base
+ * que el catálogo local no tiene. Ese era el bug —muchos colores salían sin
+ * muestra porque aquí solo se buscaba en el catálogo local—.
+ *
+ * Sin él —color del catálogo local, base de colores apagada, o un pedido viejo
+ * reenviado sin pasar por confirmColour— se cae al catálogo local como antes.
+ * Vacío cuando tampoco está ahí; el correo se arma igual, sin muestra.
  */
 function colourHex(data) {
+    if (data.hex) return data.hex;
     if (!data.colorCode || !data.brand) return '';
     const wanted = oneLine(data.brand).toLowerCase();
     const brandId = Object.keys(paints.BRAND_NAMES)
@@ -714,7 +720,7 @@ function paintCustomerMessage(created, data) {
     // que hay es una visita, y la única línea que se puede escribir del color
     // es dónde se va a medir.
     const rows = [
-        row('Empresa', data.company),
+        row('Nombre taller', data.company),
         row('Color', inPerson ? 'Se mide en el taller' : colourName(data)),
         row('Acabado', finishLabel(data.finish)),
         row('Envase', orderLine(data)),
@@ -751,12 +757,10 @@ function paintShopMessage(created, data) {
             ? 'Visita para medir un color, desde la página de venta de matizado.'
             : 'Nuevo pedido de matizado desde el sitio.',
         block('CLIENTE', [
-            row('Empresa', data.company),
-            row('RUC', data.ruc),
+            row('Nombre taller', data.company),
             row('Contacto', `${oneLine(data.firstName)} ${oneLine(data.lastName)}`),
             row('Teléfono', formatPhone(data.phone)),
             row('Email', data.email),
-            row('Zona', zoneLabel(data)),
         ]),
         block('PEDIDO', [
             row('Identificado', methodLabel(data.method)),

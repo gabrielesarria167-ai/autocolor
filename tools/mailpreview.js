@@ -136,6 +136,10 @@ const PAINT_ORDER = {
     colorCode: '1F7',
     colorName: 'Plata Metálico',
     finish: 'metalico',
+    // El hex que confirmColour() (server/server.js) resuelve contra la base de
+    // colores al guardar el pedido. Antes no viajaba y colourHex() lo buscaba
+    // en el catálogo local; ahora el correo pinta esta muestra directamente.
+    hex: '#bdc7c8',
     reading: null,
     size: '1_4',
     units: 2,
