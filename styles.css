@@ -4349,6 +4349,22 @@ body.wizard {
     display: none;
 }
 
+/* The button sets its own display, which beats the hidden attribute; without
+   this it stayed on screen after a code search had found the colour. */
+.finder-toggle[hidden] {
+    display: none;
+}
+
+/* A code with several versions: the grid of those versions and its note, and
+   none of the browsing controls (model, year, tones, text filter, «ver más»).
+   The class is set by renderFinder in src/paintings.js. */
+.colour-finder.is-variants > .field-row,
+.colour-finder.is-variants .finder-tools,
+.colour-finder.is-variants .finder-widen,
+.colour-finder.is-variants .finder-more {
+    display: none;
+}
+
 .finder-tools {
     display: flex;
     flex-direction: column;

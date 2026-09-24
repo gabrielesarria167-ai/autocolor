@@ -901,6 +901,13 @@
     function renderFinder() {
         if (!finder || finder.hidden || !PAINTS) return;
 
+        // A code's versions are shown on their own: the model and year
+        // selects, the tone chips and the text filter are for browsing a
+        // make, and next to the versions of a code already typed they only
+        // invite a second search. See .colour-finder.is-variants in styles.css.
+        var variants = finderState.pinned;
+        finder.classList.toggle("is-variants", variants);
+
         if (!brandSelect.value) {
             finderGrid.innerHTML = "";
             finderMore.hidden = true;
@@ -912,6 +919,9 @@
         var q = PAINTS.normalizeCode(finderSearch.value);
         var text = finderSearch.value.trim().toLowerCase();
         var items = finderState.rows.filter(function (c) {
+            // The versions all show: a tone or text left over from browsing
+            // would hide some of them behind controls that are not on screen.
+            if (variants) return true;
             if (finderState.family && c.family !== finderState.family) return false;
             if (!text) return true;
             if (c.name.toLowerCase().indexOf(text) !== -1) return true;
