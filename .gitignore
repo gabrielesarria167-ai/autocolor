@@ -31,3 +31,6 @@ design/*.html
 # above. See server/colordb/README.md.
 server/colordb/bundle/data/
 server/colordb/export/
+
+# Python bytecode caches from the scripts in tools/.
+__pycache__/
