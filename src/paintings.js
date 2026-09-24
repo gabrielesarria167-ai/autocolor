@@ -422,6 +422,7 @@
         if (colourAlias) colourAlias.hidden = true;
         if (colourFinishPick) colourFinishPick.hidden = true;
         if (colourMiss) colourMiss.hidden = true;
+        codeAnswered(false);
         if (finderState.pinned) {
             // The finder was pinned to the versions of a code that no longer
             // matches (the field was edited or cleared). Drop them and go back
@@ -506,7 +507,26 @@
         });
     }
 
+    /* «¿No sabes el código?» is for whoever has no label to read. Once a code
+       typed with its brand has found the colour, the question has been
+       answered, and the button — with the finder under it, if it was open —
+       goes. It comes back as soon as that answer stops holding: the code is
+       edited or cleared, the brand changes, or the code is not found, which
+       is exactly when looking the colour up by model and year helps.
+
+       The finder stays open when it is showing the code's own versions
+       (finderState.pinned): that grid is the rest of the answer. */
+    function codeAnswered(found) {
+        if (!finderToggle || !finder || !PAINTS) return;
+        finderToggle.hidden = found;
+        if (found && !finderState.pinned && !finder.hidden) {
+            finder.hidden = true;
+            finderToggle.setAttribute("aria-expanded", "false");
+        }
+    }
+
     function showMiss(message) {
+        codeAnswered(false);
         state.colour = null;
         colourCard.hidden = true;
         colourMiss.textContent = message;
@@ -570,7 +590,7 @@
         // es como funcionaba la página antes de todo esto.
         if (!INDEX) {
             var local = searchLocally(value, code);
-            if (local) { state.picked = false; showColour(local, null); }
+            if (local) { state.picked = false; showColour(local, null); codeAnswered(true); }
             else showMiss(missMessage(PAINTS.brandName(value), code));
             return;
         }
@@ -606,6 +626,7 @@
                 state.picked = false;
                 if (items.length === 1) {
                     showColour(items[0], null);
+                    codeAnswered(true);
                     return;
                 }
                 // Un mismo código de fábrica puede tener varias versiones, por
@@ -628,6 +649,7 @@
                     finder.hidden = false;
                     finderToggle.setAttribute("aria-expanded", "true");
                 }
+                codeAnswered(true);
                 renderFinder();
                 finderNote.textContent = twoTone
                     ? "El código «" + code.toUpperCase() + "» es de un coche de dos"
@@ -645,6 +667,7 @@
                 if (fallback) {
                     state.picked = false;
                     showColour(fallback, null);
+                    codeAnswered(true);
                     colourNote.textContent = "Del catálogo local: el buscador completo no" +
                         " responde ahora mismo. " + colourNote.textContent;
                     return;
