@@ -341,6 +341,15 @@ ALTER TABLE paint_orders DROP CONSTRAINT IF EXISTS paint_orders_ruc_check;
 ALTER TABLE paint_orders ALTER COLUMN ruc DROP NOT NULL;
 ALTER TABLE paint_orders ALTER COLUMN email DROP NOT NULL;
 
+-- The swatch the workshop table paints in the «Color» column. It is stored
+-- because the colour database is the only place that knows the hex of most of
+-- its 68k colours, and asking it again for every row of every listing would
+-- tie the panel to a second database. Older orders have none; the server falls
+-- back to the page's local catalogue for those (see paintHex in server.js).
+-- The boss fills it in, too, when he defines an order read at the counter.
+ALTER TABLE paint_orders ADD COLUMN IF NOT EXISTS hex text
+    CHECK (hex ~ '^#[0-9a-f]{6}$');
+
 -- Mismo trigger que `requests`, por lo mismo: cambiar el estado a mano desde
 -- psql no debe dejar la fecha desactualizada.
 DROP TRIGGER IF EXISTS paint_orders_touch_updated_at ON paint_orders;

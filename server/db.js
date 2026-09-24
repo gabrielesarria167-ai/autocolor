@@ -188,6 +188,7 @@ async function createRequest(data) {
                 data.phone,
                 data.email,
                 data.notes,
+                data.hex || null,
             ]);
             return { id: rows[0].id.trim(), status: rows[0].status, createdAt: rows[0].created_at };
         } catch (err) {
@@ -239,9 +240,9 @@ const INSERT_PAINT_ORDER = `
                               reading_l, reading_a, reading_b,
                               size, units, price,
                               company, ruc, first_name, last_name,
-                              department, province, phone, email, notes)
+                              department, province, phone, email, notes, hex)
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
-            $17, $18, $19, $20, $21, $22)
+            $17, $18, $19, $20, $21, $22, $23)
     RETURNING id, status, created_at
 `;
 
@@ -279,6 +280,7 @@ async function createPaintOrder(data) {
                 data.phone,
                 data.email,
                 data.notes,
+                data.hex || null,
             ]);
             return { id: rows[0].id.trim(), status: rows[0].status, createdAt: rows[0].created_at };
         } catch (err) {
@@ -286,6 +288,106 @@ async function createPaintOrder(data) {
         }
     }
     throw new Error('No se pudo generar un código libre'); // inalcanzable: el bucle lanza antes
+}
+
+const PAINT_ORDER_COLUMNS = `
+    id, created_at, method, brand, color_code, color_name, finish, hex,
+    size, units, price, company, first_name, last_name, phone, notes, status`;
+
+function mapPaintOrder(row) {
+    return {
+        id: row.id.trim(),
+        createdAt: row.created_at,
+        method: row.method,
+        brand: row.brand,
+        colorCode: row.color_code,
+        colorName: row.color_name,
+        finish: row.finish,
+        hex: row.hex,
+        size: row.size,
+        units: row.units,
+        price: row.price,
+        company: row.company,
+        firstName: row.first_name,
+        lastName: row.last_name,
+        phone: row.phone,
+        notes: row.notes,
+        status: row.status,
+    };
+}
+
+/**
+ * The counter's queue of matizado orders for the workshop table, newest first,
+ * optionally by status. Same ceiling as listRequests and for the same reason:
+ * every order still open comes back whatever its age, and only the finished
+ * ones — the part that grows without end — are capped at the 200 newest.
+ *
+ * No email, RUC, zone or reading: the table does not show them, and data that
+ * does not need showing does not need fetching.
+ */
+async function listPaintOrders(options) {
+    const status = (options || {}).status || null;
+    const { rows } = await query(
+        `SELECT ${PAINT_ORDER_COLUMNS}
+           FROM paint_orders
+          WHERE ($1::text IS NULL OR status = $1)
+            AND (status <> ALL($2::text[]) OR id IN (
+                    SELECT id FROM paint_orders
+                     WHERE status = ANY($2::text[])
+                       AND ($1::text IS NULL OR status = $1)
+                     ORDER BY created_at DESC
+                     LIMIT 200))
+          ORDER BY created_at DESC`,
+        [status, FINISHED]
+    );
+    return rows.map(mapPaintOrder);
+}
+
+/**
+ * Moves a matizado order along. Nobody holds a paint order the way they hold a
+ * vehicle — it is one tin mixed at the counter — so there is no «who may»
+ * inside the statement: whoever is working the shift moves it. Returns the
+ * order, or null when the code does not exist.
+ */
+async function updatePaintOrderStatus(id, status) {
+    const { rows } = await query(
+        `UPDATE paint_orders SET status = $2 WHERE id = $1
+          RETURNING ${PAINT_ORDER_COLUMNS}`,
+        [id, status]
+    );
+    return rows.length ? mapPaintOrder(rows[0]) : null;
+}
+
+/**
+ * The boss defines an order the customer brought to be read at the counter:
+ * the colour the spectrophotometer found, the container, and the price he
+ * closes. Only those orders: one whose colour the customer chose on the page
+ * was quoted on screen, and rewriting it here would change what they agreed to.
+ * The method stays 'in_person', which is still how the colour was found.
+ *
+ * Returns { ok: true, order }, or { ok: false, reason } — 'not_found', or
+ * 'not_in_person' when the order came with its colour already chosen.
+ */
+async function definePaintOrder(id, data) {
+    const { rows } = await query(
+        `WITH cur AS (
+             SELECT id, method FROM paint_orders WHERE id = $1 FOR UPDATE
+         ), upd AS (
+             UPDATE paint_orders p
+                SET brand = $2, color_code = $3, color_name = $4, finish = $5,
+                    hex = $6, size = $7, units = $8, price = $9
+               FROM cur
+              WHERE p.id = cur.id AND cur.method = 'in_person'
+          RETURNING p.*
+         )
+         SELECT cur.method AS current_method, upd.*
+           FROM cur LEFT JOIN upd ON true`,
+        [id, data.brand, data.colorCode, data.colorName, data.finish,
+         data.hex, data.size, data.units, data.price]
+    );
+    if (rows.length === 0) return { ok: false, reason: 'not_found' };
+    if (!rows[0].id) return { ok: false, reason: 'not_in_person' };
+    return { ok: true, order: mapPaintOrder(rows[0]) };
 }
 
 
@@ -626,7 +728,7 @@ function describe() {
 
 module.exports = {
     createRequest, findRequest, listRequests, listOccupied, updateRequestStatus,
-    createPaintOrder,
+    createPaintOrder, listPaintOrders, updatePaintOrderStatus, definePaintOrder,
     occupyRequest, releaseRequest,
     listWorkerNotes, findWorkerNote, setWorkerNote, clearWorkerNote,
     ping, describe, pool, DATABASE_URL, unreachable,

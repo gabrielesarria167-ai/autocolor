@@ -23,6 +23,11 @@
     <!-- Panel names for the walk-in form's 3D picker, shared with the public
          wizard so the two cannot disagree. -->
     <script src="../src/parts.js" defer></script>
+    <!-- Containers, finishes and their prices for the matizado table and the
+         boss's form that defines an order read at the counter. Loaded without
+         src/paintCatalog.js on purpose: the swatches come from the server, and
+         the catalogue weighs more than this whole page. -->
+    <script src="../src/paints.js" defer></script>
     <script src="../src/staff.js" defer></script>
     <!-- The 3D viewer (src/carVisual.js) is an ES module and resolves `three`
          through this map. staff.js pulls it in with a dynamic import() the
@@ -399,8 +404,38 @@
 
         <section class="staff-panel" id="staffPanel" aria-labelledby="staffPanelTitle" hidden>
 
+            <!-- Two tables behind one switch: the vehicles in the shop and the
+                 matizado orders sold over the counter (pgs/paintings.html).
+                 Each tab carries its count, and the matizado one says how many
+                 are still unopened, so paint waiting at the counter is seen
+                 from the vehicle table without leaving it. -->
+            <div class="staff-switch" role="tablist" aria-label="Qué tabla ver">
+                <button type="button" class="staff-switch__tab" role="tab" id="staffTabVehicles"
+                    aria-selected="true" aria-controls="staffVehiclesCard">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M3 14l1.8-5.2A2 2 0 0 1 6.7 7.5h10.6a2 2 0 0 1 1.9 1.3L21 14" />
+                        <path d="M3 14h18v4H3zM6 18v1.5M18 18v1.5" />
+                    </svg>
+                    Vehículos
+                    <span class="staff-switch__count" id="staffTabVehiclesCount"></span>
+                </button>
+                <button type="button" class="staff-switch__tab" role="tab" id="staffTabPaint"
+                    aria-selected="false" aria-controls="staffPaintCard" tabindex="-1">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M5 8h14v11.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 19.5z" />
+                        <path d="M5 8l1.5-3.5h11L19 8" />
+                        <path d="M9 13.5h6" />
+                    </svg>
+                    Matizado
+                    <span class="staff-switch__count" id="staffTabPaintCount"></span>
+                    <span class="staff-switch__new" id="staffTabPaintNew" hidden></span>
+                </button>
+            </div>
+
             <header>
-                <h1 id="staffPanelTitle">Autocolor Taller</h1>
+                <h1 id="staffPanelTitle">Vehículos en el taller</h1>
                 <p class="staff-page__count" id="staffCount"></p>
             </header>
 
@@ -424,9 +459,13 @@
                      lista de estados que pinta las píldoras, para que no haya
                      dos sitios donde agregar un estado nuevo. -->
                 <div class="staff-filters" id="staffFilters" role="group" aria-label="Filtrar por estado"></div>
+                <!-- The matizado table's own five, built in src/staff.js from
+                     PAINT_ORDER in src/statuses.js. -->
+                <div class="staff-filters" id="staffPaintFilters" role="group"
+                    aria-label="Filtrar pedidos por estado" hidden></div>
             </div>
 
-            <div class="staff-card">
+            <div class="staff-card" id="staffVehiclesCard" role="tabpanel" aria-labelledby="staffTabVehicles">
                 <div class="staff-table__scroll">
                     <table class="staff-table">
                         <thead>
@@ -456,6 +495,33 @@
                 </div>
 
                 <p class="staff-empty" id="staffEmpty" hidden>No se encontraron solicitudes con esos criterios.</p>
+            </div>
+
+            <!-- Los pedidos de matizado. Nadie los «ocupa» —es una lata que se
+                 prepara en el mostrador—, así que no hay columna «Ocupado»:
+                 el estado lo mueve cualquiera que tenga la sesión iniciada.
+                 El código es del jefe, como en la tabla de vehículos. -->
+            <div class="staff-card" id="staffPaintCard" role="tabpanel" aria-labelledby="staffTabPaint" hidden>
+                <div class="staff-table__scroll">
+                    <table class="staff-table staff-table--paint">
+                        <thead>
+                            <tr>
+                                <th scope="col" id="staffPaintCodeHead" hidden>Código</th>
+                                <th scope="col">Taller / contacto</th>
+                                <th scope="col">Teléfono</th>
+                                <th scope="col">Color</th>
+                                <th scope="col">Acabado</th>
+                                <th scope="col">Envase</th>
+                                <th scope="col">Precio ref.</th>
+                                <th scope="col">Ingreso</th>
+                                <th scope="col">Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="staffPaintRows"></tbody>
+                    </table>
+                </div>
+
+                <p class="staff-empty" id="staffPaintEmpty" hidden>No se encontraron pedidos con esos criterios.</p>
             </div>
 
             <p class="staff-note" id="staffNote">Los cambios de estado se guardan solos.</p>
@@ -517,6 +583,98 @@
                 </aside>
             </div>
 
+        </div>
+    </div>
+
+    <!-- The boss defines an order whose colour is read at the counter: the
+         customer brought the vehicle, the spectrophotometer found the colour,
+         and now the order gets its colour, its container and the price he
+         closes. Only those orders; one whose colour came from the page was
+         already quoted on screen. The server holds both rules (requireBoss and
+         definePaintOrder). -->
+    <div class="parts-view paint-define" id="paintDefine" hidden>
+        <div class="parts-view__backdrop" id="paintDefineBackdrop"></div>
+
+        <div class="parts-view__panel paint-define__panel" role="dialog" aria-modal="true"
+            aria-labelledby="paintDefineTitle">
+
+            <header class="parts-view__head">
+                <div>
+                    <h2 class="parts-view__title" id="paintDefineTitle">Definir el pedido</h2>
+                    <p class="parts-view__subtitle" id="paintDefineSubtitle"></p>
+                </div>
+                <button type="button" class="parts-view__close" id="paintDefineClose" aria-label="Cerrar">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M6 6l12 12M18 6L6 18" />
+                    </svg>
+                </button>
+            </header>
+
+            <form class="paint-define__form" id="paintDefineForm" novalidate>
+                <p class="paint-define__group">El color leído</p>
+                <div class="field-row field-row--wide">
+                    <div class="field">
+                        <label for="paintDefineBrand">Marca</label>
+                        <input type="text" id="paintDefineBrand" maxlength="40" list="paintDefineBrands"
+                            autocomplete="off" required>
+                        <datalist id="paintDefineBrands"></datalist>
+                    </div>
+                    <div class="field">
+                        <label for="paintDefineCode">Código de color</label>
+                        <input type="text" id="paintDefineCode" maxlength="20" spellcheck="false"
+                            autocapitalize="characters" autocomplete="off" required>
+                    </div>
+                </div>
+                <div class="field-row field-row--wide">
+                    <div class="field">
+                        <label for="paintDefineName">Nombre del color</label>
+                        <input type="text" id="paintDefineName" maxlength="80" autocomplete="off" required>
+                    </div>
+                    <div class="field">
+                        <label for="paintDefineFinish">Acabado</label>
+                        <select id="paintDefineFinish" required></select>
+                    </div>
+                </div>
+                <div class="field">
+                    <span class="paint-define__label" id="paintDefineHexLabel">Muestra en la tabla
+                        <span class="field__optional">(opcional)</span></span>
+                    <div class="paint-define__swatch">
+                        <input type="color" id="paintDefineHex" value="#9aa1ad"
+                            aria-labelledby="paintDefineHexLabel">
+                        <label class="paint-define__check">
+                            <input type="checkbox" id="paintDefineHexOn">
+                            Pintar esta muestra en la tabla
+                        </label>
+                    </div>
+                </div>
+
+                <p class="paint-define__group">El envase y el precio</p>
+                <div class="field-row paint-define__row3">
+                    <div class="field">
+                        <label for="paintDefineSize">Envase</label>
+                        <select id="paintDefineSize" required></select>
+                    </div>
+                    <div class="field">
+                        <label for="paintDefineUnits">Unidades</label>
+                        <input type="number" id="paintDefineUnits" min="1" max="20" step="1"
+                            inputmode="numeric" value="1" required>
+                    </div>
+                    <div class="field">
+                        <label for="paintDefinePrice">Precio (S/)</label>
+                        <input type="number" id="paintDefinePrice" min="0" step="1"
+                            inputmode="numeric" required aria-describedby="paintDefinePriceHint">
+                    </div>
+                </div>
+                <p class="field__hint" id="paintDefinePriceHint"></p>
+
+                <p class="form-error" id="paintDefineError" role="alert" hidden></p>
+
+                <div class="staff-intake__actions">
+                    <button type="submit" class="staff-intake__submit" id="paintDefineSave">Guardar</button>
+                    <button type="button" class="staff-intake__cancel" id="paintDefineCancel">Cancelar</button>
+                </div>
+            </form>
         </div>
     </div>
 

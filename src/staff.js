@@ -108,6 +108,37 @@
     var readOnlyTextEl = document.getElementById("staffReadOnlyText");
     var readOnlyEnterBtn = document.getElementById("staffReadOnlyEnter");
     var noteEl = document.getElementById("staffNote");
+    var panelTitleEl = document.getElementById("staffPanelTitle");
+    var tabVehiclesEl = document.getElementById("staffTabVehicles");
+    var tabPaintEl = document.getElementById("staffTabPaint");
+    var tabVehiclesCountEl = document.getElementById("staffTabVehiclesCount");
+    var tabPaintCountEl = document.getElementById("staffTabPaintCount");
+    var tabPaintNewEl = document.getElementById("staffTabPaintNew");
+    var vehiclesCardEl = document.getElementById("staffVehiclesCard");
+    var paintCardEl = document.getElementById("staffPaintCard");
+    var paintFiltersEl = document.getElementById("staffPaintFilters");
+    var paintRowsEl = document.getElementById("staffPaintRows");
+    var paintEmptyEl = document.getElementById("staffPaintEmpty");
+    var paintCodeHeadEl = document.getElementById("staffPaintCodeHead");
+    var defineEl = document.getElementById("paintDefine");
+    var defineBackdropEl = document.getElementById("paintDefineBackdrop");
+    var defineCloseEl = document.getElementById("paintDefineClose");
+    var defineSubtitleEl = document.getElementById("paintDefineSubtitle");
+    var defineFormEl = document.getElementById("paintDefineForm");
+    var defineBrandEl = document.getElementById("paintDefineBrand");
+    var defineBrandsEl = document.getElementById("paintDefineBrands");
+    var defineCodeEl = document.getElementById("paintDefineCode");
+    var defineNameEl = document.getElementById("paintDefineName");
+    var defineFinishEl = document.getElementById("paintDefineFinish");
+    var defineHexEl = document.getElementById("paintDefineHex");
+    var defineHexOnEl = document.getElementById("paintDefineHexOn");
+    var defineSizeEl = document.getElementById("paintDefineSize");
+    var defineUnitsEl = document.getElementById("paintDefineUnits");
+    var definePriceEl = document.getElementById("paintDefinePrice");
+    var definePriceHintEl = document.getElementById("paintDefinePriceHint");
+    var defineErrorEl = document.getElementById("paintDefineError");
+    var defineSaveEl = document.getElementById("paintDefineSave");
+    var defineCancelEl = document.getElementById("paintDefineCancel");
 
     // Vacío es el mismo origen. El panel solo funciona contra el servidor Node
     // que tiene la base al lado; en una publicación estática (GitHub Pages) no
@@ -123,6 +154,13 @@
     var STATUS_LABELS = window.AUTOCOLOR_STATUSES.LABELS;
     var STATUS_ORDER = window.AUTOCOLOR_STATUSES.ORDER;
     var FILTER_LABELS = window.AUTOCOLOR_STATUSES.FILTER_LABELS;
+    var PAINT_ORDER = window.AUTOCOLOR_STATUSES.PAINT_ORDER;
+    var PAINT_LABELS = window.AUTOCOLOR_STATUSES.PAINT_LABELS;
+    var PAINT_FILTER_LABELS = window.AUTOCOLOR_STATUSES.PAINT_FILTER_LABELS;
+
+    // Containers, finishes and the price list, for the matizado table and the
+    // boss's form (src/paints.js, loaded without its colour catalogue).
+    var PAINTS = window.AUTOCOLOR_PAINTS || null;
 
     var QUALITY_LABELS = {
         standard: "Económico",
@@ -217,6 +255,15 @@
     // «Mis vehículos»: recorta a los que tiene ocupados quien está mirando.
     var mineOnly = false;
     var mineBtn = null;
+
+    // The matizado orders, the panel's second table (see «Matizado» below).
+    // Their own filter; the search box is shared and searches whichever table
+    // is on screen.
+    var allPaintOrders = [];
+    var paintStatusFilter = "";
+    var paintLoaded = false;
+    // Which of the two tables the switch above the title shows.
+    var panelTab = "vehicles";
 
     // Quién entró: lo manda el servidor con el listado (ver /api/staff/requests).
     // Con esto se decide qué filas puede tocar —una ocupada solo la mueve quien
@@ -457,7 +504,54 @@
         menu.style.left = left + "px";
     }
 
-    function buildStatusCell(row, request, editable) {
+    // What the pill needs to know about its table. The vehicles and the
+    // matizado orders share the pill, the menu and the one-change-at-a-time
+    // rule, and differ in their list of statuses, their route and what else a
+    // saved change touches. Built lazily (statusSpec) because patchStatus and
+    // friends are declared further down.
+    var VEHICLE_STATUS = null;
+
+    function vehicleStatusSpec() {
+        if (VEHICLE_STATUS) return VEHICLE_STATUS;
+        VEHICLE_STATUS = {
+            order: STATUS_ORDER,
+            labels: STATUS_LABELS,
+            noun: "de la solicitud",
+            patch: patchStatus,
+            lockedTitle: function (request) {
+                // Por qué no se puede: se entró solo a mirar, o —con la sesión
+                // iniciada— está libre y hay que tomarlo, o lo tienen otros.
+                var holding = holdersOf(request);
+                return readOnly
+                    ? "Inicia sesión para cambiar el estado"
+                    : holding.length
+                        ? (holding.length > 1 ? "Lo tienen " : "Lo tiene ") + holderNames(holding)
+                        : "Toma el vehículo para cambiarle el estado";
+            },
+            saved: function (request, updated) {
+                // Con un filtro puesto, la fila deja de pertenecer a la
+                // lista que se está viendo: se vuelve a pedir para no
+                // dejarla ahí contradiciendo al filtro.
+                if (statusFilter && statusFilter !== updated.status) {
+                    loadRequests();
+                    return;
+                }
+                // A finished status (entregado, cancelado) releases the
+                // vehicle on the server — from both holders at once — so
+                // the «Ocupado» cell has to follow. Compared by code and
+                // not by identity: every answer brings a fresh array.
+                var fresh = updated.holders || [];
+                if (holderKey(fresh) !== holderKey(holdersOf(request))) {
+                    request.holders = fresh;
+                    rebuildRow(request);
+                }
+            }
+        };
+        return VEHICLE_STATUS;
+    }
+
+    function buildStatusCell(row, request, editable, spec) {
+        spec = spec || vehicleStatusSpec();
         var td = document.createElement("td");
 
         var wrap = document.createElement("span");
@@ -470,7 +564,7 @@
         pill.className = "staff-status__pill";
         pill.setAttribute("aria-haspopup", "listbox");
         pill.setAttribute("aria-expanded", "false");
-        pill.setAttribute("aria-label", "Estado de la solicitud " + request.id);
+        pill.setAttribute("aria-label", "Estado " + spec.noun);
 
         // Un vehículo ocupado por otro no se toca: la píldora queda inerte. Es
         // solo comodidad —el servidor rechaza el cambio igual (403)—, pero
@@ -479,21 +573,14 @@
         if (!editable) {
             pill.disabled = true;
             pill.classList.add("staff-status__pill--locked");
-            // Por qué no se puede: se entró solo a mirar, o —con la sesión
-            // iniciada— está libre y hay que tomarlo, o lo tienen otros.
-            var holding = holdersOf(request);
-            pill.title = readOnly
-                ? "Inicia sesión para cambiar el estado"
-                : holding.length
-                    ? (holding.length > 1 ? "Lo tienen " : "Lo tiene ") + holderNames(holding)
-                    : "Toma el vehículo para cambiarle el estado";
+            pill.title = spec.lockedTitle(request);
         }
 
         var dot = document.createElement("span");
         dot.className = "staff-status__dot";
 
         var label = document.createElement("span");
-        label.textContent = STATUS_LABELS[request.status] || request.status;
+        label.textContent = spec.labels[request.status] || request.status;
 
         var caret = document.createElement("span");
         caret.className = "staff-status__caret";
@@ -508,7 +595,7 @@
         menu.setAttribute("role", "listbox");
         menu.hidden = true;
 
-        STATUS_ORDER.forEach(function (value) {
+        spec.order.forEach(function (value) {
             var option = document.createElement("button");
             option.type = "button";
             option.className = "staff-status__option";
@@ -519,7 +606,7 @@
             var optionDot = document.createElement("span");
             optionDot.className = "staff-status__dot";
             option.appendChild(optionDot);
-            option.appendChild(document.createTextNode(STATUS_LABELS[value]));
+            option.appendChild(document.createTextNode(spec.labels[value]));
 
             option.addEventListener("click", function () {
                 closeMenu(true);
@@ -581,32 +668,17 @@
             pill.disabled = true;
             setError("");
 
-            patchStatus(request.id, next)
+            spec.patch(request.id, next)
                 .then(function (updated) {
                     wrap.dataset.status = updated.status;
-                    label.textContent = STATUS_LABELS[updated.status] || updated.status;
+                    label.textContent = spec.labels[updated.status] || updated.status;
                     Array.prototype.forEach.call(options(), function (option) {
                         option.setAttribute("aria-selected", String(option.dataset.status === updated.status));
                     });
                     // La copia en memoria también, o el próximo filtrado
                     // seguiría creyendo lo anterior.
                     request.status = updated.status;
-                    // Con un filtro puesto, la fila deja de pertenecer a la
-                    // lista que se está viendo: se vuelve a pedir para no
-                    // dejarla ahí contradiciendo al filtro.
-                    if (statusFilter && statusFilter !== updated.status) {
-                        loadRequests();
-                        return;
-                    }
-                    // A finished status (entregado, cancelado) releases the
-                    // vehicle on the server — from both holders at once — so
-                    // the «Ocupado» cell has to follow. Compared by code and
-                    // not by identity: every answer brings a fresh array.
-                    var fresh = updated.holders || [];
-                    if (holderKey(fresh) !== holderKey(holdersOf(request))) {
-                        request.holders = fresh;
-                        rebuildRow(request);
-                    }
+                    spec.saved(request, updated);
                 })
                 .catch(function (err) {
                     // Sesión vencida —o servidor reiniciado, que se lleva las
@@ -1141,6 +1213,25 @@
 
         var term = searchTerm.trim().toLowerCase();
         var shown = 0;
+
+        if (panelTab === "paint") {
+            allPaintOrders.forEach(function (order) {
+                var visible = !term || order.searchText.indexOf(term) !== -1;
+                if (order.row) order.row.hidden = !visible;
+                if (visible) shown++;
+            });
+            show(paintEmptyEl, paintLoaded && shown === 0);
+            var orders = allPaintOrders.length;
+            var noun2 = orders === 1 ? "pedido" : "pedidos";
+            var open = allPaintOrders.filter(function (order) {
+                return order.status === "recibido" || order.status === "preparacion";
+            }).length;
+            countEl.textContent = !paintLoaded ? ""
+                : (shown === orders ? orders + " " + noun2 : shown + " de " + orders + " " + noun2)
+                    + (open ? " · " + open + " por preparar" : "");
+            return;
+        }
+
         allRequests.forEach(function (request) {
             var visible = !term || request.searchText.indexOf(term) !== -1;
             if (visible && mineOnly) {
@@ -1230,6 +1321,501 @@
         applySearch();
     }
 
+
+    /* ---------------------------------------------------------------------
+       Matizado: the second table
+
+       The orders sold over the counter from pgs/paintings.html, behind the
+       switch above the title. Same card, same search box and the same status
+       pill as the vehicles, but a different trade: nobody leaves a car, so
+       there is no «Ocupado» column and no «Mis vehículos» filter, and any
+       worker on shift moves an order along (PATCH /api/staff/paint-orders).
+
+       The one thing only the boss does here is define an order read at the
+       counter — method 'in_person', which arrives with no colour, container
+       or price because the customer is bringing the vehicle to be measured.
+       His «Definir» button opens the form at the bottom of this section.
+    --------------------------------------------------------------------- */
+
+    function paintSizeOf(order) {
+        return PAINTS && order.size ? PAINTS.SIZES.filter(function (size) {
+            return size.id === order.size;
+        })[0] || null : null;
+    }
+
+    function finishLabel(finish) {
+        return PAINTS && PAINTS.FINISHES[finish] ? PAINTS.FINISHES[finish].label : finish;
+    }
+
+    // The date, and the hour under it: an order placed this morning and one
+    // from yesterday evening are different amounts of waiting at the counter.
+    // Two lines rather than one so the column stays as narrow as the date.
+    function buildDateTimeCell(row, iso) {
+        var td = document.createElement("td");
+        td.className = "staff-table__muted";
+        var date = new Date(iso);
+        if (isNaN(date.getTime())) {
+            td.textContent = "—";
+        } else {
+            td.textContent = formatDate(iso);
+            var time = document.createElement("div");
+            time.className = "paint-time";
+            time.textContent = pad(date.getHours()) + ":" + pad(date.getMinutes());
+            td.appendChild(time);
+        }
+        row.appendChild(td);
+    }
+
+    // An in-person order the boss has not defined yet: no colour, nothing to
+    // mix. Once defined it reads like any other row, with a note of where the
+    // colour came from.
+    function awaitingReading(order) {
+        return order.method === "in_person" && !order.colorCode;
+    }
+
+    function buildPaintFilters() {
+        var choices = [{ value: "", label: "Todos" }];
+        PAINT_ORDER.forEach(function (value) {
+            choices.push({ value: value, label: PAINT_FILTER_LABELS[value] || PAINT_LABELS[value] });
+        });
+
+        choices.forEach(function (choice) {
+            var button = document.createElement("button");
+            button.type = "button";
+            button.className = "staff-chip";
+            button.textContent = choice.label;
+            button.setAttribute("aria-pressed", String(choice.value === paintStatusFilter));
+            button.dataset.value = choice.value;
+            button.addEventListener("click", function () {
+                if (paintStatusFilter === choice.value) return;
+                paintStatusFilter = choice.value;
+                Array.prototype.forEach.call(paintFiltersEl.querySelectorAll(".staff-chip"), function (other) {
+                    other.setAttribute("aria-pressed", String(other.dataset.value === paintStatusFilter));
+                });
+                // Filtered by the server, like the vehicles, for the same
+                // reason: the old finished orders are capped there.
+                loadPaintOrders();
+            });
+            paintFiltersEl.appendChild(button);
+        });
+    }
+
+    function paintHaystack(order) {
+        return [
+            order.id,
+            order.company,
+            order.firstName,
+            order.lastName,
+            order.phone,
+            order.brand,
+            order.colorCode,
+            order.colorName
+        ].filter(Boolean).join(" ").toLowerCase();
+    }
+
+    var PAINT_STATUS = {
+        order: PAINT_ORDER,
+        labels: PAINT_LABELS,
+        noun: "del pedido",
+        patch: function (id, status) {
+            return sendJson("PATCH", "/api/staff/paint-orders/" + id, { status: status },
+                "No pudimos guardar el estado.");
+        },
+        lockedTitle: function () {
+            return viewer.isBoss
+                ? "El estado lo mueven los trabajadores"
+                : "Inicia sesión para cambiar el estado";
+        },
+        saved: function (order, updated) {
+            if (paintStatusFilter && paintStatusFilter !== updated.status) {
+                loadPaintOrders();
+                return;
+            }
+            // «N nuevos» on the tab counts the received ones, and «por
+            // preparar» under the title the received and the ones in the works.
+            paintTabs();
+            applySearch();
+        }
+    };
+
+    function canEditPaintStatus() {
+        return !readOnly && !viewer.isBoss;
+    }
+
+    function buildColourCell(row, order) {
+        var td = document.createElement("td");
+        var wrap = document.createElement("div");
+        wrap.className = "paint-colour";
+
+        var swatch = document.createElement("span");
+        swatch.className = "paint-colour__swatch";
+        swatch.setAttribute("aria-hidden", "true");
+
+        var text = document.createElement("div");
+        text.className = "paint-colour__text";
+        var name = document.createElement("span");
+        name.className = "paint-colour__name";
+        var meta = document.createElement("span");
+        meta.className = "paint-colour__meta";
+
+        if (awaitingReading(order)) {
+            swatch.classList.add("paint-colour__swatch--pending");
+            name.textContent = "Lectura en el taller";
+            meta.textContent = "Trae el vehículo para medirlo";
+        } else {
+            // The hex is a hint of the colour and not a proof of the match: an
+            // order with none gets the hatched swatch rather than a guess.
+            if (order.hex) swatch.style.background = order.hex;
+            else swatch.classList.add("paint-colour__swatch--unknown");
+            name.textContent = order.colorName || "—";
+            var code = document.createElement("span");
+            code.className = "paint-colour__code";
+            code.textContent = order.colorCode || "";
+            meta.appendChild(code);
+            if (order.brand) meta.appendChild(document.createTextNode(" · " + order.brand));
+        }
+
+        text.appendChild(name);
+        text.appendChild(meta);
+        wrap.appendChild(swatch);
+        wrap.appendChild(text);
+
+        // Picked by model and year, without reading the label: the counter
+        // should check the vehicle before mixing.
+        if (order.method === "model") {
+            var tag = document.createElement("span");
+            tag.className = "paint-colour__tag";
+            tag.textContent = "Confirmar";
+            tag.title = "El cliente eligió el color por modelo y año, sin leer la etiqueta";
+            wrap.appendChild(tag);
+        } else if (order.method === "in_person" && !awaitingReading(order)) {
+            var read = document.createElement("span");
+            read.className = "paint-colour__tag paint-colour__tag--read";
+            read.textContent = "Medido";
+            read.title = "Color leído en el taller";
+            wrap.appendChild(read);
+        }
+
+        // The boss's button, on the orders read at the counter only: the
+        // others were quoted on screen and are not his to rewrite.
+        if (viewer.isBoss && order.method === "in_person") {
+            var define = document.createElement("button");
+            define.type = "button";
+            define.className = "paint-colour__define";
+            define.textContent = awaitingReading(order) ? "Definir" : "Editar";
+            define.setAttribute("aria-label", (awaitingReading(order) ? "Definir" : "Editar")
+                + " el pedido de " + (order.company || "este taller"));
+            define.addEventListener("click", function () { openPaintDefine(order, define); });
+            wrap.appendChild(define);
+        }
+
+        td.appendChild(wrap);
+        row.appendChild(td);
+    }
+
+    function makePaintRow(order) {
+        var row = document.createElement("tr");
+        if (viewer.isBoss) cell(row, order.id, "staff-table__code");
+
+        var who = document.createElement("td");
+        var company = document.createElement("div");
+        company.className = "paint-who__company";
+        company.textContent = order.company || "—";
+        var person = document.createElement("div");
+        person.className = "paint-who__person";
+        person.textContent = [order.firstName, order.lastName].filter(Boolean).join(" ");
+        who.appendChild(company);
+        who.appendChild(person);
+        if (order.notes) who.title = order.notes;
+        row.appendChild(who);
+
+        cell(row, order.phone, "staff-table__nowrap");
+        buildColourCell(row, order);
+        cell(row, order.finish ? finishLabel(order.finish) : "", "staff-table__nowrap");
+
+        var size = paintSizeOf(order);
+        var sizeTd = document.createElement("td");
+        sizeTd.className = "staff-table__nowrap";
+        if (size) {
+            var sizeLine = document.createElement("div");
+            sizeLine.className = "paint-size";
+            sizeLine.textContent = size.label + (order.units > 1 ? " × " + order.units : "");
+            var volume = document.createElement("div");
+            volume.className = "paint-size__volume";
+            volume.textContent = size.volume + (order.units > 1 ? " c/u" : "");
+            sizeTd.appendChild(sizeLine);
+            sizeTd.appendChild(volume);
+        } else {
+            sizeTd.textContent = "—";
+        }
+        row.appendChild(sizeTd);
+
+        cell(row, order.price == null ? "" : "S/ " + order.price, "staff-table__num");
+        buildDateTimeCell(row, order.createdAt);
+        buildStatusCell(row, order, canEditPaintStatus(), PAINT_STATUS);
+
+        order.row = row;
+        return row;
+    }
+
+    function renderPaint() {
+        closeMenu(false);
+        paintRowsEl.textContent = "";
+        allPaintOrders.forEach(function (order) {
+            paintRowsEl.appendChild(makePaintRow(order));
+        });
+        applySearch();
+    }
+
+    // The counts on the two tabs. The vehicles' is what the table holds; the
+    // matizado one adds how many orders nobody has opened yet.
+    function paintTabs() {
+        tabVehiclesCountEl.textContent = String(allRequests.length);
+        tabPaintCountEl.textContent = paintLoaded ? String(allPaintOrders.length) : "";
+        var fresh = allPaintOrders.filter(function (order) { return order.status === "recibido"; }).length;
+        tabPaintNewEl.textContent = fresh === 1 ? "1 nuevo" : fresh + " nuevos";
+        show(tabPaintNewEl, fresh > 0);
+    }
+
+    function setPanelTab(tab, focus) {
+        if (panelTab === tab) return;
+        panelTab = tab;
+        closeMenu(false);
+        paintView();
+        applySearch();
+        if (focus) (tab === "paint" ? tabPaintEl : tabVehiclesEl).focus();
+        // Asked again on every visit: the vehicle table is refreshed by its own
+        // clicks, while an order placed on the website arrives on its own.
+        if (tab === "paint") loadPaintOrders();
+    }
+
+    tabVehiclesEl.addEventListener("click", function () { setPanelTab("vehicles", false); });
+    tabPaintEl.addEventListener("click", function () { setPanelTab("paint", false); });
+
+    // Arrow keys between the two tabs, as a tablist is expected to do.
+    [tabVehiclesEl, tabPaintEl].forEach(function (tab) {
+        tab.addEventListener("keydown", function (event) {
+            if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+            event.preventDefault();
+            setPanelTab(panelTab === "paint" ? "vehicles" : "paint", true);
+        });
+    });
+
+    function loadPaintOrders() {
+        var query = paintStatusFilter ? "?status=" + encodeURIComponent(paintStatusFilter) : "";
+        return fetch(API_BASE + "/api/staff/paint-orders" + query, { credentials: "same-origin" })
+            .then(function (response) {
+                return response.json().catch(function () { return null; }).then(function (body) {
+                    if (response.status === 401) {
+                        showLogin();
+                        return;
+                    }
+                    if (!response.ok) {
+                        throw new Error((body && body.error) || "No pudimos cargar los pedidos de matizado.");
+                    }
+                    allPaintOrders = (body && body.orders) || [];
+                    allPaintOrders.forEach(function (order) {
+                        order.searchText = paintHaystack(order);
+                    });
+                    paintLoaded = true;
+                    paintTabs();
+                    renderPaint();
+                });
+            })
+            .catch(function (err) {
+                setError(err instanceof TypeError ? NETWORK_MESSAGE : err.message);
+            });
+    }
+
+    // PATCH and PUT with a JSON body, and the same reading of the answer as
+    // patchStatus: a 401 is flagged so the caller can bring the login back.
+    function sendJson(method, path, payload, fallback) {
+        return fetch(API_BASE + path, {
+            method: method,
+            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify(payload)
+        }).then(function (response) {
+            return response.json().catch(function () { return null; }).then(function (body) {
+                if (!response.ok) {
+                    var error = new Error((body && body.error) || fallback);
+                    if (response.status === 401) error.unauthorized = true;
+                    throw error;
+                }
+                return body;
+            });
+        }, function () {
+            throw new Error(NETWORK_MESSAGE);
+        });
+    }
+
+    /* --- the boss's form: defining an order read at the counter --- */
+
+    var defineOrder = null;
+    var defineTrigger = null;
+    // Whether the boss typed the price himself. Until he does, it follows the
+    // price list (container × finish × units); after, it is his and stays.
+    var definePriceTouched = false;
+
+    function fillDefineChoices() {
+        if (!PAINTS) return;
+        Object.keys(PAINTS.FINISHES).forEach(function (id) {
+            var option = document.createElement("option");
+            option.value = id;
+            option.textContent = PAINTS.FINISHES[id].label;
+            defineFinishEl.appendChild(option);
+        });
+        PAINTS.SIZES.forEach(function (size) {
+            var option = document.createElement("option");
+            option.value = size.id;
+            option.textContent = size.label + " (" + size.volume + ")";
+            defineSizeEl.appendChild(option);
+        });
+        Object.keys(PAINTS.BRAND_NAMES).forEach(function (id) {
+            var option = document.createElement("option");
+            option.value = PAINTS.BRAND_NAMES[id];
+            defineBrandsEl.appendChild(option);
+        });
+        defineUnitsEl.max = String(PAINTS.MAX_UNITS);
+    }
+
+    // The price list's total for what is on the form, or null when the form
+    // does not describe a container yet.
+    function listPrice() {
+        if (!PAINTS) return null;
+        var each = PAINTS.price(defineSizeEl.value, defineFinishEl.value);
+        var units = parseInt(defineUnitsEl.value, 10);
+        if (each == null || !(units >= 1)) return null;
+        return each * units;
+    }
+
+    function syncDefinePrice() {
+        var suggested = listPrice();
+        definePriceHintEl.textContent = suggested == null
+            ? ""
+            : "Según la lista de precios: S/ " + suggested + ". Puedes cambiarlo.";
+        if (!definePriceTouched && suggested != null) definePriceEl.value = String(suggested);
+    }
+
+    function openPaintDefine(order, trigger) {
+        defineOrder = order;
+        defineTrigger = trigger;
+        definePriceTouched = order.price != null;
+
+        defineSubtitleEl.textContent = [order.company,
+            [order.firstName, order.lastName].filter(Boolean).join(" "), order.id]
+            .filter(Boolean).join(" · ");
+        defineBrandEl.value = order.brand || "";
+        defineCodeEl.value = order.colorCode || "";
+        defineNameEl.value = order.colorName || "";
+        defineFinishEl.value = order.finish || "metalico";
+        defineSizeEl.value = order.size || "1_4";
+        defineUnitsEl.value = String(order.units || 1);
+        definePriceEl.value = order.price == null ? "" : String(order.price);
+        defineHexOnEl.checked = !!order.hex;
+        if (order.hex) defineHexEl.value = order.hex;
+        defineErrorEl.hidden = true;
+        syncDefinePrice();
+
+        show(defineEl, true);
+        defineBrandEl.focus();
+    }
+
+    function closePaintDefine(restoreFocus) {
+        if (defineEl.hidden) return;
+        show(defineEl, false);
+        defineOrder = null;
+        if (restoreFocus && defineTrigger && defineTrigger.isConnected) defineTrigger.focus();
+        defineTrigger = null;
+    }
+
+    function defineProblem() {
+        if (!defineBrandEl.value.trim()) return [defineBrandEl, "Escribe la marca."];
+        if (!defineCodeEl.value.trim()) return [defineCodeEl, "Escribe el código del color."];
+        if (!defineNameEl.value.trim()) return [defineNameEl, "Escribe el nombre del color."];
+        var units = Number(defineUnitsEl.value);
+        if (!Number.isInteger(units) || units < 1 || units > Number(defineUnitsEl.max || 20)) {
+            return [defineUnitsEl, "Las unidades van de 1 a " + (defineUnitsEl.max || 20) + "."];
+        }
+        var price = Number(definePriceEl.value);
+        if (definePriceEl.value === "" || !Number.isInteger(price) || price < 0) {
+            return [definePriceEl, "Escribe el precio en soles, sin decimales."];
+        }
+        return null;
+    }
+
+    defineHexEl.addEventListener("input", function () { defineHexOnEl.checked = true; });
+    defineFinishEl.addEventListener("change", syncDefinePrice);
+    defineSizeEl.addEventListener("change", syncDefinePrice);
+    defineUnitsEl.addEventListener("input", syncDefinePrice);
+    definePriceEl.addEventListener("input", function () { definePriceTouched = definePriceEl.value !== ""; });
+
+    defineFormEl.addEventListener("submit", function (event) {
+        event.preventDefault();
+        if (!defineOrder) return;
+        var problem = defineProblem();
+        if (problem) {
+            defineErrorEl.textContent = problem[1];
+            defineErrorEl.hidden = false;
+            problem[0].focus();
+            return;
+        }
+
+        var order = defineOrder;
+        defineSaveEl.disabled = true;
+        defineSaveEl.textContent = "Guardando…";
+        defineErrorEl.hidden = true;
+
+        sendJson("PUT", "/api/staff/paint-orders/" + order.id + "/definition", {
+            brand: defineBrandEl.value.trim(),
+            colorCode: defineCodeEl.value.trim().toUpperCase(),
+            colorName: defineNameEl.value.trim(),
+            finish: defineFinishEl.value,
+            hex: defineHexOnEl.checked ? defineHexEl.value : null,
+            size: defineSizeEl.value,
+            units: Number(defineUnitsEl.value),
+            price: Number(definePriceEl.value)
+        }, "No pudimos guardar el pedido.")
+            .then(function (updated) {
+                // The copy in memory takes the answer, and the row is rebuilt
+                // from it: the colour cell, the container and the price all
+                // change at once.
+                Object.keys(updated).forEach(function (key) { order[key] = updated[key]; });
+                order.searchText = paintHaystack(order);
+                if (order.row && order.row.parentNode) {
+                    var old = order.row;
+                    old.parentNode.replaceChild(makePaintRow(order), old);
+                    applySearch();
+                }
+                closePaintDefine(false);
+                var button = order.row && order.row.querySelector(".paint-colour__define");
+                if (button) button.focus();
+            })
+            .catch(function (err) {
+                if (err.unauthorized) {
+                    closePaintDefine(false);
+                    showLogin();
+                    setError("Tu sesión venció. Vuelve a entrar para guardar el pedido.");
+                    return;
+                }
+                defineErrorEl.textContent = err.message;
+                defineErrorEl.hidden = false;
+            })
+            .then(function () {
+                defineSaveEl.disabled = false;
+                defineSaveEl.textContent = "Guardar";
+            });
+    });
+
+    defineCloseEl.addEventListener("click", function () { closePaintDefine(true); });
+    defineCancelEl.addEventListener("click", function () { closePaintDefine(true); });
+    defineBackdropEl.addEventListener("click", function () { closePaintDefine(true); });
+    document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape" && !defineEl.hidden) closePaintDefine(true);
+    });
+
+    fillDefineChoices();
+
     /* ---------------------------------------------------------------------
        Las tres vistas: acceso, ficha y tabla
 
@@ -1275,6 +1861,24 @@
         // (see makeRow). Both read the same `viewer.isBoss`, and both are
         // repainted by the same answer from the server.
         show(codeHeadEl, !!viewer.isBoss);
+        show(paintCodeHeadEl, !!viewer.isBoss);
+
+        // The switch above the title, and everything that belongs to one table
+        // or the other: its card, its filters, its title and its search hint.
+        var onPaint = panelTab === "paint";
+        tabVehiclesEl.setAttribute("aria-selected", String(!onPaint));
+        tabPaintEl.setAttribute("aria-selected", String(onPaint));
+        tabVehiclesEl.tabIndex = onPaint ? -1 : 0;
+        tabPaintEl.tabIndex = onPaint ? 0 : -1;
+        show(vehiclesCardEl, !onPaint);
+        show(paintCardEl, onPaint);
+        show(filtersEl, !onPaint);
+        show(paintFiltersEl, onPaint);
+        panelTitleEl.textContent = onPaint ? "Pedidos de matizado" : "Vehículos en el taller";
+        searchEl.placeholder = onPaint
+            ? "Buscar por taller, color o código…"
+            : "Buscar por placa, cliente o código…";
+        if (view !== "panel") closePaintDefine(false);
 
         show(readOnlyEl, view === "panel" && readOnly);
         // For the boss the table is for looking at and nothing else: there is no
@@ -1282,8 +1886,12 @@
         // button. The server would refuse the change anyway (see refuseBoss in
         // server/server.js); this is about not offering what cannot be done.
         readOnlyTextEl.textContent = viewer.isBoss
-            ? "El jefe del taller ve las solicitudes, pero no toma vehículos ni les cambia el estado."
-            : "Estás viendo las solicitudes sin iniciar sesión: no puedes tomar vehículos ni cambiarles el estado.";
+            ? (onPaint
+                ? "Defines el color y el precio de los pedidos que se leen en el taller; el estado lo mueven los trabajadores."
+                : "El jefe del taller ve las solicitudes, pero no toma vehículos ni les cambia el estado.")
+            : (onPaint
+                ? "Estás viendo los pedidos sin iniciar sesión: no puedes cambiarles el estado."
+                : "Estás viendo las solicitudes sin iniciar sesión: no puedes tomar vehículos ni cambiarles el estado.");
         show(readOnlyEnterBtn, !viewer.isBoss);
         // «Mis vehículos» goes too: the boss takes none, so that filter could
         // only ever empty the table.
@@ -1332,6 +1940,7 @@
         view = "panel";
         paintView();
         render();
+        renderPaint();
         searchEl.focus();
     }
 
@@ -2474,6 +3083,10 @@
                     // saldría de cero.
                     sizePhoto();
                     render();
+                    paintTabs();
+                    // The matizado orders ride along the first time, so the
+                    // tab's count is there before anybody opens it.
+                    if (!paintLoaded) loadPaintOrders();
                     return body;
                 });
             })
@@ -2561,6 +3174,10 @@
             saveNotes();
             allRequests = [];
             rowsEl.textContent = "";
+            allPaintOrders = [];
+            paintLoaded = false;
+            paintRowsEl.textContent = "";
+            panelTab = "vehicles";
             setError("");
             showLogin();
         };
@@ -2574,6 +3191,7 @@
     });
 
     buildFilters();
+    buildPaintFilters();
 
     // Al abrir la página no se sabe si hay sesión: se pregunta, y el 401 —si
     // llega— es lo que decide mostrar el formulario de acceso.

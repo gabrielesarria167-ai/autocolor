@@ -50,6 +50,7 @@ const gzip = promisify(zlib.gzip);
 const {
     createRequest, findRequest, listRequests, listOccupied, updateRequestStatus,
     occupyRequest, releaseRequest, createPaintOrder,
+    listPaintOrders, updatePaintOrderStatus, definePaintOrder,
     listWorkerNotes, findWorkerNote, setWorkerNote, clearWorkerNote,
     ping, describe, pool, DATABASE_URL, unreachable,
 } = require('./db');
@@ -58,6 +59,7 @@ const colordb = require('./colordb');
 const names = require('./names');
 const mail = require('./mail');
 const netcheck = require('./netcheck');
+const paints = require('../src/paints.js');
 
 const PORT = Number(process.env.PORT) || 3000;
 
@@ -337,6 +339,18 @@ const MAX_UNITS = 20;
 // mande un número absurdo al campo que el mostrador va a leer como «esto se le
 // prometió en pantalla».
 const MAX_PAINT_PRICE = 100_000;
+// Los estados de un pedido de matizado. Otra lista y más corta que STATUSES:
+// un matizado se recibe, se prepara, está listo y se entrega. Las copias son
+// PAINT_ORDER en src/statuses.js y el CHECK de `paint_orders.status`
+// (server/schema.sql), que es la última palabra.
+const PAINT_STATUSES = new Set(['recibido', 'preparacion', 'listo', 'entregado', 'cancelado']);
+const HEX_RE = /^#?([0-9a-fA-F]{6})$/;
+
+/** A swatch as the column stores it, «#rrggbb» in lower case, or null. */
+function normalizeHex(value) {
+    const match = HEX_RE.exec(String(value || '').trim());
+    return match ? '#' + match[1].toLowerCase() : null;
+}
 
 /** Un valor de la lectura CIELAB, o null si el pedido no trae medición. */
 function labValue(value, { min, max, field }) {
@@ -348,6 +362,56 @@ function labValue(value, { min, max, field }) {
     // Dos decimales, que es lo que entrega un espectrofotómetro y lo que
     // acepta la columna.
     return Math.round(number * 100) / 100;
+}
+
+/**
+ * What the boss sends when he defines an order read at the counter: the colour
+ * the spectrophotometer found, the container and the price he closes. Unlike
+ * the customer's form, everything that describes the tin is required — this
+ * is the step that turns «bring the car in» into an order that can be mixed —
+ * except the swatch, which is only the table's hint of the colour.
+ */
+function validatePaintDefinition(body) {
+    requireObject(body);
+    const brand = text(body.brand, { max: 40, required: true, field: 'la marca', agree: 'f' });
+    const colorCode = text(body.colorCode, { max: 20, required: true, field: 'el código de color' });
+    const colorName = text(body.colorName, { max: 80, required: true, field: 'el nombre del color' });
+    if (!PAINT_FINISHES.has(body.finish)) throw new BadRequest('Acabado no válido.');
+    if (!PAINT_SIZES.has(body.size)) throw new BadRequest('Envase no válido.');
+    let hex = null;
+    if (body.hex !== undefined && body.hex !== null && body.hex !== '') {
+        hex = normalizeHex(body.hex);
+        if (!hex) throw new BadRequest('La muestra de color no es válida.');
+    }
+    return {
+        brand,
+        colorCode,
+        colorName,
+        finish: body.finish,
+        hex,
+        size: body.size,
+        units: integer(body.units, { min: 1, max: MAX_UNITS, required: true, field: 'la cantidad', agree: 'f' }),
+        price: integer(body.price, { min: 0, max: MAX_PAINT_PRICE, required: true, field: 'el precio' }),
+    };
+}
+
+// The swatch for a row of the workshop table: the one stored with the order,
+// else the page's local catalogue by brand and code — orders placed before
+// the column existed, or a colour the colour database had no hex for. Empty
+// when neither knows it; the table then draws the swatch as unknown rather
+// than guess one.
+function paintHex(order) {
+    if (order.hex) return order.hex;
+    if (!order.brand || !order.colorCode) return '';
+    const wanted = order.brand.trim().toLowerCase();
+    const brandId = Object.keys(paints.BRAND_NAMES)
+        .find((id) => paints.BRAND_NAMES[id].toLowerCase() === wanted);
+    const colour = brandId ? paints.findColour(brandId, order.colorCode) : null;
+    return colour && colour.hex ? normalizeHex(colour.hex) || '' : '';
+}
+
+function withPaintHex(order) {
+    return Object.assign({}, order, { hex: paintHex(order) });
 }
 
 function validatePaintOrder(body) {
@@ -930,6 +994,8 @@ function applyCors(req, res) {
 const STAFF_PATH = /^\/api\/staff\/requests\/([0-9]{10})$/;
 const OCCUPANCY_PATH = /^\/api\/staff\/requests\/([0-9]{10})\/occupancy$/;
 const WORKER_NOTE_PATH = /^\/api\/staff\/workers\/([A-Za-z]{2}[0-9]{5})\/note$/;
+const STAFF_PAINT_PATH = /^\/api\/staff\/paint-orders\/([0-9]{10})$/;
+const STAFF_PAINT_DEFINE_PATH = /^\/api\/staff\/paint-orders\/([0-9]{10})\/definition$/;
 
 // Long enough for «Termina el Onix antes del viernes y avísame», short enough
 // that the card can show it whole. The column CHECKs the same number.
@@ -1236,6 +1302,53 @@ async function handleStaff(req, res, pathname, ip) {
         });
     }
 
+    // The matizado orders, the table the panel shows beside the vehicles. Same
+    // gate as the vehicle list: anybody with a session reads it.
+    if (pathname === '/api/staff/paint-orders' && req.method === 'GET') {
+        requireStaff(req);
+        const wanted = new URL(req.url, 'http://localhost').searchParams.get('status');
+        if (wanted && !PAINT_STATUSES.has(wanted)) throw new BadRequest('El estado no es válido.');
+        const orders = (await listPaintOrders({ status: wanted })).map(withPaintHex);
+        return sendJson(res, 200, { orders });
+    }
+
+    // The boss defines an order the customer brought to be read at the counter:
+    // colour, container and the price he closes. Boss only, like the walk-in
+    // form: pricing is running the workshop, not working in it.
+    const defineMatch = STAFF_PAINT_DEFINE_PATH.exec(pathname);
+    if (defineMatch && req.method === 'PUT') {
+        requireBoss(req);
+        const data = validatePaintDefinition(await readJsonBody(req));
+        const result = await definePaintOrder(defineMatch[1], data);
+        if (!result.ok && result.reason === 'not_found') {
+            return sendJson(res, 404, { error: 'No encontramos ningún pedido con ese código.' });
+        }
+        if (!result.ok) {
+            return sendJson(res, 409, {
+                error: 'Este pedido ya trae su color desde la página: solo se definen los que se leen en el taller.',
+            });
+        }
+        console.log(`[taller] matizado ${result.order.id} definido: ${data.brand} ${data.colorCode}, ${data.size} x${data.units}, S/ ${data.price}`);
+        return sendJson(res, 200, withPaintHex(result.order));
+    }
+
+    // A matizado order's status. Nobody holds a tin the way they hold a car, so
+    // there is no occupancy to check: any worker on shift moves it. The boss
+    // does not, as with the vehicles (see refuseBoss).
+    const paintMatch = STAFF_PAINT_PATH.exec(pathname);
+    if (paintMatch && req.method === 'PATCH') {
+        requireStaff(req);
+        if (auth.isBoss(auth.sessionWorkerId(req))) {
+            throw new HttpError(403, 'El jefe del taller define los pedidos, pero no les cambia el estado.');
+        }
+        const body = requireObject(await readJsonBody(req));
+        if (!PAINT_STATUSES.has(body.status)) throw new BadRequest('El estado no es válido.');
+        const updated = await updatePaintOrderStatus(paintMatch[1], body.status);
+        if (!updated) return sendJson(res, 404, { error: 'No encontramos ningún pedido con ese código.' });
+        console.log(`[taller] matizado ${updated.id} -> ${updated.status}`);
+        return sendJson(res, 200, withPaintHex(updated));
+    }
+
     if (req.method === 'PATCH') {
         const match = STAFF_PATH.exec(pathname);
         if (match) {
@@ -1491,7 +1604,7 @@ async function confirmColour(data) {
     // (server/paintCatalog.js, ~777 colores), así que un color de los 693k de
     // la base salía sin muestra. Aquí ya tenemos la fila de la base, con su hex,
     // así que lo guardamos para que el correo lo pinte sin volver a buscar.
-    data.hex = colour.hex || '';
+    data.hex = normalizeHex(colour.hex) || '';
 }
 
 async function handleApi(req, res, pathname) {

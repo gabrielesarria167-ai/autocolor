@@ -5896,6 +5896,333 @@ body.staff {
     background: var(--surface-tint);
 }
 
+/* -----------------------------------------------------------------------------
+   Vehículos / Matizado: the switch above the title
+
+   Two large tabs rather than two more filter chips: they swap the whole table,
+   not a slice of it, and at the workshop screen they are tapped by hand. The
+   selected one is filled in ink like a status filter that is on; the counts
+   ride inside so the other table's queue is visible without opening it.
+   -------------------------------------------------------------------------- */
+
+.staff-switch {
+    display: inline-flex;
+    align-self: flex-start;
+    max-width: 100%;
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+}
+
+.staff-switch__tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 48px;
+    padding: 0 20px;
+    border: none;
+    background: var(--surface);
+    color: var(--text-dim);
+    font: inherit;
+    font-size: 0.95rem;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background 0.15s var(--ease-out), color 0.15s var(--ease-out);
+}
+
+.staff-switch__tab + .staff-switch__tab {
+    border-left: 1px solid var(--border-strong);
+}
+
+.staff-switch__tab svg {
+    flex: none;
+    width: 20px;
+    height: 20px;
+}
+
+.staff-switch__tab:hover {
+    color: var(--ink);
+    background: var(--surface-tint);
+}
+
+.staff-switch__tab[aria-selected="true"] {
+    background: var(--ink);
+    color: #fff;
+}
+
+.staff-switch__tab:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+}
+
+.staff-switch__count {
+    min-width: 22px;
+    padding: 2px 7px;
+    box-sizing: border-box;
+    background: #eceef2;
+    color: #3f4757;
+    font-family: var(--font-label);
+    font-size: 0.75rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+}
+
+.staff-switch__count:empty {
+    display: none;
+}
+
+.staff-switch__tab[aria-selected="true"] .staff-switch__count {
+    background: rgba(255, 255, 255, 0.16);
+    color: #fff;
+}
+
+/* «2 nuevos»: the received orders nobody has opened. Orange, the colour of
+   «En preparación», because it is the next thing that has to happen to them. */
+.staff-switch__new {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #a24c14;
+}
+
+.staff-switch__new::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #dd7b38;
+}
+
+.staff-switch__tab[aria-selected="true"] .staff-switch__new {
+    color: #f6c39e;
+}
+
+@media (max-width: 520px) {
+    .staff-switch {
+        display: flex;
+        align-self: stretch;
+    }
+
+    .staff-switch__tab {
+        flex: 1 1 0;
+        justify-content: center;
+        padding: 0 12px;
+    }
+
+    .staff-switch__new {
+        display: none;
+    }
+}
+
+/* -----------------------------------------------------------------------------
+   Matizado: the table's own cells
+   -------------------------------------------------------------------------- */
+
+.paint-who__company {
+    font-weight: 600;
+}
+
+.paint-who__person {
+    font-size: 0.82rem;
+    color: var(--text-dim);
+}
+
+.paint-colour {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+/* The colour itself, as big as the row allows: it is what the counter checks
+   the mixed tin against at a glance. A hint, not a proof of the match. */
+.paint-colour__swatch {
+    flex: none;
+    width: 36px;
+    height: 36px;
+    box-sizing: border-box;
+    border: 1px solid rgba(38, 45, 64, 0.18);
+    background: var(--surface-tint);
+}
+
+/* A colour the catalogue has no hex for: hatched, so it cannot be read as grey. */
+.paint-colour__swatch--unknown {
+    background: repeating-linear-gradient(45deg, #eceef2 0 4px, #ffffff 4px 8px);
+}
+
+/* Not read yet: the customer is bringing the vehicle. */
+.paint-colour__swatch--pending {
+    border: 1px dashed #a0a7b6;
+    background: transparent;
+}
+
+.paint-colour__text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.paint-colour__name {
+    font-weight: 600;
+}
+
+.paint-colour__meta {
+    font-size: 0.82rem;
+    color: var(--text-dim);
+    white-space: nowrap;
+}
+
+.paint-colour__code {
+    font-family: var(--font-label);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--ink);
+}
+
+.paint-colour__tag {
+    flex: none;
+    padding: 3px 7px;
+    background: #f8efd9;
+    color: #6f520b;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.paint-colour__tag--read {
+    background: #e0f3f1;
+    color: #15645b;
+}
+
+/* The boss's button on an order read at the counter. Dashed like «Tomar» in
+   the vehicle table: it offers a job that is waiting for somebody. */
+.paint-colour__define {
+    flex: none;
+    margin-left: auto;
+    padding: 6px 12px;
+    border: 1px dashed var(--border-strong);
+    background: transparent;
+    color: var(--ink);
+    font: inherit;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color 0.15s var(--ease-out), background 0.15s var(--ease-out);
+}
+
+.paint-colour__define:hover {
+    border-style: solid;
+    border-color: var(--brand);
+    background: var(--surface-tint);
+}
+
+.paint-colour__define:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+}
+
+.paint-time {
+    font-size: 0.82rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.paint-size {
+    font-weight: 600;
+}
+
+.paint-size__volume {
+    font-size: 0.82rem;
+    color: var(--text-dim);
+}
+
+/* -----------------------------------------------------------------------------
+   Matizado: the boss's form for an order read at the counter
+
+   It borrows the parts viewer's layer (.parts-view) and only narrows it: one
+   column of fields instead of a 3D model and its list.
+   -------------------------------------------------------------------------- */
+
+.paint-define__panel {
+    width: min(620px, 100%);
+}
+
+.paint-define__form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.paint-define__group {
+    margin: 6px 0 0;
+    font-family: var(--font-label);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: var(--track-label);
+    text-transform: uppercase;
+    color: var(--text-dim);
+}
+
+.paint-define__label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--ink);
+}
+
+.paint-define__swatch {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.paint-define__swatch input[type="color"] {
+    width: 56px;
+    height: 44px;
+    padding: 2px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+    cursor: pointer;
+}
+
+.paint-define__check {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9rem;
+    color: var(--ink);
+    cursor: pointer;
+}
+
+.paint-define__check input {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+}
+
+.paint-define__row3 {
+    grid-template-columns: 1.4fr 0.8fr 1fr;
+}
+
+.paint-define .field__hint {
+    margin-top: -6px;
+}
+
+@media (max-width: 560px) {
+    .paint-define__row3 {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .paint-define__row3 .field:first-child {
+        grid-column: 1 / -1;
+    }
+}
+
 /* Aviso del modo consulta, encima de la tabla: sin él, una tabla con todo
    inerte se lee como una tabla rota. */
 .staff-readonly {

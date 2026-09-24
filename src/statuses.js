@@ -76,10 +76,36 @@
         cancelado: "Canceladas"
     };
 
+    // Los pedidos de matizado (tabla `paint_orders`) tienen su propia lista,
+    // más corta: una lata se recibe, se prepara, está lista y se entrega, sin
+    // pasar por el planchado ni por el horno. Sus otras copias son
+    // PAINT_STATUSES en server/server.js y el CHECK de `paint_orders.status`.
+    // Van en masculino porque el sujeto es «el pedido».
+    var PAINT_ORDER = ["recibido", "preparacion", "listo", "entregado", "cancelado"];
+
+    var PAINT_LABELS = {
+        recibido: "Recibido",
+        preparacion: "En preparación",
+        listo: "Listo para recoger",
+        entregado: "Entregado",
+        cancelado: "Cancelado"
+    };
+
+    var PAINT_FILTER_LABELS = {
+        recibido: "Recibidos",
+        preparacion: "En preparación",
+        listo: "Listos",
+        entregado: "Entregados",
+        cancelado: "Cancelados"
+    };
+
     window.AUTOCOLOR_STATUSES = {
         ORDER: ORDER,
         LABELS: LABELS,
         FILTER_LABELS: FILTER_LABELS,
+        PAINT_ORDER: PAINT_ORDER,
+        PAINT_LABELS: PAINT_LABELS,
+        PAINT_FILTER_LABELS: PAINT_FILTER_LABELS,
 
         // Un estado que no esté en la lista se muestra en crudo antes que
         // dejar el hueco en blanco: si la base gana un estado y el cliente
