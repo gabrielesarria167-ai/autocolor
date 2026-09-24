@@ -1,107 +1,110 @@
-# Despliegue en Render (https://render.com), un solo servicio.
+# Deploy on Render (https://render.com), a single service.
 #
-# El mismo proceso sirve el sitio y la API. No son dos —el sitio en un
-# alojamiento estático y la API aparte— porque el panel del taller no
-# funcionaría: src/staff.js manda sus peticiones con credentials:
-# "same-origin", la cookie de sesión es SameSite=Strict y el servidor no emite
-# Access-Control-Allow-Credentials. Desde otro dominio, el panel respondería 401
-# para siempre. Por eso ALLOWED_ORIGINS se queda vacío: no hay peticiones entre
-# dominios que permitir.
+# The same process serves the site and the API. They are not two (the site
+# on a static host and the API elsewhere) because the workshop panel would
+# not work: src/staff.js sends its requests with credentials: "same-origin",
+# the session cookie is SameSite=Strict and the server does not emit
+# Access-Control-Allow-Credentials. From another domain the panel would
+# answer 401 forever. That is why ALLOWED_ORIGINS stays empty: there are no
+# cross-origin requests to allow.
 #
-# La base es Neon (https://neon.tech), aparte de Render. La de Render caduca a
-# los 30 días en el plan gratuito; la de Neon, no.
+# The database is Neon (https://neon.tech), separate from Render. Render's
+# expires after 30 days on the free plan; Neon's does not.
 #
-# El esquema NO se aplica desde aquí. Ver server/migrate.js: schema.sql toca
-# filas vivas, y un fallo suyo en buildCommand tumbaría el sitio entero por un
-# problema de la base. Se corre a mano, una vez, desde la máquina de trabajo.
+# The schema is NOT applied from here. See server/migrate.js: schema.sql
+# touches live rows, and a failure of it in buildCommand would take the whole
+# site down over a database problem. It is run by hand, once, from the work
+# machine.
 
 services:
   - type: web
     name: autocolor
     runtime: node
     plan: free
-    # La misma región de nube que el proyecto de Neon: lo que domina el tiempo
-    # de respuesta son las idas y vueltas entre la aplicación y la base.
+    # The same cloud region as the Neon project: what dominates response time
+    # is the round trips between the application and the database.
     region: virginia
     branch: main
     buildCommand: npm ci
     startCommand: npm start
-    # Ver el manejador de /healthz en server/server.js: contesta sin tocar la
-    # base, a propósito.
+    # See the /healthz handler in server/server.js: it answers without
+    # touching the database, on purpose.
     healthCheckPath: /healthz
     autoDeploy: true
 
     envVars:
-      # Render escucha en el puerto que anuncia por PORT —que ya lee
-      # server/server.js— y necesita que el proceso ate 0.0.0.0. El 127.0.0.1
-      # por omisión es deliberado (ver el comentario junto a HOST en
-      # server/server.js) y se queda como está: esto es una decisión de este
-      # despliegue, no del programa. PORT no se pone aquí; lo da Render.
+      # Render listens on the port it announces through PORT (which
+      # server/server.js already reads) and needs the process to bind 0.0.0.0.
+      # The default 127.0.0.1 is deliberate (see the comment next to HOST in
+      # server/server.js) and stays as it is: this is a decision of this
+      # deploy, not of the program. PORT is not set here; Render provides it.
       - key: HOST
         value: "0.0.0.0"
 
-      # TRES proxies de confianza delante, no uno. Medido con
-      # /api/staff/whoami contra el sitio ya desplegado, que para esto es la
-      # única fuente fiable:
+      # THREE trusted proxies in front, not one. Measured with
+      # /api/staff/whoami against the deployed site, which is the only
+      # reliable source for this:
       #
       #     x-forwarded-for: 151.62.162.119, 172.70.34.4, 10.26.204.136
-      #                      ^el cliente     ^Cloudflare  ^el router de Render
+      #                      ^the client     ^Cloudflare  ^Render's router
       #
-      # clientIp() cuenta desde la derecha, así que con TRUST_PROXY=3 sale el
-      # primero — el cliente de verdad — y sigue saliendo aunque alguien mande
-      # su propia cabecera, porque los tres saltos de la derecha los escriben
-      # los proxies y no él.
+      # clientIp() counts from the right, so with TRUST_PROXY=3 out comes the
+      # first one, the real client, and it keeps coming out even if someone
+      # sends their own header, because the three hops on the right are
+      # written by the proxies and not by them.
       #
-      # Con 1 salía el router interno de Render, que rota entre tres
-      # direcciones: los límites por IP se repartían en tres cubos y no
-      # frenaban nada. Y no se veía desde fuera — de ahí /api/staff/whoami.
+      # With 1 out came Render's internal router, which rotates between three
+      # addresses: the per-IP limits were split across three buckets and
+      # stopped nothing. And it was not visible from outside, hence
+      # /api/staff/whoami.
       #
-      # Si algún día cambia la topología del alojamiento, este número cambia
-      # con ella. Comprobarlo con whoami después de tocarlo.
+      # If the host's topology ever changes, this number changes with it.
+      # Check it with whoami after touching it.
       - key: TRUST_PROXY
         value: "3"
 
-      # El sitio se sirve por https, así que la cookie del panel viaja Secure.
+      # The site is served over https, so the panel cookie travels Secure.
       - key: AUTOCOLOR_STAFF_COOKIE_SECURE
         value: "1"
 
-      # Explícito para que se lea que está vacío a propósito, y no por olvido.
+      # Explicit so it reads as empty on purpose, not by oversight.
       - key: ALLOWED_ORIGINS
         value: ""
 
-      # Los dos secretos se escriben a mano en el panel de Render y no viven en
-      # el repositorio, que se publica entero.
+      # Both secrets are typed by hand in Render's dashboard and do not live
+      # in the repository, which is published whole.
       #
-      # La URL de Neon: la directa (no la de -pooler), con sslmode=verify-full
-      # y sin channel_binding. La que Neon da para copiar trae
-      # 'sslmode=require', que en esta versión de pg significa verify-full
-      # igual, pero imprime un aviso de obsolescencia y cambiará a algo más
-      # débil en pg 9; 'channel_binding' pg lo ignora.
+      # The Neon URL: the direct one (not the -pooler one), with
+      # sslmode=verify-full and no channel_binding. The one Neon gives you to
+      # copy carries 'sslmode=require', which in this pg version means
+      # verify-full all the same, but prints a deprecation warning and will
+      # change to something weaker in pg 9; pg ignores 'channel_binding'.
       - key: DATABASE_URL
         sync: false
 
-      # La base de colores: el catálogo de Sherwin-Williams que identifica los
-      # colores en la página de matizado. Es otra base y otro rol, no el mismo
-      # de arriba con otro nombre.
+      # The colour database: the Sherwin-Williams catalogue that identifies
+      # colours on the matizado page. It is another database and another
+      # role, not the one above under another name.
       #
-      # El rol es colordb_app, que no puede leer ninguna tabla: sólo ejecutar
-      # seis funciones. Se crea con SQL y nunca desde la consola de Neon, donde
-      # recibiría neon_superuser y podría leerlo todo. Ver
+      # The role is colordb_app, which cannot read any table: it can only run
+      # six functions. It is created with SQL and never from the Neon console,
+      # where it would get neon_superuser and could read everything. See
       # server/colordb/README.md.
       #
-      # Aquí el sslmode=verify-full no es una recomendación: server/colordb.js
-      # comprueba la URL al arrancar y no se conecta si falta. Si esta variable
-      # no está, el sitio funciona igual —el buscador contesta 503 y la página
-      # usa el catálogo local—, así que no es motivo para no desplegar.
+      # Here sslmode=verify-full is not a recommendation: server/colordb.js
+      # checks the URL at startup and does not connect if it is missing. If
+      # this variable is not set, the site works the same (the finder answers
+      # 503 and the page uses the local catalogue), so it is no reason not to
+      # deploy.
       #
-      # El rol dueño (AUTOCOLOR_COLORDB_ADMIN_URL) NO va aquí: carga las tablas
-      # desde la máquina de trabajo y el servidor no tiene nada que hacer con él.
+      # The owner role (AUTOCOLOR_COLORDB_ADMIN_URL) does NOT go here: it loads
+      # the tables from the work machine and the server has nothing to do with it.
       - key: AUTOCOLOR_COLORDB_URL
         sync: false
 
-      # Sin ella, /api/staff/* responde 503 y el panel queda apagado. Se lee una
-      # sola vez al arrancar (server/auth.js), así que cambiarla exige reiniciar
-      # el servicio.
+      # Without it, /api/staff/* answers 503 and the panel stays off. It is
+      # read once at startup (server/auth.js), so changing it requires
+      # restarting the service.
       - key: AUTOCOLOR_STAFF_PASSWORD
         sync: false
 
@@ -117,34 +120,34 @@ services:
         sync: false
 
       # The workshop boss, one entry written like the ones above. It is accepted
-      # without being in the list, and his profile carries the worker monitor —
-      # who is holding which vehicle — instead of the start-session button; in
+      # without being in the list, and his profile carries the worker monitor
+      # (who is holding which vehicle) instead of the start-session button; in
       # exchange he takes no vehicles. Optional: without it there is no boss and
       # the panel works the same. Read once at startup, like the other two.
       - key: AUTOCOLOR_BOSS_ID
         sync: false
 
-      # La llave de la API de Brevo, que es por donde salen los dos avisos de
-      # cada solicitud (server/mail.js). Sin ella el asistente sigue guardando
-      # solicitudes y nadie recibe aviso: el fallo se registra y ya, porque
-      # perder una solicitud por un correo sería mucho peor.
+      # The Brevo API key, which is how the two notices for each request go
+      # out (server/mail.js). Without it the wizard keeps storing requests and
+      # nobody gets a notice: the failure is logged and that is it, because
+      # losing a request over an email would be far worse.
       #
-      # POR QUÉ NO EL SMTP DE GMAIL, QUE ES LO QUE HABÍA. Desde aquí no sale.
-      # El 465 lo bloquea Render, y por el 587 —que sí deja salir— las
-      # conexiones a smtp.gmail.com se agotan sin respuesta a ratos largos.
-      # Medido: una conexión sana tarda 22 ms; estas se agotaban a los 15 000
-      # sin contestar. Se subieron los topes a un minuto y se le puso delante
-      # una cola con seis reintentos en cuarenta y ocho minutos, y aun así los
-      # avisos no llegaban. El 443 no lo bloquea nadie.
+      # WHY NOT GMAIL'S SMTP, WHICH IS WHAT THERE WAS. It does not get out from
+      # here. Render blocks 465, and on 587 (which does let traffic out)
+      # connections to smtp.gmail.com time out with no answer for long
+      # stretches. Measured: a healthy connection takes 22 ms; these timed out
+      # at 15,000 without answering. The caps went up to a minute and a queue
+      # with six retries over forty-eight minutes went in front, and still the
+      # notices did not arrive. Nobody blocks 443.
       #
-      # El remitente tiene que estar verificado en Brevo (Senders), o la API
-      # contesta 400. Por omisión es el mismo AUTOCOLOR_MAIL_SHOP de abajo.
+      # The sender has to be verified in Brevo (Senders), or the API answers
+      # 400. By default it is the same AUTOCOLOR_MAIL_SHOP below.
       - key: AUTOCOLOR_BREVO_KEY
         sync: false
 
-      # A dónde va la copia con los datos del cliente. Un Gmail personal
-      # mientras nadie tenga las llaves del correo del dominio; cambiarlo es
-      # esta línea y un reinicio, no un cambio de código.
+      # Where the copy with the customer's details goes. A personal Gmail
+      # while nobody has the keys to the domain's mail; changing it is this
+      # line and a restart, not a code change.
       - key: AUTOCOLOR_MAIL_SHOP
         value: "gabrielesarria167@gmail.com"
 

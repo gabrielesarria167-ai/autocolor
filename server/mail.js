@@ -1,53 +1,54 @@
 'use strict';
 
 /* =============================================================================
-   mail.js — los dos correos que salen con cada solicitud nueva
+   mail.js: the two emails that go out with each new request
 
-   Cuando alguien termina el asistente (pgs/repair.html) salen dos avisos:
+   When someone finishes the wizard (pgs/repair.html) two notices go out:
 
-     - al cliente: unas líneas y el código de seguimiento, que es lo único que
-       necesita para consultar su estado más tarde.
-     - al taller: los datos de contacto y el trabajo pedido, para preparar el
-       presupuesto sin tener que abrir el panel.
+     - to the customer: a few lines and the tracking code, which is all they
+       need to check their status later.
+     - to the workshop: the contact details and the job asked for, to prepare
+       the quote without opening the panel.
 
-   Salen por la API de Brevo, con una petición HTTPS al 443.
+   They go out through the Brevo API, with an HTTPS request to 443.
 
-   ANTES SALÍAN POR EL SMTP DE GMAIL Y NO FUNCIONABA. Cuatro rondas de
-   pruebas desde Render: los avisos morían en «Connection timeout» contra
-   smtp.gmail.com, primero por el 465 —que Render bloquea— y después por el
-   587, que deja salir pero no hasta Gmail. Se midió: una conexión sana se
-   establece en 22 milésimas de segundo, y las de Render se agotaban a los
-   quince mil sin respuesta. Se subieron los topes a un minuto: nada. Se le
-   puso delante una cola con seis reintentos repartidos en cuarenta y ocho
-   minutos: tampoco. Con eso quedó claro que el camino no es lento, está
-   cerrado, y que ninguna cantidad de reintentos lo abre.
+   THEY USED TO GO OUT THROUGH GMAIL'S SMTP AND IT DID NOT WORK. Four rounds of
+   tests from Render: the notices died on «Connection timeout» against
+   smtp.gmail.com, first on 465 (which Render blocks) and then on 587, which
+   lets traffic out but not as far as Gmail. It was measured: a healthy
+   connection is established in 22 milliseconds, and Render's timed out at
+   fifteen thousand with no answer. The caps went up to a minute: nothing. A
+   queue with six retries spread over forty-eight minutes went in front:
+   nothing either. That made it clear the path is not slow, it is closed, and
+   no number of retries opens it.
 
-   El 443 no lo bloquea nadie, porque es por donde va la web entera. Y Brevo
-   verifica UNA DIRECCIÓN suelta en vez de un dominio, que es lo que lo hace
-   posible aquí: el taller no tiene dominio propio —el sitio vive en el
-   subdominio de Render, cuyo DNS es de Render—, así que los proveedores que
-   piden dominio verificado quedaban descartados.
+   Nobody blocks 443, because the whole web goes through it. And Brevo
+   verifies A SINGLE ADDRESS instead of a domain, which is what makes it
+   possible here: the workshop has no domain of its own (the site lives on a
+   Render subdomain, whose DNS is Render's), so providers that require a
+   verified domain were out.
 
-   Ya no hace falta nodemailer, así que `pg` vuelve a ser la única dependencia.
-   Lo que costaba escribir a mano de SMTP era codificar los mensajes —tildes y
-   «ñ» significan MIME, quoted-printable y cabeceras codificadas—, y por HTTPS
-   eso desaparece: el cuerpo va en un JSON en UTF-8 y de las cabeceras se
-   encarga Brevo.
+   nodemailer is no longer needed, so `pg` is the only dependency again. What
+   was hard to write by hand for SMTP was encoding the messages (accents and
+   «ñ» mean MIME, quoted-printable and encoded headers), and over HTTPS that
+   goes away: the body travels as UTF-8 JSON and Brevo handles the headers.
 
-   NINGUNO DE LOS DOS PUEDE TUMBAR UNA SOLICITUD. Para cuando se envían, la
-   fila ya está en la base y el cliente ya tiene su código en pantalla. Que un
-   correo no salga es una molestia; perder la solicitud por eso sería mucho
-   peor. Por eso server.js los dispara DESPUÉS de responder el 201 y
-   notifyNewRequest() no lanza ni rechaza nunca: los fallos se registran y ya.
+   NEITHER OF THE TWO CAN BRING A REQUEST DOWN. By the time they are sent, the
+   row is already in the database and the customer already has their code on
+   screen. An email not going out is a nuisance; losing the request over it
+   would be far worse. That is why server.js fires them AFTER answering the
+   201 and notifyNewRequest() never throws or rejects: failures get logged
+   and that is it.
 
-   NO SALEN EN EL ACTO: van a una cola (OUTBOX) que los manda de uno en uno y
-   reintenta los que fallan. La cola se escribió para el problema de Gmail y se
-   queda ahora que no lo hay: una API caída un rato es algo que pasa, y volver
-   a intentarlo veinte minutos después no le cuesta nada a nadie.
+   THEY DO NOT GO OUT IMMEDIATELY: they go into a queue (OUTBOX) that sends
+   them one at a time and retries the ones that fail. The queue was written
+   for the Gmail problem and stays now that there is none: an API down for a
+   while is something that happens, and trying again twenty minutes later
+   costs nobody anything.
 
-   Sin AUTOCOLOR_BREVO_KEY no se manda nada y el sitio funciona igual. Es lo
-   que pasa en la máquina de trabajo, donde no hace falta una cuenta para
-   probar el asistente.
+   Without AUTOCOLOR_BREVO_KEY nothing is sent and the site works the same.
+   That is what happens on the work machine, where no account is needed to
+   test the wizard.
    ========================================================================== */
 
 const mailhtml = require('./mailhtml');
@@ -55,71 +56,70 @@ const mailhtml = require('./mailhtml');
 // The panel names have to read the same in the email as they did on the
 // screen the customer picked them from, and one file is what guarantees it.
 const parts = require('../src/parts.js');
-// Idem para el matizado: los envases, los acabados y los precios los nombra
-// src/paints.js, y el correo del pedido tiene que decirlos igual que la
-// página donde se eligieron.
+// Same for matizado: the containers, finishes and prices are named by
+// src/paints.js, and the order email has to say them the way the page where
+// they were chosen does.
 const paints = require('../src/paints.js');
 
-// La llave de la API de Brevo (Brevo → SMTP & API → API keys). Es lo único
-// secreto que hace falta: no hay usuario ni contraseña que guardar.
+// The Brevo API key (Brevo > SMTP & API > API keys). It is the only secret
+// needed: there is no user or password to store.
 const BREVO_KEY = process.env.AUTOCOLOR_BREVO_KEY || '';
 
-// Los dos extremos de la API. Configurables para poder apuntarlos a un
-// servidor de mentira en las pruebas sin tocar código; en producción no se
-// ponen.
+// The API's two endpoints. Configurable so tests can point them at a fake
+// server without touching code; in production they are not set.
 const SEND_URL = process.env.AUTOCOLOR_BREVO_URL || 'https://api.brevo.com/v3/smtp/email';
-// Sirve para comprobar la llave sin mandar ningún correo: ver verify().
+// Used to check the key without sending any email: see verify().
 const ACCOUNT_URL = process.env.AUTOCOLOR_BREVO_ACCOUNT_URL || 'https://api.brevo.com/v3/account';
 
-// Lo que se espera por una petición entera, desde que sale hasta la respuesta.
+// How long a whole request is waited for, from sending to the response.
 //
-// Quince segundos son muchísimos para un JSON de unos kilobytes: si Brevo
-// tarda más, es que algo va mal y lo que toca es reintentar, no seguir
-// esperando. Y como el envío va detrás de la respuesta al cliente, rendirse
-// pronto no le cuesta nada a nadie.
+// Fifteen seconds is a lot for a JSON of a few kilobytes: if Brevo takes
+// longer, something is wrong and the right move is to retry, not to keep
+// waiting. And since sending happens after answering the customer, giving up
+// early costs nobody anything.
 const REQUEST_TIMEOUT_MS = 15000;
 
-// Cuánto se espera antes de cada reintento, contando desde el intento
-// anterior: seis intentos en total repartidos en unos 48 minutos.
+// How long to wait before each retry, counted from the previous attempt: six
+// attempts in total spread over about 48 minutes.
 //
-// La escalera se escribió para el problema de Gmail —conexiones que en un rato
-// salían y en otro no— y con Brevo debería sobrar: por el 443 el primer
-// intento va a bastar casi siempre. Se queda porque el caso que cubre no
-// desaparece con el proveedor: una API puede estar caída un rato, y volver a
-// intentarlo a los veinte minutos no le cuesta nada a nadie.
+// The ladder was written for the Gmail problem (connections that went through
+// one moment and not the next) and with Brevo it should be overkill: over 443
+// the first attempt will almost always do. It stays because the case it
+// covers does not go away with the provider: an API can be down for a while,
+// and trying again twenty minutes later costs nobody anything.
 //
-// Que tarde no importa: cuando estos correos salen, la solicitud ya está
-// guardada y el cliente ya tiene su código en pantalla. Un aviso que llega
-// media hora tarde es infinitamente mejor que uno que no llega.
+// Being late does not matter: when these emails go out, the request is
+// already stored and the customer already has their code on screen. A notice
+// that arrives half an hour late is infinitely better than one that never does.
 const RETRY_DELAYS_MS = [30000, 120000, 300000, 900000, 1800000];
 
-// Tope de la cola. Con el correo caído y alguien insistiendo en el formulario,
-// esto es lo que se guarda antes de empezar a tirar lo más viejo. No es una
-// cifra medida: es un techo para que un fallo del correo no se coma la memoria
-// del proceso, que es lo único que aquí no puede pasar.
+// Queue cap. With mail down and someone insisting on the form, this is what
+// is kept before the oldest starts getting dropped. It is not a measured
+// figure: it is a ceiling so a mail failure cannot eat the process's memory,
+// which is the one thing that cannot happen here.
 const MAX_OUTBOX = 100;
 
-// A dónde va la copia del taller. Por ahora el Gmail personal que hace de
-// buzón; cuando el taller tenga el suyo, esto es una variable de entorno y no
-// un cambio de código.
+// Where the workshop's copy goes. For now the personal Gmail acting as the
+// inbox; when the workshop has its own, this is an environment variable and
+// not a code change.
 const SHOP = process.env.AUTOCOLOR_MAIL_SHOP || 'gabrielesarria167@gmail.com';
 
-// Quién firma los dos correos.
+// Who signs both emails.
 //
-// LA DIRECCIÓN TIENE QUE ESTAR VERIFICADA EN BREVO (Brevo → Senders), o la API
-// contesta 400 y no manda nada. Verificar es recibir un correo de confirmación
-// y pinchar el enlace, así que se verifica una dirección que se pueda abrir:
-// por omisión la misma del taller, que es la que ya hace de buzón.
+// THE ADDRESS HAS TO BE VERIFIED IN BREVO (Brevo > Senders), or the API
+// answers 400 and sends nothing. Verifying means receiving a confirmation
+// email and clicking the link, so verify an address that can be opened: by
+// default the workshop's own, which already acts as the inbox.
 //
-// El nombre visible sí es libre: es lo que se lee en la bandeja de entrada.
+// The display name is free: it is what is read in the inbox.
 const SENDER = {
     name: process.env.AUTOCOLOR_MAIL_FROM_NAME || 'Autocolor',
     email: process.env.AUTOCOLOR_MAIL_FROM || SHOP,
 };
 
-// Para los enlaces de los correos. RENDER_EXTERNAL_URL la pone el alojamiento
-// sola; en la máquina de trabajo no hay ninguna y los enlaces se omiten, que
-// es mejor que mandar un http://localhost:3000 que no le sirve a nadie.
+// For the links in the emails. The host sets RENDER_EXTERNAL_URL itself; on
+// the work machine there is none and the links are left out, which beats
+// sending an http://localhost:3000 that helps nobody.
 const SITE_URL = (process.env.AUTOCOLOR_SITE_URL || process.env.RENDER_EXTERNAL_URL || '')
     .replace(/\/+$/, '');
 
@@ -128,39 +128,39 @@ const SITE_URL = (process.env.AUTOCOLOR_SITE_URL || process.env.RENDER_EXTERNAL_
 // mailhtml.js shows whichever fits the reader's system. Both are rendered by
 // tools/tracelogo.py.
 //
-// IBA PEGADO AL MENSAJE Y AHORA NO PUEDE. Un logotipo dentro del correo se
-// referencia por su identificador (cid:), y eso es una cabecera MIME que la
-// API de Brevo no expone: su lista de adjuntos acepta un archivo con nombre,
-// no un adjunto en línea. Un data: URI tampoco vale —Gmail lo borra—, así que
-// queda la URL, que es lo que hacen casi todos los correos que uno recibe.
+// IT USED TO BE ATTACHED TO THE MESSAGE AND NOW IT CANNOT BE. A logo inside
+// the email is referenced by its identifier (cid:), and that is a MIME header
+// the Brevo API does not expose: its attachment list takes a named file, not
+// an inline attachment. A data: URI will not do either (Gmail strips it), so
+// what remains is the URL, which is what nearly every email one gets does.
 //
-// SON PNG CON TRANSPARENCIA Y NO JPEG, que es lo que había. El JPEG llevaba el
-// fondo blanco pegado, y los clientes que invierten los colores por su cuenta
-// —Gmail en el móvil, sin ir más lejos— no tocan las imágenes: la tarjeta se
-// volvía oscura y el logotipo se quedaba como un ladrillo blanco en medio. Sin
-// fondo, cae bien sobre lo que haya. De paso pesan menos: 5 y 6 KB contra los
-// 18 del JPEG, porque el dibujo son tres tintas y entra en una paleta.
+// THEY ARE PNGs WITH TRANSPARENCY, NOT JPEGs as before. The JPEG carried its
+// white background, and clients that invert colours on their own (Gmail on a
+// phone, for one) leave images alone: the card went dark and the logo stayed
+// as a white brick in the middle. With no background it sits well on
+// anything. They also weigh less: 5 and 6 KB against the JPEG's 18, because
+// the drawing is three inks and fits a palette.
 //
-// El sitio es público y sirve /imgs/ (ver serveStatic en server/server.js).
+// The site is public and serves /imgs/ (see serveStatic in server/server.js).
 //
-// Si el cliente de correo no baja imágenes remotas, se ve el texto alternativo
-// y ya; y sin sitio conocido —la máquina de trabajo— no hay URL que poner, así
-// que mailhtml.js escribe el nombre del taller en su lugar.
+// If the mail client does not download remote images, the alt text shows and
+// that is it; and with no known site (the work machine) there is no URL to
+// put, so mailhtml.js writes the workshop's name instead.
 const LOGO_URL = SITE_URL ? `${SITE_URL}/imgs/brand/logo-email.png` : '';
 const LOGO_DARK_URL = SITE_URL ? `${SITE_URL}/imgs/brand/logo-email-white.png` : '';
 
-// Copia de src/staff.js. Son dos y no pueden leerse entre ellas —una corre en
-// el navegador y la otra aquí—, así que las dos tienen que decir lo mismo, del
-// mismo modo que los estados (ver la nota de src/statuses.js).
+// A copy of src/staff.js. There are two and they cannot read each other (one
+// runs in the browser and the other here), so both have to say the same, the
+// same way as the statuses (see the note in src/statuses.js).
 const QUALITY_LABELS = {
     standard: 'Económico',
     premium: 'Profesional',
     custom: 'Alta gama',
 };
 
-// Copia de src/carModels.js (BODY_TYPES) y de src/lookup.js (VEHICLE_LABELS).
-// Sin ellas el correo del taller decía «sedan» y «wagon» —los identificadores
-// del catálogo— donde el resto del sitio dice «Sedán» y «Familiar».
+// A copy of src/carModels.js (BODY_TYPES) and src/lookup.js (VEHICLE_LABELS).
+// Without them the workshop email said «sedan» and «wagon» (the catalogue's
+// identifiers) where the rest of the site says «Sedán» and «Familiar».
 const BODY_TYPE_LABELS = {
     sedan: 'Sedán',
     hatchback: 'Hatchback',
@@ -179,13 +179,13 @@ const VEHICLE_LABELS = {
     suv: 'SUV',
 };
 
-// Object.hasOwn y no `MAPA[id] || id`: sin él, `id` valiendo 'constructor' o
-// 'toString' saca lo que hereda el objeto de Object.prototype, y el correo del
-// taller pedía presupuesto para «function Object() { [native code] }». Las
-// piezas vienen del formulario, así que el que las escribe elige el `id`; los
-// mapas de aquí abajo son cerrados, pero se leen igual para no dejar la
-// trampa puesta para el próximo mapa que sí venga de fuera. La misma guarda
-// está en label() de src/parts.js, que es el que nombra las piezas.
+// Object.hasOwn and not `MAP[id] || id`: without it, `id` being 'constructor'
+// or 'toString' pulls out what the object inherits from Object.prototype, and
+// the workshop email asked for a quote on «function Object() { [native code] }».
+// The parts come from the form, so whoever fills it in picks the `id`; the
+// maps down here are closed, but they are read the same way so the trap is
+// not left set for the next map that does come from outside. The same guard
+// is in label() in src/parts.js, which is what names the parts.
 function label(map, id) {
     return Object.hasOwn(map, id) ? map[id] : id;
 }
@@ -206,8 +206,8 @@ function vehicleLabel(id) {
 }
 
 /**
- * '+51935646304' -> '+51 935 646 304'. Un número de nueve dígitos de corrido
- * no se lee ni se dicta; el sitio lo enseña así en todas partes.
+ * '+51935646304' -> '+51 935 646 304'. Nine digits in a row cannot be read
+ * or dictated; the site shows it this way everywhere.
  */
 function formatPhone(value) {
     const match = /^\+51(\d{3})(\d{3})(\d{3})$/.exec(oneLine(value));
@@ -219,13 +219,13 @@ function qualityLabel(id) {
 }
 
 /**
- * 85000 -> «85,000 km», y nada si no lo dejó.
+ * 85000 -> «85,000 km», and nothing if they left it out.
  *
- * Existe como función porque los dos cuerpos —el de texto y el HTML— lo
- * necesitan, y mientras fueron dos expresiones copiadas se separaron: una
- * miraba solo `null` y la otra `null` y `undefined`, así que un kilometraje
- * ausente armaba bien el HTML y reventaba el texto. Lo mismo vale para
- * zoneLabel() y vehicleName().
+ * It exists as a function because both bodies (the text one and the HTML)
+ * need it, and while they were two copied expressions they drifted apart: one
+ * checked only `null` and the other `null` and `undefined`, so a missing
+ * mileage built the HTML fine and blew up the text. The same goes for
+ * zoneLabel() and vehicleName().
  */
 function mileageLabel(value) {
     return value === null || value === undefined ? '' : `${value.toLocaleString('es-PE')} km`;
@@ -236,16 +236,15 @@ function zoneLabel(data) {
     return [oneLine(data.department), oneLine(data.province)].filter(Boolean).join(' / ');
 }
 
-/** «Toyota Corolla», y con el año si se pide. */
 /**
- * Marca y modelo, con el año si se pide.
+ * Make and model («Toyota Corolla»), with the year if asked for.
  *
- * `orSilhouette` es para el correo del cliente. Un vehículo registrado en el
- * local puede no traer ni marca ni modelo —el jefe elige la silueta y se salta
- * el catálogo—, y sin respaldo la línea «Vehículo» salía vacía y detailRows la
- * quitaba, así que el correo no nombraba ningún vehículo. El del taller no lo
- * pide: ya lleva su propia fila «Silueta 3D» justo debajo, y con el respaldo
- * decía «SUV» dos veces seguidas.
+ * `orSilhouette` is for the customer's email. A vehicle registered at the
+ * counter may carry neither make nor model (the boss picks the silhouette and
+ * skips the catalogue), and with no fallback the «Vehículo» line came out
+ * empty and detailRows dropped it, so the email named no vehicle at all. The
+ * workshop's does not ask for it: it already has its own «Silueta 3D» row
+ * right below, and with the fallback it said «SUV» twice in a row.
  */
 function vehicleName(data, withYear, orSilhouette) {
     const parts = [oneLine(data.brand), oneLine(data.model)];
@@ -254,9 +253,9 @@ function vehicleName(data, withYear, orSilhouette) {
     return named || (orSilhouette ? vehicleLabel(data.vehicle) : '');
 }
 
-// Lo que mailhtml.js necesita de aquí para armar las dos maquetas. Se pasa en
-// vez de que allí se importe medio módulo: así las etiquetas y la dirección
-// del sitio siguen viviendo en un solo sitio.
+// What mailhtml.js needs from here to build the two layouts. Passed in rather
+// than importing half a module there: that way the labels and the site
+// address keep living in one place.
 function htmlContext() {
     return { oneLine, partLabel, qualityLabel, bodyTypeLabel, vehicleLabel,
              formatPhone, mileageLabel, zoneLabel, vehicleName,
@@ -307,24 +306,24 @@ function isConfigured() {
 }
 
 /**
- * Un valor del formulario en una sola línea.
+ * A form value on a single line.
  *
- * validateRequest() recorta los extremos pero no toca lo de dentro, así que un
- * nombre pegado desde otro sitio puede traer saltos de línea. En un cuerpo de
- * texto plano eso solo descuadra la lista de datos —no hay cabeceras que
- * inyectar: el mensaje va en un JSON y las cabeceras las arma Brevo—, pero un
- * correo cuadrado se lee mejor.
+ * validateRequest() trims the ends but leaves the inside alone, so a name
+ * pasted from elsewhere can carry line breaks. In a plain-text body that only
+ * misaligns the details list (there are no headers to inject: the message
+ * travels as JSON and Brevo builds the headers), but an aligned email reads
+ * better.
  */
 function oneLine(value) {
     if (value === undefined || value === null || value === '') return '';
     return String(value).replace(/\s+/g, ' ').trim();
 }
 
-// El ancho de la columna de etiquetas del cuerpo de texto. Cabe la más larga
-// («Código de color») con un espacio de sobra.
+// The width of the label column in the text body. It fits the longest
+// («Código de color») with a space to spare.
 const LABEL_WIDTH = 16;
 
-/** «  Teléfono          +51935646304», o nada si el dato no vino. */
+/** «  Teléfono          +51935646304», or nothing if the value did not come. */
 function row(label, value) {
     const clean = oneLine(value);
     if (!clean) return null;
@@ -338,10 +337,10 @@ function block(title, rows) {
 }
 
 /**
- * Un intento de envío: una petición a la API de Brevo.
+ * One send attempt: one request to the Brevo API.
  *
- * Rechaza si falta la llave, si no se llega a la API o si la API contesta que
- * no. Quien llama decide si reintentar —lo hace drain()— o rendirse.
+ * Rejects if the key is missing, if the API cannot be reached or if the API
+ * says no. The caller decides whether to retry (drain() does) or give up.
  */
 async function attemptSend(message) {
     if (!isConfigured()) throw new Error('Falta AUTOCOLOR_BREVO_KEY');
@@ -349,20 +348,20 @@ async function attemptSend(message) {
 }
 
 /**
- * El mensaje, en la forma que pide la API.
+ * The message, in the shape the API asks for.
  *
- * Los cuerpos se arman igual que antes y se traducen aquí: así el resto del
- * archivo —y mailhtml.js entero— no sabe por dónde salen los correos, que es
- * lo que hizo que cambiar de transporte fuera solo este trozo.
+ * The bodies are built as before and translated here: that way the rest of
+ * the file (and all of mailhtml.js) does not know how the emails go out,
+ * which is what made switching transport a matter of this one piece.
  */
 function brevoBody(message) {
     const body = {
         sender: SENDER,
         to: message.to.map((email) => ({ email })),
         subject: message.subject,
-        // Los dos cuerpos viajan juntos y Brevo arma el multipart/alternative.
-        // El de texto no es un resto: es lo que se ve en los clientes que no
-        // pintan HTML y en los avisos del reloj o del móvil.
+        // Both bodies travel together and Brevo builds the multipart/alternative.
+        // The text one is not a leftover: it is what shows in clients that do
+        // not render HTML and in watch or phone notifications.
         htmlContent: message.html,
         textContent: message.text,
     };
@@ -371,11 +370,11 @@ function brevoBody(message) {
 }
 
 /**
- * Una petición a la API, con su tope de tiempo y sus errores ya interpretados.
+ * A request to the API, with its time cap and its errors already interpreted.
  *
- * El error sale diciendo qué contestó y cuánto tardó, que es lo que hace que
- * un fallo se lea sin adivinar: un 401 en 200 ms dice que la llave está mal, y
- * un tiempo agotado a los 15 s dice que no se llega a la API.
+ * The error comes out saying what the API answered and how long it took,
+ * which is what makes a failure readable without guessing: a 401 in 200 ms
+ * says the key is wrong, and a timeout at 15 s says the API cannot be reached.
  */
 async function request(url, { method = 'GET', body } = {}) {
     const started = Date.now();
@@ -392,22 +391,22 @@ async function request(url, { method = 'GET', body } = {}) {
             signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         });
     } catch (err) {
-        // Ni siquiera hubo respuesta. Se conserva el error original en `cause`
-        // porque es donde viene el código que dice si se llegó a conectar, y
-        // de eso depende si se puede reintentar sin duplicar (ver
-        // isDeliveryUnknown).
+        // There was not even a response. The original error is kept in `cause`
+        // because that is where the code saying whether a connection was made
+        // lives, and whether a retry can happen without duplicating depends on
+        // it (see isDeliveryUnknown).
         throw decorate(new Error(reasonFor(err)), { cause: err, started });
     }
 
     if (response.ok) return readJson(response);
 
-    // La API contesta el motivo en el cuerpo, y es el dato que convierte «400»
-    // en «el remitente no está verificado». Si no viniera, queda el número.
+    // The API gives the reason in the body, and that is what turns «400» into
+    // «the sender is not verified». If it is missing, the number remains.
     const detail = await readJson(response).then(
         (data) => (data && (data.message || data.code)) || '',
         () => '',
     );
-    throw decorate(new Error(`${response.status} ${response.statusText}${detail ? ` — ${detail}` : ''}`),
+    throw decorate(new Error(`${response.status} ${response.statusText}${detail ? `: ${detail}` : ''}`),
                    { status: response.status, started });
 }
 
@@ -418,7 +417,7 @@ function decorate(err, { cause, status, started }) {
     return err;
 }
 
-/** El cuerpo de la respuesta, o null si no era JSON. Nunca lanza. */
+/** The response body, or null if it was not JSON. Never throws. */
 async function readJson(response) {
     try {
         return await response.json();
@@ -427,7 +426,7 @@ async function readJson(response) {
     }
 }
 
-/** Un motivo legible para un fallo que no llegó a tener respuesta. */
+/** A readable reason for a failure that never got a response. */
 function reasonFor(err) {
     if (err.name === 'TimeoutError') return 'la API no contestó a tiempo';
     if (err.name === 'AbortError') return 'la petición se canceló';
@@ -436,46 +435,46 @@ function reasonFor(err) {
 }
 
 /**
- * ¿Tiene sentido volver a intentarlo?
+ * Is it worth trying again?
  *
- * Un 4xx es la API contestando que no, y siempre por algo que repetir no
- * cambia: la llave está mal (401), el remitente no está verificado o el cuerpo
- * está mal armado (400). La excepción es el 429, que es «ahora no» y no «no»:
- * ese es exactamente para lo que existe la escalera de reintentos.
+ * A 4xx is the API saying no, and always for something repeating will not
+ * change: the key is wrong (401), the sender is not verified or the body is
+ * malformed (400). The exception is 429, which means «not now» rather than
+ * «no»: that is exactly what the retry ladder exists for.
  *
- * Todo lo demás —5xx, tiempos agotados, fallos de red— es pasajero por
- * definición.
+ * Everything else (5xx, timeouts, network failures) is transient by
+ * definition.
  */
 function isPermanent(err) {
     return Number.isInteger(err.status) && err.status >= 400 && err.status < 500 && err.status !== 429;
 }
 
-// Los códigos que solo aparecen cuando la conexión NO llegó a establecerse. Si
-// no hubo conexión, no salió ni un byte del mensaje.
+// The codes that only appear when the connection was NOT established. With
+// no connection, not a single byte of the message went out.
 const NEVER_CONNECTED = new Set([
-    'ENOTFOUND',               // el nombre no resuelve
-    'EAI_AGAIN',               // el DNS no contesta
-    'ECONNREFUSED',            // hay ruta, no hay nadie escuchando
-    'ENETUNREACH',             // no hay ruta
-    'EHOSTUNREACH',            // no se alcanza la máquina
-    'UND_ERR_CONNECT_TIMEOUT', // se agotó estableciendo la conexión
-    'CERT_HAS_EXPIRED',        // TLS: se rechazó antes de mandar nada
+    'ENOTFOUND',               // the name does not resolve
+    'EAI_AGAIN',               // DNS does not answer
+    'ECONNREFUSED',            // there is a route, nobody is listening
+    'ENETUNREACH',             // there is no route
+    'EHOSTUNREACH',            // the machine cannot be reached
+    'UND_ERR_CONNECT_TIMEOUT', // timed out establishing the connection
+    'CERT_HAS_EXPIRED',        // TLS: refused before sending anything
 ]);
 
 /**
- * ¿Nos quedamos sin saber si el correo se entregó?
+ * Are we left not knowing whether the email was delivered?
  *
- * Con respuesta no hay duda: un 2xx es que Brevo lo aceptó y cualquier otro
- * código es que no. Sin respuesta, depende de dónde se cortó:
+ * With a response there is no doubt: a 2xx means Brevo accepted it and any
+ * other code means it did not. Without a response, it depends on where it
+ * was cut:
  *
- *   - Si no se llegó a conectar, el mensaje no salió. Reintentar es gratis.
- *   - Si se cortó ESPERANDO la respuesta, la petición ya iba de camino y Brevo
- *     puede haberla aceptado: reintentar entregaría el mismo correo dos veces.
- *     Ahí se para, aunque signifique quedarse sin saberlo.
+ *   - If the connection was never made, the message did not go out. Retrying is free.
+ *   - If it was cut WAITING for the response, the request was already on its
+ *     way and Brevo may have accepted it: retrying would deliver the same
+ *     email twice. There it stops, even if that means never knowing.
  *
- * Un error que no encaje en ninguno de los dos se reintenta, que es el lado
- * por el que conviene equivocarse: un duplicado se ve y se explica, un correo
- * que no llegó no se ve.
+ * An error that fits neither is retried, which is the side to err on: a
+ * duplicate shows and can be explained, an email that never arrived does not show.
  */
 function isDeliveryUnknown(err) {
     if (Number.isInteger(err.status)) return false;
@@ -486,7 +485,7 @@ function isDeliveryUnknown(err) {
 }
 
 /* -----------------------------------------------------------------------------
-   Los dos mensajes
+   The two messages
 -------------------------------------------------------------------------- */
 
 function customerMessage(created, data, walkIn) {
@@ -506,7 +505,7 @@ function customerMessage(created, data, walkIn) {
         '',
         // The same steps the HTML draws as a track, as a numbered list.
         ...customerSteps(created, walkIn).map((step, i) =>
-            `  ${i + 1}. ${step.title}${step.detail ? ` — ${step.detail}` : ''}`),
+            `  ${i + 1}. ${step.title}${step.detail ? `: ${step.detail}` : ''}`),
         '',
         'Tu código de seguimiento es:',
         '',
@@ -514,21 +513,21 @@ function customerMessage(created, data, walkIn) {
         '',
     ];
 
-    // El mismo texto que la pantalla de éxito del asistente, para que el
-    // correo no diga una cosa distinta de la que acaba de leer en el sitio.
+    // The same text as the wizard's success screen, so the email does not say
+    // something different from what they just read on the site.
     lines.push(SITE_URL
         ? `Guárdalo: con este código puedes ver el estado de tu ${walkIn ? 'vehículo' : 'solicitud'} en\n${SITE_URL}/pgs/repair.html#consulta`
         : `Guárdalo: con este código puedes ver el estado de tu ${walkIn ? 'vehículo' : 'solicitud'} en nuestro sitio.`);
 
-    lines.push('', '— Autocolor');
+    lines.push('', 'Autocolor');
 
     return {
         to: [data.email],
-        // Solo el código, que lo genera el servidor. Nada que haya escrito
-        // quien rellenó el formulario entra en el asunto.
+        // Only the code, which the server generates. Nothing typed by whoever
+        // filled in the form goes into the subject.
         subject: walkIn
-            ? `Tu vehículo en Autocolor — código ${created.id}`
-            : `Tu solicitud en Autocolor — código ${created.id}`,
+            ? `Tu vehículo en Autocolor: código ${created.id}`
+            : `Tu solicitud en Autocolor: código ${created.id}`,
         text: lines.join('\n'),
         html: mailhtml.customerHtml(created, data, htmlContext(), walkIn),
     };
@@ -556,9 +555,9 @@ function shopMessage(created, data, walkIn) {
             row('Placa', data.plate),
             row('Kilometraje', mileageLabel(data.mileage)),
             row('Código de color', data.colorCode),
-            // La silueta del visor 3D no siempre coincide con la carrocería
-            // real (el catálogo tiene cuatro siluetas y ocho carrocerías), así
-            // que va aparte y no en lugar de la de arriba.
+            // The 3D viewer's silhouette does not always match the real body
+            // (the catalogue has four silhouettes and eight bodies), so it
+            // goes separately and not in place of the one above.
             row('Silueta 3D', vehicleLabel(data.vehicle)),
         ]),
         block('TRABAJO', [
@@ -569,60 +568,59 @@ function shopMessage(created, data, walkIn) {
                 ? `(${data.parts.length}) ${data.parts.map(partLabel).join(', ')}`
                 : 'Sin definir'),
         ]),
-        // Las notas se dejan como las escribió el cliente, con sus saltos de
-        // línea: son lo único del formulario donde el formato dice algo.
+        // The notes are left as the customer wrote them, with their line
+        // breaks: they are the only part of the form where formatting says something.
         data.notes ? `NOTAS\n${data.notes}` : null,
         SITE_URL ? `Panel del taller: ${SITE_URL}/pgs/taller.html` : null,
     ];
 
     const message = {
         to: [SHOP],
-        // La placa ya pasó por PLATE_RE y el código lo genera el servidor: los
-        // dos son seguros de poner en el asunto. With no plate (only rows from
-        // before walk-ins required one) the code is left, which always exists.
+        // The plate has already passed PLATE_RE and the server generates the
+        // code: both are safe to put in the subject. With no plate (only rows
+        // from before walk-ins required one) the code is left, which always exists.
         subject: data.plate
-            ? `Solicitud ${created.id} — ${data.plate}`
+            ? `Solicitud ${created.id}, placa ${data.plate}`
             : `Solicitud ${created.id}`,
         text: blocks.filter(Boolean).join('\n\n'),
         html: mailhtml.shopHtml(created, data, htmlContext(), walkIn),
     };
 
-    // Responder al correo del taller le escribe al cliente, que es lo que uno
-    // quiere hacer al leerlo.
+    // Replying to the workshop email writes to the customer, which is what
+    // one wants to do on reading it.
     if (data.email) message.replyTo = data.email;
 
     return message;
 }
 
 /* -----------------------------------------------------------------------------
-   Lo que llama server.js
+   What server.js calls
 -------------------------------------------------------------------------- */
 
-// La cola de salida: los correos que faltan por mandar, cada uno con el
-// intento por el que va y el momento a partir del cual se puede reintentar.
+// The outbox: the emails still to send, each with the attempt it is on and
+// the moment from which it can be retried.
 //
-// Vive en memoria, y eso es una decisión, no un descuido: guardarla en
-// Postgres pediría una tabla y una migración a mano (ver render.yaml) para
-// proteger un caso —que Render apague la instancia justo en la media hora en
-// que el correo está caído— en el que además no se pierde nada importante: la
-// solicitud está en la base y el panel del taller la enseña igual. Lo que sí
-// se hace es DECIRLO al apagar (ver close()), para que un aviso que no salió
-// no se vaya en silencio.
+// It lives in memory, and that is a decision, not an oversight: storing it in
+// Postgres would need a table and a hand-run migration (see render.yaml) to
+// protect a case (Render shutting the instance down right in the half hour
+// mail is down) in which nothing important is lost anyway: the request is in
+// the database and the workshop panel shows it just the same. What it does do
+// is SAY SO on shutdown (see close()), so a notice that did not go out does
+// not leave silently.
 const OUTBOX = [];
 
-// La cola se recorre de una en una (ver también oneAtATime, que serializa
-// además con la comprobación del arranque).
+// The queue is walked one at a time (see also oneAtATime, which also
+// serialises with the startup check).
 let draining = false;
 let retryTimer = null;
 
 /* -----------------------------------------------------------------------------
-   Pedidos de matizado (pgs/paintings.html)
+   Matizado orders (pgs/paintings.html)
 
-   Los mismos dos correos —uno al cliente con su código, otro al taller con la
-   ficha— para el otro formulario del sitio. Las etiquetas salen de
-   src/paints.js, que es el archivo que la página lee para dibujar las
-   tarjetas: así el correo dice «1/4 galón (946 ml)» donde la pantalla decía
-   lo mismo.
+   The same two emails (one to the customer with their code, another to the
+   workshop with the order sheet) for the site's other form. The labels come
+   from src/paints.js, the file the page reads to draw the cards: that way
+   the email says «1/4 galón (946 ml)» where the screen said the same.
 -------------------------------------------------------------------------- */
 
 const PAINT_METHOD_LABELS = {
@@ -640,13 +638,13 @@ function finishLabel(id) {
     return id ? paints.finishLabel(id) : '';
 }
 
-/** «Toyota 1F7 · Plata Metálico», o lo que haya de eso. */
+/** «Toyota 1F7, Plata Metálico», or whatever of that there is. */
 function colourName(data) {
     const code = [oneLine(data.brand), oneLine(data.colorCode)].filter(Boolean).join(' ');
-    return [code, oneLine(data.colorName)].filter(Boolean).join(' · ');
+    return [code, oneLine(data.colorName)].filter(Boolean).join(', ');
 }
 
-/** «1/4 galón (946 ml) × 2», o nada cuando el envase se decide en el taller. */
+/** «1/4 galón (946 ml) × 2», or nothing when the container is decided at the workshop. */
 function orderLine(data) {
     const size = data.size ? paints.size(data.size) : null;
     if (!size) return '';
@@ -660,21 +658,23 @@ function priceLabel(price) {
 
 function readingLabel(reading) {
     if (!reading) return '';
-    return `L* ${reading.L} · a* ${reading.a} · b* ${reading.b}`;
+    return `L* ${reading.L}, a* ${reading.a}, b* ${reading.b}`;
 }
 
 /**
- * El hex de la muestra.
+ * The swatch's hex.
  *
- * Primero el que el servidor ya resolvió contra la base de colores al confirmar
- * el pedido (confirmColour en server/server.js deja data.hex): es la muestra
- * del color exacto que el cliente eligió, incluidos los 693k colores de la base
- * que el catálogo local no tiene. Ese era el bug —muchos colores salían sin
- * muestra porque aquí solo se buscaba en el catálogo local—.
+ * First the one the server already resolved against the colour database when
+ * confirming the order (confirmColour in server/server.js leaves data.hex):
+ * it is the swatch of the exact colour the customer picked, including the
+ * database's 693k colours the local catalogue lacks. That was the bug: many
+ * colours came out without a swatch because only the local catalogue was
+ * searched here.
  *
- * Sin él —color del catálogo local, base de colores apagada, o un pedido viejo
- * reenviado sin pasar por confirmColour— se cae al catálogo local como antes.
- * Vacío cuando tampoco está ahí; el correo se arma igual, sin muestra.
+ * Without it (a local catalogue colour, the colour database off, or an old
+ * order resent without going through confirmColour) it falls back to the
+ * local catalogue as before. Empty when it is not there either; the email
+ * builds the same, without a swatch.
  */
 function colourHex(data) {
     if (data.hex) return data.hex;
@@ -706,8 +706,8 @@ function paintCustomerMessage(created, data) {
             : ['Recibimos tu pedido de matizado. Preparamos la fórmula y te avisamos',
                'en cuanto esté lista para recoger.']),
         '',
-        // El paso siguiente lo damos nosotros: escribimos por WhatsApp dentro
-        // de 24 h para coordinar la cita o la entrega y afinar los detalles.
+        // The next step is ours: we write on WhatsApp within 24 h to arrange
+        // the appointment or the pickup and settle the details.
         ...(inPerson
             ? ['Te escribimos por WhatsApp dentro de las próximas 24 horas para',
                'coordinar la cita y ver los detalles.']
@@ -716,9 +716,9 @@ function paintCustomerMessage(created, data) {
         '',
     ];
 
-    // Sin color ni envase todavía, el bloque no puede llamarse «tu pedido»: lo
-    // que hay es una visita, y la única línea que se puede escribir del color
-    // es dónde se va a medir.
+    // With no colour or container yet, the block cannot be called «tu
+    // pedido»: what there is is a visit, and the only line that can be
+    // written about the colour is where it will be measured.
     const rows = [
         row('Nombre taller', data.company),
         row('Color', inPerson ? 'Se mide en el taller' : colourName(data)),
@@ -739,13 +739,13 @@ function paintCustomerMessage(created, data) {
             'color se aprueba con plancha de prueba antes de entregarlo.');
     }
 
-    lines.push('', '— Autocolor');
+    lines.push('', 'Autocolor');
 
     return {
         to: [data.email],
         subject: inPerson
-            ? `Tu visita a Autocolor — código ${created.id}`
-            : `Tu pedido de matizado en Autocolor — código ${created.id}`,
+            ? `Tu visita a Autocolor: código ${created.id}`
+            : `Tu pedido de matizado en Autocolor: código ${created.id}`,
         text: lines.join('\n'),
         html: mailhtml.paintCustomerHtml(created, data, paintContext()),
     };
@@ -778,18 +778,18 @@ function paintShopMessage(created, data) {
 
     return {
         to: [SHOP],
-        // Responder al correo le escribe al cliente, que es lo que se hace con
-        // esto: confirmar el color o avisar de que ya está listo.
+        // Replying to the email writes to the customer, which is what this is
+        // for: confirming the colour or saying it is ready.
         replyTo: data.email || undefined,
-        subject: `Matizado ${created.id} — ${oneLine(data.company)}`,
+        subject: `Matizado ${created.id}, ${oneLine(data.company)}`,
         text: blocks.filter(Boolean).join('\n\n'),
         html: mailhtml.paintShopHtml(created, data, paintContext()),
     };
 }
 
 /**
- * Avisa de un pedido de matizado nuevo. Mismas reglas que notifyNewRequest():
- * no lanza, encola los dos mensajes y devuelve en cuanto están en la cola.
+ * Announces a new matizado order. Same rules as notifyNewRequest(): it does
+ * not throw, it queues both messages and returns as soon as they are queued.
  */
 function notifyNewPaintOrder(created, data) {
     if (!isConfigured()) return { customer: false };
@@ -809,30 +809,30 @@ function notifyNewPaintOrder(created, data) {
 }
 
 /**
- * Avisa de una solicitud nueva por correo. NO LANZA NI RECHAZA NUNCA, ni
- * siquiera si armar los mensajes falla: se la llama sin `await` y sin
- * `.catch()` desde el manejador de POST /api/requests, que ya contestó su 201.
+ * Announces a new request by email. IT NEVER THROWS OR REJECTS, not even if
+ * building the messages fails: it is called without `await` and without
+ * `.catch()` from the POST /api/requests handler, which already sent its 201.
  *
- * Devuelve en cuanto los mensajes están en la cola. Lo que tarden en salir es
- * asunto de drain().
+ * Returns as soon as the messages are queued. How long they take to go out is
+ * drain()'s business.
  */
 function notifyNewRequest(created, data, options) {
     if (!isConfigured()) return { customer: false };
     // Registered at the counter rather than sent from the website. Only the
-    // wording changes — both messages go out the same way, to the same two
-    // places — but a walk-in told «te contactaremos en 24 horas con tu
+    // wording changes (both messages go out the same way, to the same two
+    // places) but a walk-in told «te contactaremos en 24 horas con tu
     // presupuesto» would read as a letter that did not notice they came in.
     const walkIn = !!(options && options.walkIn);
 
-    // Uno y otro por separado: que armar el del taller falle no puede dejar al
-    // cliente sin su código, ni al revés.
+    // Each one separately: the workshop's failing to build cannot leave the
+    // customer without their code, nor the other way round.
     if (withinDailyCap('shop', '')) {
         enqueue(`aviso al taller de ${created.id}`, () => shopMessage(created, data, walkIn));
     }
 
-    // El asistente ya lo exige, pero la guarda se queda: en la base hay
-    // solicitudes anteriores a que el correo fuera obligatorio, y sin ella
-    // reenviar una de esas mandaría un mensaje a `undefined`.
+    // The wizard already requires it, but the guard stays: the database holds
+    // requests from before email was required, and without it resending one
+    // of those would send a message to `undefined`.
     let customer = false;
     if (data.email && withinDailyCap('customer', data.email)) {
         enqueue(`confirmación al cliente de ${created.id}`, () => customerMessage(created, data, walkIn));
@@ -895,13 +895,13 @@ function withinDailyCap(kind, address) {
 }
 
 /**
- * Pone un correo en la cola. El mensaje se arma AQUÍ y no fuera, para que un
- * fallo al armarlo muera dentro de este try.
+ * Puts an email in the queue. The message is built HERE and not outside, so
+ * a failure while building it dies inside this try.
  *
- * Antes notifyNewRequest() era `async` y se la llamaba sin `.catch()`: un error
- * al armar un cuerpo se convertía en una promesa rechazada sin dueño, y Node se
- * lleva el proceso entero por eso —con el 201 ya mandado y todas las sesiones
- * del panel dentro—.
+ * notifyNewRequest() used to be `async` and was called without `.catch()`: an
+ * error building a body became an unhandled rejected promise, and Node takes
+ * the whole process down for that (with the 201 already sent and every panel
+ * session inside it).
  */
 function enqueue(what, build) {
     let message;
@@ -911,7 +911,7 @@ function enqueue(what, build) {
         console.error(`[mail] no se pudo armar ${what}: ${err.message}`);
         return;
     }
-    // `retryAt` en 0 y no en Date.now(): se puede mandar ya.
+    // `retryAt` at 0 and not Date.now(): it can go right away.
     OUTBOX.push({ what, message, attempt: 0, retryAt: 0 });
     while (OUTBOX.length > MAX_OUTBOX) {
         const dropped = OUTBOX.shift();
@@ -919,14 +919,14 @@ function enqueue(what, build) {
     }
 }
 
-/** drain() sin dueño, que es como se la llama siempre. */
+/** drain() with nobody awaiting it, which is how it is always called. */
 function kick() {
     drain().catch((err) => console.error(`[mail] fallo inesperado en la cola: ${err.message}`));
 }
 
 /**
- * Manda lo que ya toca mandar, de uno en uno, y deja programado el siguiente
- * reintento si algo se quedó por el camino.
+ * Sends whatever is due, one at a time, and schedules the next retry if
+ * something was left along the way.
  */
 async function drain() {
     if (draining) return;
@@ -940,24 +940,24 @@ async function drain() {
 
             try {
                 await attemptSend(item.message);
-                // Las direcciones no se registran: el registro del alojamiento
-                // no es sitio para los datos de contacto de un cliente. El
-                // código de la solicitud basta para seguir el rastro.
+                // Addresses are not logged: the host's log is no place for a
+                // customer's contact details. The request code is enough to
+                // follow the trail.
                 const which = item.attempt > 0 ? ` (al intento ${item.attempt + 1})` : '';
                 console.log(`[mail] salió ${item.what}${which}`);
             } catch (err) {
-                // Se corta la conversación sin saber si el mensaje entró.
-                // Reintentar podría entregarlo dos veces, así que se para y se
-                // dice, que es lo único honesto: puede que haya llegado.
+                // The conversation was cut without knowing whether the message
+                // got in. Retrying could deliver it twice, so it stops and
+                // says so, which is the only honest thing: it may have arrived.
                 if (isDeliveryUnknown(err)) {
-                    console.error(`[mail] ${item.what}: se cortó sin respuesta y puede haber llegado; no se reintenta para no duplicarlo — ${err.message}`);
+                    console.error(`[mail] ${item.what}: se cortó sin respuesta y puede haber llegado; no se reintenta para no duplicarlo: ${err.message}`);
                     continue;
                 }
-                // `undefined` cuando se acabaron los intentos.
+                // `undefined` when the attempts ran out.
                 const delay = isPermanent(err) ? undefined : RETRY_DELAYS_MS[item.attempt];
                 if (delay === undefined) {
-                    // No hay más que hacer: o se agotaron, o el servidor dijo
-                    // que no y repetirlo no lo va a cambiar.
+                    // Nothing more to do: either they ran out, or the server
+                    // said no and repeating it will not change that.
                     console.error(`[mail] no salió ${item.what}: ${err.message}`);
                     continue;
                 }
@@ -986,71 +986,70 @@ function scheduleNextAttempt() {
         kick();
     }, Math.max(next - Date.now(), 0));
 
-    // Un correo pendiente no puede ser la razón de que el proceso no termine.
-    // El servidor mantiene vivo el bucle de eventos mientras esté escuchando;
-    // cuando deja de escuchar, lo que quede en la cola se anuncia en close()
-    // en vez de retener el apagado media hora.
+    // A pending email cannot be the reason the process does not end. The
+    // server keeps the event loop alive while it is listening; once it stops,
+    // whatever is left in the queue is announced in close() instead of holding
+    // the shutdown for half an hour.
     retryTimer.unref();
 }
 
 /**
- * Comprueba que se puede conectar y autenticar, sin mandar nada. Es lo que
- * server.js dice al arrancar.
+ * Checks that it can connect and authenticate, without sending anything. It
+ * is what server.js reports at startup.
  *
- * Existe porque el fallo del correo es invisible: las solicitudes se siguen
- * guardando y el sitio se ve perfecto, así que sin esto la primera señal de
- * que la cuenta está mal es que alguien no recibió su código, días después.
- * Preguntarlo al arrancar convierte eso en un renglón del registro del
- * despliegue, que es donde se mira.
+ * It exists because a mail failure is invisible: requests keep being stored
+ * and the site looks perfect, so without this the first sign that the
+ * account is wrong is someone not getting their code, days later. Asking at
+ * startup turns that into a line in the deploy log, which is where people look.
  *
- * Devuelve { ok: true } o { ok: false, error } — no lanza.
+ * Returns { ok: true } or { ok: false, error }; it does not throw.
  */
 async function verify() {
     if (!isConfigured()) return { ok: false, error: 'falta AUTOCOLOR_BREVO_KEY' };
 
     let detail = null;
-    // DOS INTENTOS Y NO UNO. Este renglón del arranque es una alarma, y una
-    // alarma que salta de vez en cuando por un tropiezo pasajero deja de
-    // mirarse, que es lo único que esta comprobación no se puede permitir.
+    // TWO ATTEMPTS, NOT ONE. This startup line is an alarm, and an alarm that
+    // goes off now and then over a passing stumble stops being looked at,
+    // which is the one thing this check cannot afford.
     for (let attempt = 0; attempt < 2; attempt += 1) {
         try {
-            // Se pregunta por la cuenta y no se manda un correo de prueba:
-            // comprueba la llave y el camino hasta la API, no gasta uno de los
-            // 300 envíos diarios del plan gratuito y no le llega nada a nadie.
+            // It asks about the account instead of sending a test email: it
+            // checks the key and the path to the API, does not spend one of the
+            // free plan's 300 daily sends and reaches nobody.
             const account = await request(ACCOUNT_URL);
             return { ok: true, account: account && account.email };
         } catch (err) {
             detail = err.message;
-            // Una llave mal puesta no mejora repitiéndola.
+            // A wrong key does not get better by repeating it.
             if (isPermanent(err)) break;
         }
     }
     return { ok: false, error: detail };
 }
 
-/** La configuración del correo, sin la llave. Para /api/staff/whoami. */
+/** The mail configuration, without the key. For /api/staff/whoami. */
 function describe() {
     return {
         configured: isConfigured(),
         endpoint: SEND_URL,
         from: SENDER,
         shop: SHOP,
-        // Cuántos avisos están esperando su turno o su reintento. Un número
-        // que no baja entre dos consultas es la señal de que el correo está
-        // caído, sin tener que ir a buscarla al registro del despliegue.
+        // How many notices are waiting their turn or their retry. A number
+        // that does not go down between two checks is the sign mail is down,
+        // without having to dig for it in the deploy log.
         pending: OUTBOX.length,
     };
 }
 
 /**
- * Abandona la cola. SOLO la llama el apagado ordenado de server.js, y después
- * de server.close(): la cola no es de nadie más.
+ * Drops the queue. ONLY the orderly shutdown in server.js calls it, and after
+ * server.close(): the queue belongs to nobody else.
  *
- * No cierra nada —cada envío es una petición que se acaba sola—; lo que hace
- * es cancelar el reloj de los reintentos y DEJAR DICHO qué se queda sin
- * mandar. Es la contrapartida de tener la cola en memoria: si Render
- * apaga la instancia con avisos pendientes, se pierden, y el registro del
- * despliegue tiene que decir cuáles para que nadie se entere por una llamada.
+ * It closes nothing (each send is a request that finishes on its own); what
+ * it does is cancel the retry clock and PUT ON RECORD what is left unsent.
+ * It is the flip side of keeping the queue in memory: if Render shuts the
+ * instance down with pending notices, they are lost, and the deploy log has
+ * to say which ones so nobody finds out through a phone call.
  */
 function close() {
     if (retryTimer) {
@@ -1070,7 +1069,7 @@ module.exports = {
     notifyNewRequest,
     notifyNewPaintOrder,
     close,
-    // Exportados para poder revisar los cuerpos sin mandar nada (ver
+    // Exported so the bodies can be reviewed without sending anything (see
     // tools/mailpreview.js).
     customerMessage,
     shopMessage,

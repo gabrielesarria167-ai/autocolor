@@ -15,7 +15,7 @@
 # Read from the environment and not from arguments on purpose: an argument is
 # visible to anyone who can run ps while this is going.
 #
-# Run npm run colordb:load first. This sends export/, nothing else — the
+# Run npm run colordb:load first. This sends export/, nothing else: the
 # formulas stay on this machine.
 
 set -euo pipefail

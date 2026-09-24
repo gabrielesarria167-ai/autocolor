@@ -21,12 +21,12 @@
     <script src="../src/paints.js" defer></script>
     <script src="../src/paintings.js" defer></script>
 
-    <title>Autocolor — Venta de matizado</title>
+    <title>Venta de matizado | Autocolor</title>
 </head>
 
 <body class="wizard wizard--paints">
     <header class="site-header">
-        <a class="site-header__brand" href="../index.html" aria-label="Autocolor — inicio">
+        <a class="site-header__brand" href="../index.html" aria-label="Autocolor, ir al inicio">
             <img src="../imgs/brand/lockup-horizontal.svg" alt="Autocolor" class="site-header__logo" width="199" height="30">
         </a>
 
@@ -70,27 +70,26 @@
         <div class="wizard-body">
 
         <!-- ==========================================================
-             Paso 1 — el color
+             Step 1: the colour
 
-             Tres maneras de llegar al mismo dato, y ninguna es la
-             principal: el código lo tiene quien puede leer la etiqueta
-             del vehículo, la lectura digital quien ya midió el color con
-             su propio equipo, y el taller es para cuando el vehículo
-             está repintado y la etiqueta ya no dice la verdad.
+             Several ways to reach the same data, and none is the main
+             one: the code is for whoever can read the vehicle's label,
+             and the workshop is for when the vehicle has been repainted
+             and the label no longer tells the truth.
 
-             La tercera termina el pedido antes: sin el color no hay
-             fórmula, y sin fórmula no hay cuánta pintura ni cuánto
-             cuesta. Lo que se envía entonces es una visita, no una
-             compra, y src/paintings.js salta el paso 2.
+             The workshop route ends the order early: without the colour
+             there is no formula, and without a formula there is no
+             quantity or price. What gets sent then is a visit, not a
+             purchase, and src/paintings.js skips step 2.
              ========================================================== -->
         <section class="step active" data-step="1">
             <h1>¿Qué color necesitas?</h1>
             <p class="step__subtitle">Dos formas de identificarlo. Elige la que tengas a mano.</p>
 
-            <!-- Botones con estado, no una tablist. Un tablist de verdad le
-                 debe al teclado las flechas y un tabindex móvil, y uno que no
-                 los cumple es peor que no declarar el patrón: los botones de
-                 cámara del paso 3 de repair.html se resuelven igual. -->
+            <!-- Stateful buttons, not a tablist. A real tablist owes the
+                 keyboard arrow keys and a roving tabindex, and one that does
+                 not deliver them is worse than not declaring the pattern: the
+                 camera buttons in step 3 of repair.html are solved the same way. -->
             <div class="view-tabs method-tabs" id="methodTabs" role="group" aria-label="Cómo identificar el color">
                 <button type="button" class="view-tab is-active" id="methodTabCode"
                     data-method="code" aria-pressed="true" aria-controls="methodPanelCode">Por código</button>
@@ -98,7 +97,7 @@
                     data-method="in_person" aria-pressed="false" aria-controls="methodPanelShop">En el taller</button>
             </div>
 
-            <!-- Por código ------------------------------------------------>
+            <!-- By code -------------------------------------------------->
             <section class="method-panel" id="methodPanelCode" aria-labelledby="methodTabCode">
                 <section class="data-card">
                     <h2 class="data-card__head">
@@ -132,19 +131,19 @@
                         </div>
                     </div>
 
-                    <!-- El color encontrado va aquí, encima del buscador: cuando
-                         el código tiene varias versiones, primero se ve el color
-                         y debajo la rejilla para elegir la del modelo o el año.
-                         Lo llena src/paintings.js. -->
+                    <!-- The colour found goes here, above the finder: when the
+                         code has several versions, the colour shows first and
+                         below it the grid to pick the one for the model or year.
+                         src/paintings.js fills it. -->
                     <figure class="colour-card" id="colourCard" hidden>
                         <span class="colour-card__swatch" id="colourSwatch" aria-hidden="true"></span>
                         <figcaption class="colour-card__body">
                             <span class="colour-card__status" id="colourStatus"></span>
                             <strong class="colour-card__name" id="colourName"></strong>
-                            <!-- El nombre que le da Sherwin, cuando no es el mismo que
-                                 el del fabricante. El del fabricante viene en su
-                                 idioma —SCHWARZGRAU, GRIGIO METROPOLI— y este suele
-                                 ser el que se entiende en el mostrador. -->
+                            <!-- Sherwin's name for it, when it differs from the
+                                 manufacturer's. The manufacturer's comes in its
+                                 own language (SCHWARZGRAU, GRIGIO METROPOLI) and
+                                 this one is usually what the counter understands. -->
                             <span class="colour-card__alias" id="colourAlias" hidden></span>
                             <dl class="colour-card__facts">
                                 <div><dt>Marca</dt><dd id="colourBrand"></dd></div>
@@ -152,10 +151,10 @@
                                 <div><dt>Acabado</dt><dd id="colourFinish"></dd></div>
                             </dl>
 
-                            <!-- El catálogo del fabricante no dice el acabado de uno
-                                 de cada ocho colores, y el acabado multiplica el
-                                 precio. Cuando no se sabe, lo elige quien compra, en
-                                 vez de cobrarle un sólido por un tricapa. -->
+                            <!-- The manufacturer catalogue does not give the finish
+                                 for one colour in eight, and the finish multiplies
+                                 the price. When it is unknown, the buyer picks it,
+                                 instead of being charged a solid for a tri-coat. -->
                             <div class="colour-card__finish" id="colourFinishPick" hidden>
                                 <p class="colour-card__finish-ask" id="colourFinishAsk"></p>
                                 <div class="finish-chips" role="group" aria-label="Acabado de la pintura">
@@ -217,7 +216,7 @@
                 </p>
             </section>
 
-            <!-- En el taller ----------------------------------------------->
+            <!-- At the workshop ----------------------------------------->
             <section class="method-panel" id="methodPanelShop" aria-labelledby="methodTabShop" hidden>
                 <section class="data-card shop-card">
                     <h2 class="data-card__head">
@@ -236,8 +235,8 @@
                     <ol class="shop-steps">
                         <li>
                             <span class="shop-steps__n" aria-hidden="true">1</span>
-                            <span>Traes el vehículo o una pieza suelta —una tapa, un espejo, el tapón del
-                                combustible—.</span>
+                            <span>Traes el vehículo o una pieza suelta: una tapa, un espejo o el tapón del
+                                combustible.</span>
                         </li>
                         <li>
                             <span class="shop-steps__n" aria-hidden="true">2</span>
@@ -255,19 +254,19 @@
                 </section>
 
                 <p class="method-note">
-                    Jr. San Juan Masías, Ayacucho · Lunes a sábado, 07:30 – 20:00
+                    Jr. San Juan Masías, Ayacucho. Lunes a sábado, de 07:30 a 20:00.
                 </p>
             </section>
 
         </section>
 
         <!-- ==========================================================
-             Paso 2 — el envase
+             Step 2: the container
 
-             Seis fracciones de galón, de la más chica a la más grande, y
-             cada una con su volumen y para qué alcanza. La conversión
-             importa más que la fracción: el envase se pide en octavos y
-             en cuartos, pero lo que se calcula al pintar son mililitros.
+             Six fractions of a gallon, smallest to largest, each with
+             its volume and what it covers. The conversion matters more
+             than the fraction: the container is ordered in eighths and
+             quarters, but painting is worked out in millilitres.
              ========================================================== -->
         <section class="step" data-step="2" hidden>
             <h1>¿Cuánta pintura necesitas?</h1>
@@ -295,12 +294,12 @@
         </section>
 
         <!-- ==========================================================
-             Paso 3 — la empresa
+             Step 3: the company
 
-             El pedido lo hace un taller, una concesionaria o una
-             empresa. Basta el nombre del taller y un contacto: con eso
-             se prepara el matizado y se sabe a quién llamar cuando está
-             listo. El teléfono es obligatorio; el email quedó opcional.
+             The order is placed by a workshop, a dealership or a
+             company. The workshop's name and a contact are enough: with
+             that the matizado is prepared and we know whom to call when
+             it is ready. The phone is required; email stayed optional.
              ========================================================== -->
         <section class="step" data-step="3" hidden>
             <h1>¿A nombre de quién va el pedido?</h1>
@@ -376,19 +375,18 @@
                     <div class="field">
                         <label for="notes">Notas adicionales <span class="field__optional">(opcional)</span></label>
                         <textarea id="notes" rows="3" maxlength="2000"
-                            placeholder="Plazos, cantidad de vehículos, detalles útiles…"></textarea>
+                            placeholder="Plazos, cantidad de vehículos o cualquier detalle útil"></textarea>
                     </div>
                 </section>
             </form>
         </section>
 
         <!-- ==========================================================
-             Paso 4 — el resumen
+             Step 4: the summary
 
-             Todo lo elegido en una sola pantalla, antes de que se envíe
-             nada. Es la última oportunidad de leerlo completo, así que
-             cada bloque lleva su enlace de vuelta al paso donde se
-             cambia.
+             Everything chosen on a single screen, before anything is
+             sent. It is the last chance to read it all, so each block
+             carries its link back to the step where it is changed.
              ========================================================== -->
         <section class="step" data-step="4" hidden>
             <h1>Revisa tu pedido</h1>
@@ -419,7 +417,7 @@
             <div class="tracking-code">
                 <span class="tracking-code__label">Tu código de pedido</span>
                 <div class="tracking-code__row">
-                    <strong class="tracking-code__value" id="successCode">··········</strong>
+                    <strong class="tracking-code__value" id="successCode"></strong>
                     <button type="button" class="tracking-code__copy" id="copyCodeBtn">Copiar</button>
                 </div>
                 <p class="tracking-code__hint">Guárdalo: con este código te atendemos en el mostrador y por
@@ -448,8 +446,8 @@
       </div><!-- /.wizard-card -->
     </main>
 
-    <p class="wizard-note">Precios referenciales · El color se confirma con plancha de prueba ·
-        <a href="../index.html#contacto">Habla con el taller</a>
+    <p class="wizard-note">Los precios son referenciales y el color se confirma con una plancha de prueba.
+        ¿Dudas? <a href="../index.html#contacto">Habla con el taller</a>.
     </p>
 
 </body>

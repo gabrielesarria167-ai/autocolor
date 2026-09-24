@@ -2,7 +2,7 @@
  *
  *     npm run colordb:verify
  *
- * Connects as the application role — not as the owner — and checks that what
+ * Connects as the application role (not as the owner) and checks that what
  * should be refused is refused. Run it after every push, and after any change
  * to sql/70 or sql/80: a privilege mistake is silent otherwise, because the
  * page keeps working perfectly well while the door stands open.
@@ -30,12 +30,12 @@ const failures = [];
 
 function ok(what, detail) {
     passed += 1;
-    console.log(`  ok    ${what}${detail ? '  — ' + detail : ''}`);
+    console.log(`  ok    ${what}${detail ? ': ' + detail : ''}`);
 }
 
 function fail(what, detail) {
     failures.push(what);
-    console.log(`  FAIL  ${what}${detail ? '  — ' + detail : ''}`);
+    console.log(`  FAIL  ${what}${detail ? ': ' + detail : ''}`);
 }
 
 function check(what, condition, detail) {

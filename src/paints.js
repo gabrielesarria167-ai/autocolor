@@ -1,10 +1,10 @@
 /* =========================================================================
-   paints.js — the colour catalogue and the price list behind pgs/paintings.html
+   paints.js: the colour catalogue and the price list behind pgs/paintings.html
 
    Three things live here, and all three are read both by the page and by the
    server that mails the order out:
 
-     COLOURS   the factory codes, by brand, read from src/paintCatalog.js —
+     COLOURS   the factory codes, by brand, read from src/paintCatalog.js:
                the Sherwin-Williams colour guides turned into data by
                tools/paint-catalog/. The code and the name are what the
                customer reads on their vehicle's label; the finish decides the
@@ -21,7 +21,7 @@
 
    THE CATALOGUE IS NOT AN INVENTORY. It covers the US-market guides up to
    model year 2018, so newer colours and the models sold only in South America
-   are missing; a code that is not here is not a dead end — the page sends
+   are missing. A code that is not here is not a dead end: the page sends
    whoever misses it to the digital reading or to the counter.
 
    Loads two ways, like src/parts.js: `window.AUTOCOLOR_PAINTS` for the page
@@ -41,10 +41,11 @@
 
     var has = Object.prototype.hasOwnProperty;
 
-    // Cómo se comporta la pintura, y cuánto encarece el matizado. Un sólido es
-    // un color plano; un metálico lleva aluminio y un perlado mica, así que hay
-    // que orientar las partículas al aplicarlo; un tricapa se pinta en tres
-    // manos (base, perla y barniz) y es el que más producto y más tiempo pide.
+    // How the paint behaves, and how much it adds to the matizado. A solid is
+    // a flat colour; a metallic carries aluminium and a pearl carries mica, so
+    // the particles have to be oriented as it goes on; a tri-coat is sprayed
+    // in three coats (base, pearl and clear) and asks for the most product
+    // and the most time.
     var FINISHES = {
         solido:   { label: "Sólido",   factor: 1,    note: "Color plano, de una sola capa." },
         metalico: { label: "Metálico", factor: 1.15, note: "Lleva aluminio: cambia con la luz." },
@@ -52,12 +53,12 @@
         tricapa:  { label: "Tricapa",  factor: 1.6,  note: "Tres manos: base, perla y barniz." }
     };
 
-    // Un galón estadounidense. Es el que usa el rubro aquí, y el que convierte
-    // 1/4 en los 946 ml del envase que más se vende.
+    // A US gallon. It is the one the trade uses here, and the one that turns
+    // 1/4 into the 946 ml of the best-selling container.
     var GALLON_ML = 3785.41;
 
-    // Los seis envases. `use` es para qué alcanza cada uno — es lo que de
-    // verdad decide la compra, más que el número de mililitros.
+    // The six containers. `use` says what each one covers, which is what
+    // really decides the purchase, more than the millilitres.
     var SIZES = [
         { id: "1_32", fraction: "1/32", label: "1/32 galón", price: 28,  use: "Retoques muy pequeños" },
         { id: "1_16", fraction: "1/16", label: "1/16 galón", price: 45,  use: "Una pieza chica (espejo, moldura)" },
@@ -67,14 +68,14 @@
         { id: "1_1",  fraction: "1",    label: "1 galón",    price: 360, use: "Pintado amplio o completo" }
     ];
 
-    // Cuántos envases iguales admite un pedido. No es un límite del taller: es
-    // el punto en el que un pedido deja de ser una compra y pasa a ser un
-    // acuerdo que se conversa por teléfono, y la página lo dice así.
+    // How many identical containers an order accepts. It is not a workshop
+    // limit: it is the point where an order stops being a purchase and
+    // becomes a deal agreed over the phone, and the page says so.
     var MAX_UNITS = 20;
 
-    // El volumen de cada envase, calculado una vez. En mililitros hasta el
-    // medio galón y en litros de ahí para arriba, que es como se lee mejor:
-    // «946 ml» y «1.89 L», no «0.946 L» ni «3785 ml».
+    // Each container's volume, worked out once. In millilitres up to half a
+    // gallon and in litres from there up, which reads best: «946 ml» and
+    // «1.89 L», not «0.946 L» or «3785 ml».
     SIZES.forEach(function (size) {
         var parts = size.fraction.split("/");
         var value = parts.length === 2 ? Number(parts[0]) / Number(parts[1]) : Number(parts[0]);
@@ -119,9 +120,9 @@
         { id: "morado", label: "Morados" }, { id: "otro", label: "Otros" }
     ];
 
-    // Los nombres de marca que enseña la página. Salen de aquí y no de
-    // src/carModels.js porque el servidor también los necesita —para el correo
-    // del pedido—, y aquel archivo describe vehículos, no pinturas.
+    // The brand names the page shows. They come from here and not from
+    // src/carModels.js because the server needs them too (for the order
+    // email), and that file describes vehicles, not paints.
     var BRAND_NAMES = {
         toyota: "Toyota", chevrolet: "Chevrolet", ford: "Ford", subaru: "Subaru",
         nissan: "Nissan", bmw: "BMW", audi: "Audi", mercedes: "Mercedes-Benz",
@@ -129,11 +130,11 @@
     };
 
     /* ---------------------------------------------------------------------
-       Búsqueda por código
+       Search by code
 
-       Se compara sin mayúsculas, sin espacios y sin guiones: la etiqueta del
-       vehículo escribe «1F7», «1f7» y «C/TR: 1F7-0» para el mismo color, y
-       quien lo copia trae lo que tenga delante.
+       Compared without case, spaces or dashes: the vehicle label writes
+       «1F7», «1f7» and «C/TR: 1F7-0» for the same colour, and whoever copies
+       it brings whatever is in front of them.
        --------------------------------------------------------------------- */
     function normalizeCode(value) {
         return String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
@@ -154,12 +155,12 @@
     }
 
     /**
-     * El color de un código, dentro de una marca.
+     * The colour for a code, within a brand.
      *
-     * La marca es obligatoria a propósito: «040» es el blanco de Toyota y
-     * también el negro de Mercedes-Benz, así que un código suelto no
-     * identifica nada. Devuelve null cuando no está en el catálogo, que es un
-     * caso normal y no un error: el catálogo no es el inventario del taller.
+     * The brand is mandatory on purpose: «040» is Toyota's white and also
+     * Mercedes-Benz's black, so a bare code identifies nothing. Returns null
+     * when it is not in the catalogue, which is a normal case and not an
+     * error: the catalogue is not the workshop's inventory.
      */
     function findColour(brandId, code) {
         var list = has.call(COLOURS, brandId) ? COLOURS[brandId] : null;
@@ -182,8 +183,7 @@
     /**
      * The colours a model wore, newest first, each with the model years it
      * was offered on that model (`modelYears`). null when the guides do not
-     * list the model at all — they only carry the colours with a
-     * compatibility note, so even a list that exists can be short; the page
+     * list the model at all. They only carry the colours with a
      * says so and offers the brand's colours of that year too.
      */
     function modelColours(brandId, modelId) {
@@ -212,7 +212,7 @@
         return { from: min, to: max };
     }
 
-    /** Todos los colores de una marca, para enseñarlos cuando el código falla. */
+    /** Every colour of a brand, to show them when the code misses. */
     function coloursOf(brandId) {
         var list = has.call(COLOURS, brandId) ? COLOURS[brandId] : [];
         return list.map(function (colour) { return withBrand(brandId, colour); });
@@ -225,30 +225,30 @@
     }
 
     /* ---------------------------------------------------------------------
-       Lectura digital
+       Digital reading
 
-       Un espectrofotómetro entrega el color en CIELAB: L* (claridad, 0–100),
-       a* (verde–rojo) y b* (azul–amarillo). Para encontrar el más parecido del
-       catálogo hay que llevar cada hex a ese mismo espacio y comparar
-       distancias, que es lo que hacen las tres funciones de abajo.
+       A spectrophotometer gives the colour in CIELAB: L* (lightness, 0 to
+       100), a* (green to red) and b* (blue to yellow). To find the closest
+       one in the catalogue, each hex has to be taken to that same space and
+       the distances compared, which is what the three functions below do.
 
-       La diferencia se mide con ΔE*ab (CIE76): la distancia euclídea entre dos
-       colores en Lab. Es la fórmula vieja —hay otras que corrigen mejor cómo
-       ve el ojo— y es suficiente para lo que aquí se decide, que no es aprobar
-       un matizado sino ordenar el catálogo y decir cuán cerca queda el primero.
-       QUIEN APRUEBA EL COLOR ES LA PLANCHA DE PRUEBA, y la página lo dice en
-       el paso 1.
+       The difference is measured with ΔE*ab (CIE76): the Euclidean distance
+       between two colours in Lab. It is the old formula (others model the
+       eye better) and it is enough for what is decided here, which is not
+       approving a matizado but ordering the catalogue and saying how close
+       the first one lands. THE TEST PANEL IS WHAT APPROVES THE COLOUR, and
+       the page says so in step 1.
        --------------------------------------------------------------------- */
 
-    // sRGB (0–255) a lineal. El 2.4 y el 0.055 son la curva de sRGB, no una
-    // gamma de 2.2 aproximada.
+    // sRGB (0 to 255) to linear. The 2.4 and the 0.055 are the sRGB curve,
+    // not an approximate 2.2 gamma.
     function toLinear(channel) {
         var c = channel / 255;
         return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
     }
 
-    // Blanco D65 a 2°, que es el iluminante con el que se miden los colores de
-    // un vehículo y el que asume sRGB.
+    // D65 white at 2°, the illuminant vehicle colours are measured under and
+    // the one sRGB assumes.
     var WHITE = { x: 95.047, y: 100.0, z: 108.883 };
 
     function hexToLab(hex) {
@@ -280,9 +280,9 @@
     }
 
     /**
-     * Los colores del catálogo más parecidos a una lectura, el más cercano
-     * primero. `limit` recorta la lista; sin él vienen los tres primeros,
-     * que es lo que cabe en la ficha del paso 1.
+     * The catalogue colours closest to a reading, nearest first. `limit`
+     * trims the list; without it the first three come back, which is what
+     * fits on the step 1 card.
      */
     function nearest(reading, limit) {
         var matches = [];
@@ -300,9 +300,9 @@
     }
 
     /**
-     * Cómo de cerca queda una coincidencia, en palabras. Los cortes son los
-     * que usa el rubro: por debajo de 1 la diferencia no se ve, hasta 2 no se
-     * ve en la pieza montada, y de ahí en adelante hay que ajustar la fórmula.
+     * How close a match lands, in words. The cut-offs are the trade's: below
+     * 1 the difference cannot be seen, up to 2 it cannot be seen on the
+     * mounted panel, and from there on the formula needs adjusting.
      */
     function matchQuality(delta) {
         if (delta < 1) return { level: "exact",  label: "Coincidencia exacta" };
@@ -312,7 +312,7 @@
     }
 
     /* ---------------------------------------------------------------------
-       Precio
+       Price
        --------------------------------------------------------------------- */
 
     var soles = typeof Intl !== "undefined" && Intl.NumberFormat
@@ -320,9 +320,9 @@
         : null;
 
     /**
-     * Lo que cuesta un envase de un acabado, en soles enteros. null cuando no
-     * se reconoce el envase o el acabado, para que la página enseñe el pedido
-     * sin precio antes que un total inventado.
+     * What one container of a finish costs, in whole soles. null when the
+     * container or the finish is not recognised, so the page shows the order
+     * without a price rather than an invented total.
      */
     function price(sizeId, finish) {
         if (!has.call(SIZE_BY_ID, sizeId)) return null;
@@ -357,7 +357,7 @@
         finishLabel: function (id) { return has.call(FINISHES, id) ? FINISHES[id].label : id; },
         brandName: function (id) { return has.call(BRAND_NAMES, id) ? BRAND_NAMES[id] : id; },
 
-        // «S/ 1,250», como los escribe el resto del sitio (ver src/parts.js).
+        // «S/ 1,250», the way the rest of the site writes it (see src/parts.js).
         formatSoles: function (amount) {
             return "S/ " + (soles ? soles.format(amount) : String(amount));
         }

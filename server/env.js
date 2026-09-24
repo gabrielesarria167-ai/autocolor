@@ -1,24 +1,26 @@
 'use strict';
 
 /* =============================================================================
-   Carga el archivo .env de la raíz del proyecto dentro de process.env.
+   Loads the .env file at the project root into process.env.
 
-   Existe por una razón concreta: la contraseña del panel del taller vive en
-   AUTOCOLOR_STAFF_PASSWORD, y si el único modo de darla es escribirla delante
-   de cada arranque…
+   It exists for one concrete reason: the workshop panel password lives in
+   AUTOCOLOR_STAFF_PASSWORD, and if the only way to provide it is typing it
+   in front of every start:
 
        AUTOCOLOR_STAFF_PASSWORD='...' npm start
 
-   …basta olvidarla una vez —o arrancar con `npm start` a secas— para que el
-   panel responda 503 y parezca roto. Con el .env al lado, `npm start` alcanza.
+   then forgetting it once (or starting with a bare `npm start`) is enough for
+   the panel to answer 503 and look broken. With the .env alongside, `npm
+   start` is enough.
 
-   Lo que ya viene en el entorno gana: exportar una variable en la terminal, o
-   ponerla delante del comando, sigue mandando sobre el archivo. Así el .env es
-   el valor de todos los días y no un obstáculo cuando se quiere otro.
+   Whatever the environment already has wins: exporting a variable in the
+   terminal, or putting it in front of the command, still overrides the file.
+   That way the .env is the everyday value and not an obstacle when another
+   one is wanted.
 
-   El .env está en .gitignore y no debe salir de la máquina. Importa más de lo
-   normal aquí: el repositorio es público en GitHub, así que un secreto
-   versionado quedaría a la vista de cualquiera. Ver .env.example.
+   The .env is in .gitignore and must not leave the machine. It matters more
+   than usual here: the repository is public on GitHub, so a committed secret
+   would be in plain view. See .env.example.
    ========================================================================== */
 
 const fs = require('node:fs');
@@ -30,7 +32,7 @@ function parse(text) {
     const out = new Map();
     for (const rawLine of text.split(/\r?\n/)) {
         const line = rawLine.trim();
-        // Comentarios y líneas en blanco.
+        // Comments and blank lines.
         if (line === '' || line.startsWith('#')) continue;
 
         const eq = line.indexOf('=');
@@ -39,8 +41,8 @@ function parse(text) {
         const key = line.slice(0, eq).trim();
         let value = line.slice(eq + 1).trim();
 
-        // Las comillas son para que la contraseña pueda llevar espacios o un
-        // '#' sin que se corte; se quitan solo si envuelven todo el valor.
+        // Quotes let the password carry spaces or a '#' without being cut;
+        // they are only stripped if they wrap the whole value.
         const quoted = value.length >= 2 &&
             ((value[0] === '"' && value.endsWith('"')) ||
              (value[0] === "'" && value.endsWith("'")));
@@ -56,9 +58,9 @@ function load() {
     try {
         text = fs.readFileSync(ENV_PATH, 'utf8');
     } catch (err) {
-        // No tener .env es normal: en producción las variables llegan del
-        // entorno. Cualquier otro error sí se avisa, porque un .env que existe
-        // pero no se puede leer es un problema que conviene ver.
+        // Having no .env is normal: in production the variables come from
+        // the environment. Any other error is reported, because a .env that
+        // exists but cannot be read is a problem worth seeing.
         if (err.code !== 'ENOENT') {
             console.warn(`No se pudo leer ${ENV_PATH}: ${err.message}`);
         }
@@ -70,8 +72,8 @@ function load() {
     }
 }
 
-// Se ejecuta al requerir el módulo, y una sola vez: la caché de require se
-// encarga de que los demás archivos puedan pedirlo sin coordinarse.
+// Runs when the module is required, and only once: the require cache makes
+// sure the other files can ask for it without coordinating.
 load();
 
 module.exports = { ENV_PATH };

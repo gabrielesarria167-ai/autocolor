@@ -1,19 +1,19 @@
 /* =========================================================================
-   paintings.js — el asistente de venta de matizado (pgs/paintings.html)
+   paintings.js: the matizado sales wizard (pgs/paintings.html)
 
-   Cuatro pasos: el color, el envase, la empresa y el resumen. Se parece al
-   asistente de cotización (src/repair.js) y comparte con él la carcasa, la
-   barra de pasos y el pie, pero no el recorrido: aquí hay un camino que
-   termina antes.
+   Four steps: the colour, the container, the company and the summary. It
+   resembles the quote wizard (src/repair.js) and shares its shell, step bar
+   and footer with it, but not its path: here there is a route that ends
+   early.
 
-   EL CAMINO CORTO. Quien elige resolver el color en el taller no puede elegir
-   cantidad ni ver precio: las dos cosas salen de la fórmula, y la fórmula
-   todavía no existe. Ese pedido salta el paso 2 —ida y vuelta— y llega al
-   resumen sin envase. Lo que se confirma entonces es una visita, y así lo
-   dicen el resumen y el correo.
+   THE SHORT ROUTE. Whoever chooses to settle the colour at the workshop
+   cannot pick a quantity or see a price: both come from the formula, and the
+   formula does not exist yet. That order skips step 2 (both ways) and
+   reaches the summary with no container. What gets confirmed then is a
+   visit, and the summary and the email both say so.
 
-   Nada de lo que se ve aquí decide el precio final: los importes son
-   referenciales (ver src/paints.js) y el taller los cierra al matizar.
+   Nothing seen here decides the final price: the amounts are referential
+   (see src/paints.js) and the workshop settles them when mixing.
    ========================================================================= */
 
 (function () {
@@ -22,26 +22,26 @@
     var TOTAL_STEPS = 4;
     var CONFIRM_LABELS = { 4: "Confirmar pedido" };
 
-    // El catálogo. Guardado como en repair.js: sin él la página no sirve, pero
-    // un archivo que no llegó no puede además llevarse por delante los
-    // escuchadores de más abajo con un TypeError en la primera línea.
+    // The catalogue. Guarded as in repair.js: without it the page is useless,
+    // but a file that never arrived must not also take the listeners further
+    // down with it through a TypeError on the first line.
     var PAINTS = window.AUTOCOLOR_PAINTS || null;
 
-    /* El catálogo del fabricante: 68.717 colores y 383 marcas, en el servidor.
-       Ver server/colordb/README.md.
+    /* The manufacturer catalogue: 68,717 colours and 383 makes, on the server.
+       See server/colordb/README.md.
 
-       Las marcas y los modelos vienen en src/colourIndex.js, un archivo, así
-       que los dos <select> se llenan sin pedir nada. Los colores no caben en
-       un archivo —693.636 asociaciones— y son lo único que viaja.
+       Makes and models come in src/colourIndex.js, a file, so the two
+       <select>s fill without asking for anything. The colours do not fit in
+       a file (693,636 associations) and are the only thing that travels.
 
-       PAINTS deja de ser el catálogo y pasa a ser lo que la base no tiene: la
-       muestra en pantalla de 528 colores medidos y su acabado. Decora las
-       filas que llegan; ya no las produce. */
+       PAINTS stops being the catalogue and becomes what the database lacks:
+       the on-screen swatch of 528 measured colours and their finish. It
+       decorates the rows that arrive; it no longer produces them. */
     var INDEX = window.AUTOCOLOR_COLOUR_INDEX || null;
     var API = (window.AUTOCOLOR_API_BASE || "") + "/api/colours";
 
-    // Del nombre que enseña la base al id del catálogo local, para poder
-    // pedirle la muestra. Solo las diez marcas que vende el taller tienen una.
+    // From the name the database shows to the local catalogue id, so the
+    // swatch can be asked for. Only the ten makes the workshop sells have one.
     var SIDECAR_BY_LABEL = {};
     if (PAINTS) {
         Object.keys(PAINTS.BRAND_NAMES).forEach(function (id) {
@@ -59,15 +59,16 @@
         return found || "";
     }
 
-    /* Una fila de la base, vestida con lo que el catálogo local sepa de ella.
+    /* A database row, dressed with whatever the local catalogue knows of it.
 
-       La muestra puede venir de dos sitios. El catálogo local la trae medida
-       de una plancha impresa, para 746 colores; la base la trae calculada de
-       la fórmula de tinte, para todos. La medida manda donde la hay, y la
-       página dice cuál de las dos está enseñando, porque no valen lo mismo.
+       The swatch can come from two places. The local catalogue has it
+       measured off a printed chip, for 746 colours; the database has it
+       computed from the tint formula, for all of them. The measured one wins
+       where it exists, and the page says which one it is showing, because
+       they are not worth the same.
 
-       El acabado igual: el de la base es deducido del nombre, el del catálogo
-       está medido, así que ese manda. */
+       Same for the finish: the database's is inferred from the name, the
+       catalogue's is measured, so that one wins. */
     function fromDb(row, makeId) {
         var label = makeLabel(makeId);
         var brandId = SIDECAR_BY_LABEL[label] || "";
@@ -75,21 +76,21 @@
         var measured = !!(chip && chip.hex);
         return {
             swCode: row.swCode,
-            // Sin código de fábrica se enseña el de Sherwin, que es el único
-            // nombre que tiene: son 5.782 colores que antes no salían.
+            // With no factory code, Sherwin's is shown, the only name it
+            // has: 5,782 colours that did not show up before.
             code: row.code || row.swCode,
-            // Los demás códigos con los que la marca vende esta misma pintura.
+            // The other codes the make sells this same paint under.
             altCodes: row.altCodes || [],
             name: row.name,
             swName: row.swName && row.swName !== row.name ? row.swName : "",
             finish: (chip && chip.finish) || FINISH_OF[row.finish] || null,
             finishGuessed: !(chip && chip.finish),
             family: row.family || "otro",
-            // Un extremo puede faltar por separado: la base deja year_max en
-            // NULL cuando el color sigue vendiéndose, y year_min cuando no
-            // consta desde cuándo. Se guardan los dos tal cual y finderMeta()
-            // decide cómo leerlos; descartar el par entero porque falte uno
-            // tiraba un dato que sí se tiene.
+            // Either end can be missing on its own: the database leaves
+            // year_max NULL when the colour is still sold, and year_min when
+            // nobody knows since when. Both are kept as they are and
+            // finderMeta() decides how to read them; dropping the whole pair
+            // because one is missing threw away data we do have.
             years: row.years && (row.years[0] !== null || row.years[1] !== null)
                 ? row.years : null,
             brandWide: !!row.brandWide,
@@ -103,17 +104,17 @@
         };
     }
 
-    /* Los códigos de fábrica de una misma pintura, en una línea.
+    /* A paint's factory codes, on one line.
 
-       Jeep vende el mismo azul como KBX y como PBX. Antes la base devolvía
-       una fila por código y la parrilla enseñaba el mismo color dos veces;
-       ahora devuelve una sola con los dos, y se leen juntos.
+       Jeep sells the same blue as KBX and as PBX. The database used to return
+       one row per code and the grid showed the same colour twice; now it
+       returns a single row with both, and they read together.
 
-       Pero solo cuando de verdad son sinónimos. Hay colores que cargan diez
-       códigos —el rojo 234487 de Ford sale como 718, ASQC, MR, G1, VBN, K1 y
-       cinco más, según el modelo y el mercado— y entonces la lista ya no
-       explica nada: se enseña el que se buscó y ya. Las letras sueltas se
-       descartan igual, porque «VR847 · C» se lee como una errata. */
+       But only when they really are synonyms. Some colours carry ten codes
+       (Ford's red 234487 comes out as 718, ASQC, MR, G1, VBN, K1 and five
+       more, by model and market) and then the list explains nothing: the one
+       searched for is shown and that is it. Single letters are dropped too,
+       because «VR847 / C» reads like a typo. */
     function codeLabel(colour) {
         var alt = (colour.altCodes || []).filter(function (c) {
             return String(c).length > 1;
@@ -121,31 +122,32 @@
         var parts = alt.length && alt.length <= 2
             ? [colour.code].concat(alt)
             : [colour.code];
-        // Y al final el de Sherwin, siempre. Es el código con el que se pide
-        // la pintura en el mostrador, vale para las trece marcas y es el único
-        // que tienen los colores sin código de fábrica —ahí ya va el primero,
-        // y por eso se mira antes de añadirlo—. Va desnudo, sin «SW» delante,
-        // porque el buscador de arriba lo acepta tal cual y quien lo copie de
-        // la pantalla tiene que poder pegarlo sin quitarle nada.
+        // And Sherwin's at the end, always. It is the code the paint is
+        // ordered by at the counter, it works for all thirteen makes and it
+        // is the only one colours without a factory code have (there it is
+        // already first, which is why it is checked before adding). It goes
+        // bare, with no «SW» in front, because the search above accepts it as
+        // is and whoever copies it off the screen must be able to paste it
+        // without trimming anything.
         if (colour.swCode && parts.indexOf(colour.swCode) === -1) {
             parts.push(colour.swCode);
         }
-        return parts.join(" · ");
+        return parts.join(" / ");
     }
 
-    // Las letras que guarda la base, a los ids de FINISHES en src/paints.js.
-    // 'u' es «no hay nombre que leer»: se queda sin acabado y lo elige el
-    // cliente, porque el acabado multiplica el precio.
+    // The letters the database stores, mapped to the FINISHES ids in
+    // src/paints.js. 'u' means «no name to read»: it stays without a finish
+    // and the customer picks it, because the finish multiplies the price.
     var FINISH_OF = { s: "solido", m: "metalico", p: "perlado", t: "tricapa", u: null };
 
     var state = {
-        // 'code' | 'in_person' — cómo se identificó el color.
+        // 'code' | 'in_person': how the colour was identified.
         method: "code",
-        // El color encontrado, con su marca, código, nombre y acabado. En el
-        // camino del taller se queda en null y así viaja al servidor.
+        // The colour found, with its make, code, name and finish. On the
+        // workshop route it stays null and travels to the server that way.
         colour: null,
-        // Se conserva por compatibilidad con el servidor, que aún acepta una
-        // lectura CIELAB; la página ya no la pide, así que viaja siempre null.
+        // Kept for compatibility with the server, which still accepts a
+        // CIELAB reading; the page no longer asks for it, so it is always null.
         reading: null,
         // Whether the colour was picked from the finder's list rather than
         // read off the label. It travels as method 'model', so the shop
@@ -223,8 +225,8 @@
     var EMAIL_PATTERN = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
     /* ---------------------------------------------------------------------
-       Pie del asistente: el botón dice qué falta en vez de apagarse
-       (mismo trato que en src/repair.js).
+       Wizard footer: the button says what is missing instead of switching
+       off (same treatment as in src/repair.js).
        --------------------------------------------------------------------- */
 
     function setStepHint(message) {
@@ -245,11 +247,11 @@
 
     function isStepValid(step) {
         if (step === 1) {
-            // El taller no necesita color: el pedido es la visita.
+            // The workshop route needs no colour: the order is the visit.
             if (state.method === "in_person") return true;
-            // Con acabado, siempre: es lo que multiplica el precio, y el
-            // catálogo del fabricante no lo trae para uno de cada ocho
-            // colores. Sin él no hay nada que cotizar en el paso 2.
+            // Always with a finish: it is what multiplies the price, and the
+            // manufacturer catalogue lacks it for one colour in eight.
+            // Without it there is nothing to quote in step 2.
             return !!state.colour && !!state.colour.finish;
         }
         if (step === 2) return !!state.size;
@@ -276,8 +278,8 @@
         }
 
         if (step === 1) {
-            // Color encontrado pero sin acabado: lo que falta es una pastilla,
-            // no el código, así que el aviso manda allí y no al campo de arriba.
+            // Colour found but no finish: what is missing is a chip, not the
+            // code, so the hint points there and not at the field above.
             if (state.colour && !state.colour.finish) {
                 first = colourFinishPick ? colourFinishPick.querySelector(".finish-chip") : null;
                 setStepHint("Elige el acabado para poder cotizar el color.");
@@ -307,11 +309,11 @@
     }
 
     /* ---------------------------------------------------------------------
-       Navegación
+       Navigation
 
-       El paso 2 se salta entero cuando el color se resuelve en el taller, en
-       los dos sentidos: stepAfter() y stepBefore() son los únicos sitios que
-       saben del salto, para que no haya que acordarse de él en cada botón.
+       Step 2 is skipped entirely when the colour is settled at the workshop,
+       in both directions: stepAfter() and stepBefore() are the only places
+       that know about the skip, so no button has to remember it.
        --------------------------------------------------------------------- */
 
     function skipsQuantity() {
@@ -335,8 +337,8 @@
             var n = Number(dot.dataset.step);
             dot.classList.remove("is-current", "is-done", "is-skipped");
             dot.removeAttribute("aria-current");
-            // El paso saltado no se borra de la barra: se marca. Una barra que
-            // pierde un punto al elegir una opción se lee como un error.
+            // The skipped step is not removed from the bar, it is marked. A
+            // bar that loses a dot when an option is picked reads as an error.
             if (n === 2 && skipsQuantity()) {
                 dot.classList.add("is-skipped");
                 dot.title = "No aplica: el envase se decide en el taller";
@@ -386,7 +388,7 @@
     });
 
     /* ---------------------------------------------------------------------
-       Paso 1 — el color
+       Step 1: the colour
        --------------------------------------------------------------------- */
 
     function setMethod(method) {
@@ -402,9 +404,9 @@
             if (methodPanels[key]) methodPanels[key].hidden = key !== method;
         });
 
-        // Cambiar de camino tira el color encontrado por el anterior: si se
-        // quedara puesto, el resumen mostraría un color que ya no se buscó
-        // como dice la ficha.
+        // Switching route drops the colour the previous one found: if it
+        // stayed, the summary would show a colour that was no longer found
+        // the way the card says.
         clearColour();
         updateProgress(current);
         refreshConfirm();
@@ -457,13 +459,13 @@
         refreshConfirm();
     }
 
-    /* El acabado, y la nota de debajo.
+    /* The finish, and the note beneath it.
 
-       Cuando el catálogo del fabricante no lo dice —uno de cada ocho colores
-       no trae nombre que leer— se pregunta en vez de suponer: el acabado
-       multiplica el precio en src/paints.js, así que suponerlo mal es cobrar
-       mal. Cuando sí lo dice pero es deducido del nombre, se puede corregir,
-       porque deducirlo acierta siete de cada diez veces. */
+       When the manufacturer catalogue does not say (one colour in eight has
+       no name to read), the page asks instead of guessing: the finish
+       multiplies the price in src/paints.js, so a wrong guess is a wrong
+       charge. When it does say but it was inferred from the name, it can be
+       corrected, because the inference is right seven times out of ten. */
     function paintFinish() {
         var colour = state.colour;
         if (!colour) return;
@@ -484,10 +486,10 @@
 
         var finish = PAINTS.FINISHES[colour.finish];
         var note = finish ? finish.note : "";
-        // La muestra en pantalla es una aproximación y hay que decirlo donde
-        // se la está mirando: un metálico no cabe en un rectángulo de color, y
-        // quien compra por la muestra reclama después. La mayoría de los
-        // colores de la base no tiene ninguna, y entonces la nota lo dice.
+        // The on-screen swatch is an approximation and that has to be said
+        // where it is being looked at: a metallic does not fit in a colour
+        // rectangle, and whoever buys by the swatch complains later. Most of
+        // the database's colours have none, and then the note says so.
         colourNote.textContent = note + (colour.hexMeasured
             ? " La muestra es referencial: el color se aprueba con plancha de prueba."
             : " La muestra la calculamos de la fórmula, así que es orientativa:"
@@ -501,7 +503,7 @@
             state.colour.finish = btn.dataset.finish;
             state.colour.finishGuessed = true;
             paintFinish();
-            // El precio de cada envase sale del acabado, así que se rehace.
+            // Each container's price follows from the finish, so it is redone.
             refreshSizePrices();
             refreshConfirm();
         });
@@ -509,10 +511,10 @@
 
     /* «¿No sabes el código?» is for whoever has no label to read. Once a code
        typed with its brand has found the colour, the question has been
-       answered, and the button — with the finder under it, if it was open —
-       goes. It comes back as soon as that answer stops holding: the code is
-       edited or cleared, the brand changes, or the code is not found, which
-       is exactly when looking the colour up by model and year helps.
+       answered, and the button goes, along with the finder under it if it
+       was open. It comes back as soon as that answer stops holding: the code
+       is edited or cleared, the brand changes, or the code is not found,
+       which is exactly when looking the colour up by model and year helps.
 
        The finder stays open when it is showing the code's own versions
        (finderState.pinned): that grid is the rest of the answer. */
@@ -534,9 +536,9 @@
         refreshConfirm();
     }
 
-    // El valor del <select> es un id de la base cuando hay índice, y un id
-    // del catálogo local cuando no lo hay. Esto devuelve el segundo a partir
-    // del primero, que es lo que necesita la muestra.
+    // The <select> value is a database id when there is an index, and a local
+    // catalogue id when there is not. This returns the second from the first,
+    // which is what the swatch needs.
     function sidecarId(value) {
         if (!value) return "";
         if (!INDEX) return value;
@@ -548,15 +550,15 @@
         if (!brandId || !PAINTS) return null;
         var found = PAINTS.findColour(brandId, code);
         if (!found) return null;
-        // findColour() también busca por los códigos alternos, así que puede
-        // devolver una ficha cuyo código principal no es el que se escribió.
-        // Se enseña el escrito: el cliente copió «KBX» de su etiqueta y ver
-        // «PBX» en su sitio parece que la página le cambió el código, no que
-        // la misma pintura se vende con los dos.
+        // findColour() also searches the alternate codes, so it can return a
+        // card whose main code is not the one typed. The typed one is shown:
+        // the customer copied «KBX» off their label, and seeing «PBX» in its
+        // place looks like the page changed their code, not like the same
+        // paint is sold under both.
         var typed = PAINTS.normalizeCode(code);
         var swapped = PAINTS.normalizeCode(found.code) !== typed;
-        // Sin swCode: este color salió del catálogo local, no de la base, y
-        // el servidor no tiene nada que volver a resolver.
+        // No swCode: this colour came from the local catalogue, not the
+        // database, and the server has nothing to resolve again.
         return {
             swCode: "",
             code: swapped ? String(code).trim().toUpperCase() : found.code,
@@ -586,8 +588,8 @@
             return;
         }
 
-        // Sin índice no hay base que preguntar: queda el catálogo local, que
-        // es como funcionaba la página antes de todo esto.
+        // Without the index there is no database to ask: the local catalogue
+        // remains, which is how the page worked before all this.
         if (!INDEX) {
             var local = searchLocally(value, code);
             if (local) { state.picked = false; showColour(local, null); codeAnswered(true); }
@@ -629,14 +631,14 @@
                     codeAnswered(true);
                     return;
                 }
-                // Un mismo código de fábrica puede tener varias versiones, por
-                // año o por modelo. Se muestran en la rejilla para que elija
-                // quien sí sabe cuál es su coche.
+                // One factory code can have several versions, by year or by
+                // model. They are shown in the grid so whoever does know
+                // which one their car is can pick it.
                 //
-                // Salvo cuando el coche es de dos tonos: entonces no son
-                // versiones entre las que elegir, son las dos pinturas que
-                // lleva encima, y decirle «elige la de tu año» a quien tiene
-                // que matizar las dos es mandarle a la mitad del trabajo.
+                // Except when the car is two-tone: then they are not versions
+                // to choose between but the two paints it wears, and telling
+                // someone who has to mix both «pick the one for your year»
+                // sends them off with half the job.
                 var twoTone = items.length > 1 && items.every(function (c) {
                     return c.dualTone;
                 });
@@ -660,8 +662,8 @@
             })
             .catch(function (err) {
                 if (mine !== searchToken) return;
-                // Con la base caída o sin conexión, el catálogo local todavía
-                // sabe de diez marcas: la página degrada, no se rompe.
+                // With the database down or offline, the local catalogue
+                // still knows ten makes: the page degrades, it does not break.
                 var offline = err instanceof TypeError;
                 var fallback = (offline || err.soft) ? searchLocally(value, code) : null;
                 if (fallback) {
@@ -688,14 +690,14 @@
 
     if (codeInput) {
         codeInput.addEventListener("keydown", function (e) {
-            // Enter busca, y no envía nada: el campo no vive dentro de un
-            // <form>, pero el teclado del móvil ofrece «ir» igual.
+            // Enter searches and sends nothing: the field does not live inside
+            // a <form>, but the phone keyboard offers «go» anyway.
             if (e.key === "Enter") {
                 e.preventDefault();
                 searchByCode();
             }
         });
-        // Un código a medio escribir ya no describe la ficha que hay debajo.
+        // A half-typed code no longer describes the card beneath it.
         codeInput.addEventListener("input", clearColour);
     }
 
@@ -720,8 +722,9 @@
        not listed (Hilux, Onix and the other cars sold only down here).
        --------------------------------------------------------------------- */
 
-    // La página pide de a 60 porque la base contesta de a 60: el límite vive
-    // dentro de la función SQL, no aquí, y aquí sólo se sabe si hay más.
+    // The page asks for 60 at a time because the database answers 60 at a
+    // time: the limit lives inside the SQL function, not here, and here we
+    // only know whether there are more.
     var FINDER_PAGE = 60;
     var finderToggle = document.getElementById("finderToggle");
     var finder = document.getElementById("colourFinder");
@@ -744,12 +747,12 @@
         el.classList.toggle("swatch--none", !hex);
     }
 
-    /* Los seis botes, pintados del color elegido.
+    /* The six cans, painted in the chosen colour.
 
-       Se llama cada vez que se entra al paso, no solo al construir las
-       tarjetas: se puede volver atrás y cambiar de color, y entonces los botes
-       tienen que cambiar con él. Sin color que enseñar se rayan, igual que la
-       muestra de la ficha. */
+       Called every time the step is entered, not only when building the
+       cards: the customer can go back and change colour, and then the cans
+       have to change with it. With no colour to show they are striped, like
+       the card's swatch. */
     function paintSizeJars() {
         if (!sizeCards) return;
         var hex = state.colour && state.colour.hex ? state.colour.hex : "";
@@ -781,9 +784,9 @@
                 finderModel.appendChild(opt);
             });
         }
-        // Una marca sin modelos propios no deja el <select> muerto: sus
-        // colores están a nivel de marca, que es donde vive más de la mitad
-        // de este catálogo, y «todos los modelos» los trae igual.
+        // A make with no models of its own does not leave the <select> dead:
+        // its colours sit at make level, which is where more than half of
+        // this catalogue lives, and «todos los modelos» brings them anyway.
         finderModel.disabled = !makeId;
         finderModel.classList.add("is-placeholder");
         resetFinderPaging();
@@ -812,16 +815,18 @@
         });
     }
 
-    /* La página pide los colores; antes los tenía.
+    /* The page asks for the colours; it used to have them.
 
-       Dos cosas a la vez para que no se pisen: un número que sube en cada
-       petición, y un AbortController. El número es el que garantiza que una
-       respuesta lenta no escriba encima de una rápida que salió después; el
-       abort es el que evita gastar los bytes de la que ya no importa.
+       Two things at once so they do not trample each other: a number that
+       goes up on each request, and an AbortController. The number is what
+       guarantees a slow answer does not write over a fast one that left
+       later; the abort is what avoids spending bytes on the one that no
+       longer matters.
 
-       No hay debounce, y no es un olvido: lo único que dispara una petición es
-       cambiar uno de los dos <select> o pulsar «ver más». El buscador de texto
-       y las pastillas de tono filtran lo que ya está en pantalla. */
+       There is no debounce, and that is not an oversight: the only things
+       that fire a request are changing one of the two <select>s or pressing
+       «ver más». The text search and the hue chips filter what is already
+       on screen. */
     var finderToken = 0;
     var finderAbort = null;
 
@@ -880,9 +885,9 @@
             })
             .catch(function (err) {
                 if (err.name === "AbortError" || mine !== finderToken) return;
-                // Sin conexión o con la base apagada quedan los 777 colores
-                // del catálogo local, que son diez marcas pero son algo. Solo
-                // sirve si la marca elegida es una de ellas.
+                // Offline or with the database down, the local catalogue's
+                // 777 colours remain: ten makes, but something. It only helps
+                // if the chosen make is one of them.
                 var offline = err instanceof TypeError;
                 finderState.rows = [];
                 finderState.hasMore = false;
@@ -896,8 +901,8 @@
             });
     }
 
-    // Pinta lo que ya está cargado. No pide nada: el filtro de texto y las
-    // pastillas de tono trabajan sobre las filas que hay, igual que antes.
+    // Paints what is already loaded. It asks for nothing: the text filter and
+    // the hue chips work on the rows at hand, as before.
     function renderFinder() {
         if (!finder || finder.hidden || !PAINTS) return;
 
@@ -928,11 +933,11 @@
             if (c.swName && c.swName.toLowerCase().indexOf(text) !== -1) return true;
             if (!q) return false;
             if (PAINTS.normalizeCode(c.code).indexOf(q) === 0) return true;
-            // Y por el de Sherwin, que es el que se lee en la etiqueta de la
-            // lata y el que la parrilla acaba de enseñar.
+            // And by Sherwin's, the one on the can's label and the one the
+            // grid just showed.
             if (c.swCode && PAINTS.normalizeCode(c.swCode).indexOf(q) === 0) return true;
-            // También por los otros códigos de la misma pintura: quien teclea
-            // «PBX» sobre la parrilla busca la ficha que encabeza «KBX».
+            // Also by the other codes of the same paint: whoever types «PBX»
+            // over the grid is after the card headed «KBX».
             return (c.altCodes || []).some(function (a) {
                 return PAINTS.normalizeCode(a).indexOf(q) === 0;
             });
@@ -973,8 +978,8 @@
             finderGrid.appendChild(btn);
         });
 
-        // «Ver más» y no «ver N más»: la base nunca dice cuántos hay, a
-        // propósito, así que la página tampoco puede prometerlo.
+        // «Ver más» and not «ver N más»: the database never says how many
+        // there are, on purpose, so the page cannot promise it either.
         finderMore.hidden = !finderState.hasMore;
         finderMore.textContent = "Ver más colores";
         finderWiden.hidden = !finderModel.value;
@@ -991,8 +996,8 @@
         if (colour.years) {
             var from = colour.years[0];
             var to = colour.years[1];
-            // «2012–null» salía tal cual en la baldosa cuando faltaba un
-            // extremo, que es lo que pasa siempre que el color sigue en venta.
+            // «2012–null» showed as is on the tile when one end was missing,
+            // which always happens while the colour is still on sale.
             if (from !== null && to !== null) {
                 bits.push(from === to ? String(from) : from + "–" + to);
             } else if (from !== null) {
@@ -1002,7 +1007,7 @@
             }
         }
         if (colour.dualTone) bits.push("bitono");
-        return bits.join(" · ");
+        return bits.join(", ");
     }
 
     function finderNoteText(shown) {
@@ -1021,8 +1026,8 @@
         var note = "Colores " + where +
             (finderYear.value ? " de " + finderYear.value : "") +
             " en el catálogo del fabricante.";
-        // Más de la mitad de este catálogo cuelga de la marca y no del
-        // modelo, así que conviene decir cuándo lo que se ve es eso.
+        // More than half of this catalogue hangs off the make and not the
+        // model, so it is worth saying when that is what is showing.
         if (finderModel.value && finderState.rows.some(function (c) { return c.brandWide; })) {
             note += " Algunos están registrados para toda la marca, no para ese modelo.";
         }
@@ -1041,8 +1046,8 @@
         colourCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
 
-    // Una petición nueva: se vuelve a la primera página y se tiran las filas
-    // cargadas, porque describen otra combinación.
+    // A new request: back to the first page and the loaded rows are thrown
+    // away, because they describe another combination.
     function resetFinderPaging() {
         finderState.from = 0;
         finderState.rows = [];
@@ -1052,8 +1057,8 @@
         requestFinder();
     }
 
-    // El filtro de texto y las pastillas de tono no piden nada: trabajan
-    // sobre lo que ya está cargado.
+    // The text filter and the hue chips ask for nothing: they work on what
+    // is already loaded.
     function refilterFinder() {
         renderFinder();
     }
@@ -1067,8 +1072,8 @@
             finder.hidden = !open;
             finderToggle.setAttribute("aria-expanded", String(open));
             if (open) {
-                // Al abrir se pide de verdad: hasta ahora no había nada que
-                // pintar, porque los colores ya no viven en la página.
+                // Opening makes the real request: until now there was nothing
+                // to paint, because the colours no longer live in the page.
                 if (finderState.rows.length === 0) resetFinderPaging();
                 else renderFinder();
                 (brandSelect.value ? finderModel : brandSelect).focus();
@@ -1104,8 +1109,8 @@
             finderModel.focus();
         });
         finderMore.addEventListener("click", function () {
-            // La base recorta el salto a 600 y contesta 400 pasado eso, así
-            // que «ver más» se apaga antes de llegar en vez de dar vueltas.
+            // The database caps the offset at 600 and answers 400 past that,
+            // so «ver más» switches off before getting there instead of looping.
             if (finderState.from + FINDER_PAGE > 600) {
                 finderState.hasMore = false;
                 finderMore.hidden = true;
@@ -1121,7 +1126,7 @@
     }
 
     /* ---------------------------------------------------------------------
-       Paso 2 — el envase
+       Step 2: the container
        --------------------------------------------------------------------- */
 
     function unitPrice() {
@@ -1134,9 +1139,9 @@
         return unit === null ? null : unit * state.units;
     }
 
-    // Las seis tarjetas se construyen una sola vez; los precios, cada vez que
-    // se entra al paso, porque dependen del acabado del color elegido y ese
-    // puede cambiar volviendo atrás (un sólido y un tricapa no cuestan igual).
+    // The six cards are built once; the prices every time the step is
+    // entered, because they depend on the chosen colour's finish, which can
+    // change by going back (a solid and a tri-coat do not cost the same).
     function renderSizeCards() {
         if (!sizeCards || !PAINTS) return;
         if (sizeCards.childElementCount > 0) {
@@ -1153,12 +1158,11 @@
             card.setAttribute("aria-checked", "false");
             card.dataset.size = size.id;
 
-            // Los seis envases dibujados: el mismo bote a distintos tamaños,
-            // apoyados en una misma línea. Es la comparación que de verdad
-            // hace falta —cuál es más grande que cuál— y no depende de
-            // ninguna imagen. El lado crece con la raíz cúbica del volumen,
-            // que es como crece un recipiente de verdad: doble de pintura no
-            // es doble de alto.
+            // The six containers drawn: the same can at different sizes,
+            // standing on one line. It is the comparison really needed (which
+            // is bigger than which) and it depends on no image. The side grows
+            // with the cube root of the volume, which is how a real container
+            // grows: twice the paint is not twice as tall.
             var stage = document.createElement("span");
             stage.className = "size-card__stage";
             stage.setAttribute("aria-hidden", "true");
@@ -1257,7 +1261,7 @@
     if (unitsUp) unitsUp.addEventListener("click", function () { setUnits(state.units + 1); });
 
     /* ---------------------------------------------------------------------
-       Paso 3 — la empresa
+       Step 3: the company
        --------------------------------------------------------------------- */
 
     if (phoneInput) {
@@ -1296,11 +1300,11 @@
     if (companyForm) companyForm.addEventListener("input", refreshConfirm);
 
     /* ---------------------------------------------------------------------
-       Paso 4 — el resumen
+       Step 4: the summary
 
-       Cada bloque lleva su enlace al paso donde se cambia. Es la pantalla
-       donde alguien descubre que se equivocó de envase, y mandarlo a buscar
-       el botón «Atrás» tres veces es peor que ponerle el atajo.
+       Each block carries its link to the step where it is changed. This is
+       the screen where someone finds they picked the wrong container, and
+       sending them to hunt for «Atrás» three times is worse than a shortcut.
        --------------------------------------------------------------------- */
 
     function summaryBlock(title, step, rows, extra) {
@@ -1356,7 +1360,7 @@
         if (!summaryBox) return;
         summaryBox.innerHTML = "";
 
-        // El color -----------------------------------------------------
+        // The colour ---------------------------------------------------
         var colourRows = [{ label: "Identificado", value: METHOD_LABELS[orderMethod()] }];
         var swatch = null;
 
@@ -1377,7 +1381,7 @@
         if (swatch) colourSection.querySelector(".summary__head").appendChild(swatch);
         summaryBox.appendChild(colourSection);
 
-        // El pedido ----------------------------------------------------
+        // The order ----------------------------------------------------
         if (skipsQuantity()) {
             var pending = document.createElement("p");
             pending.className = "summary__pending";
@@ -1395,7 +1399,7 @@
             ]));
         }
 
-        // La empresa ---------------------------------------------------
+        // The company --------------------------------------------------
         summaryBox.appendChild(summaryBlock("La empresa", 3, [
             { label: "Nombre taller", value: companyName.value.trim() },
             { label: "Contacto", value: firstNameInput.value.trim() + " " + lastNameInput.value.trim() },
@@ -1404,17 +1408,17 @@
             { label: "Notas", value: notesInput.value.trim() }
         ]));
 
-        // El precio ----------------------------------------------------
+        // The price ----------------------------------------------------
         var total = skipsQuantity() ? null : orderTotalAmount();
         if (summaryPrice) {
             summaryPrice.hidden = total === null;
             if (total !== null) summaryTotal.textContent = PAINTS.formatSoles(total);
         }
         if (summaryLegal) {
-            // El aviso del envío depende de si dejaron correo: el WhatsApp
-            // siempre sale (el teléfono es obligatorio), el correo solo si lo
-            // escribieron. «código de la visita» / «código del pedido» según
-            // haya precio o no.
+            // The delivery note depends on whether they left an email: the
+            // WhatsApp always goes (the phone is required), the email only if
+            // they wrote one. «código de la visita» / «código del pedido»
+            // depending on whether there is a price.
             var hasEmail = emailInput.value.trim() !== "";
             var codeWord = total === null ? "de la visita" : "del pedido";
             var send = "Al confirmar te escribimos por WhatsApp dentro de 24 h con el código " +
@@ -1427,11 +1431,10 @@
     }
 
     /* ---------------------------------------------------------------------
-       Envío
+       Sending
 
-       Mismo trato que el asistente de cotización: hasta que el servidor no
-       confirma, no hay pantalla de éxito. Ver src/repair.js para el porqué de
-       cada rama del error.
+       Same treatment as the quote wizard: no success screen until the server
+       confirms. See src/repair.js for the reason behind each error branch.
        --------------------------------------------------------------------- */
 
     var ORDERS_ENDPOINT = (window.AUTOCOLOR_API_BASE || "") + "/api/paint-orders";
@@ -1454,23 +1457,24 @@
     function orderPayload() {
         return {
             method: orderMethod(),
-            // Sin color en el camino del taller: los tres campos viajan vacíos
-            // y el servidor los acepta así (ver validatePaintOrder).
+            // No colour on the workshop route: the three fields travel empty
+            // and the server accepts them that way (see validatePaintOrder).
             brand: state.colour ? state.colour.brand : "",
             brandId: state.colour ? state.colour.brandId : "",
             colorCode: state.colour ? state.colour.code : "",
             colorName: state.colour ? state.colour.name : "",
-            // El id de Sherwin, cuando el color salió de la base. Es lo que el
-            // servidor vuelve a resolver antes de guardar, y lo que encuentra
-            // la fórmula en el mostrador. Vacío si vino del catálogo local.
+            // Sherwin's id, when the colour came from the database. It is what
+            // the server resolves again before saving, and what finds the
+            // formula at the counter. Empty if it came from the local catalogue.
             swCode: state.colour ? (state.colour.swCode || "") : "",
             finish: state.colour ? state.colour.finish : "",
             reading: state.reading,
             size: skipsQuantity() ? "" : state.size,
             units: skipsQuantity() ? null : state.units,
-            // El precio que el cliente tenía delante al confirmar. Se guarda
-            // para que el taller sepa qué se le prometió, no para cobrarlo:
-            // el servidor no lo recalcula y la página lo llama referencial.
+            // The price the customer had in front of them when confirming.
+            // Stored so the workshop knows what was promised, not to charge
+            // it: the server does not recalculate it and the page calls it
+            // referential.
             price: skipsQuantity() ? null : orderTotalAmount(),
             company: companyName.value,
             firstName: firstNameInput.value,
@@ -1527,8 +1531,8 @@
             var lead = isVisit
                 ? "Te esperamos en el taller con el vehículo o la pieza."
                 : "Estamos preparando tu matizado.";
-            // Lo que de verdad cierra el pedido: dentro de 24 h escribimos por
-            // WhatsApp al teléfono para coordinar la cita o la entrega.
+            // What really closes the order: within 24 h we write on WhatsApp
+            // to the phone to arrange the appointment or the pickup.
             lead += " Te escribimos por WhatsApp dentro de 24 h para coordinar " +
                 (isVisit ? "la cita" : "la entrega") + " y los detalles.";
             var email = emailInput.value.trim();
@@ -1561,8 +1565,8 @@
                     copyCodeBtn.classList.remove("is-copied");
                 }, 2000);
             }).catch(function () {
-                // El portapapeles puede estar bloqueado: el código sigue en
-                // pantalla y se puede seleccionar.
+                // The clipboard may be blocked: the code stays on screen and
+                // can be selected.
             });
         });
     }
@@ -1599,7 +1603,7 @@
         phoneError.hidden = true;
         emailError.hidden = true;
         setSubmitError("");
-        if (successCode) successCode.textContent = "··········";
+        if (successCode) successCode.textContent = "";
 
         progressNav.hidden = false;
         confirmBtn.hidden = false;
@@ -1609,7 +1613,7 @@
     });
 
     /* ---------------------------------------------------------------------
-       Menú (igual que en el resto del sitio, ver src/home.js)
+       Menu (same as the rest of the site, see src/home.js)
        --------------------------------------------------------------------- */
 
     var menuToggle = document.getElementById("menuToggle");
@@ -1644,8 +1648,8 @@
        Arranque
        --------------------------------------------------------------------- */
 
-    // Las 383 marcas del catálogo del fabricante, las diez que vende el taller
-    // primero. Sale de un archivo, así que no hay espera ni nada que cargar.
+    // The manufacturer catalogue's 383 makes, the ten the workshop sells
+    // first. It comes from a file, so there is no wait and nothing to load.
     if (INDEX && brandSelect) {
         INDEX.makes.forEach(function (make) {
             var opt = document.createElement("option");
@@ -1654,9 +1658,9 @@
             brandSelect.appendChild(opt);
         });
     } else if (PAINTS && brandSelect) {
-        // Sin el índice queda el catálogo local: diez marcas, pero la página
-        // vende igual. El valor sigue siendo un id, y searchByCode() distingue
-        // los dos casos por SIDECAR_BY_LABEL.
+        // Without the index the local catalogue remains: ten makes, but the
+        // page still sells. The value is still an id, and searchByCode()
+        // tells the two cases apart by SIDECAR_BY_LABEL.
         PAINTS.brands().forEach(function (brand) {
             var opt = document.createElement("option");
             opt.value = brand.id;

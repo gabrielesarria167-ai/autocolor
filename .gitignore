@@ -2,23 +2,23 @@ node_modules/
 .DS_Store
 *.log
 
-# El .env y cualquier copia suya. El patrón es amplio a propósito: `.env` a
-# secas no cubre un `.env.bak` hecho de paso antes de editarlo, y ese archivo
-# lleva las mismas credenciales en un repositorio que se publica entero.
-# .env.example sí se versiona: no tiene valores, solo el comentario de cada
-# variable.
+# The .env and any copy of it. The pattern is broad on purpose: a bare `.env`
+# does not cover a `.env.bak` made in passing before editing it, and that file
+# carries the same credentials in a repository that is published whole.
+# .env.example is committed: it has no values, only each variable's comment.
 .env
 .env.*
 !.env.example
 
-# Fuentes 3D. Los .blend y los .glb sin comprimir se quedan en el disco pero
-# no en el repositorio: no se sirven nunca, pesan cientos de MB y GitHub Pages
-# publica todo lo versionado. Ver README, "Fuentes de los modelos 3D".
+# 3D sources. The .blend files and uncompressed .glb files stay on disk but
+# not in the repository: they are never served, they weigh hundreds of MB and
+# GitHub Pages publishes everything committed. See README, "Fuentes de los
+# modelos 3D".
 *.blend
 *.blend1
 imgs/assets/3d-visuals/**/src/
 
-# Notas de trabajo, con datos del taller que no tienen por qué publicarse.
+# Working notes, with workshop details that have no reason to be published.
 LAUNCH-CHECKLIST.md
 
 # seeded design canvas (rebuild with the design skill)

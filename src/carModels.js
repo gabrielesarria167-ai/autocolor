@@ -1,49 +1,48 @@
 /* =============================================================================
-   Catálogo de marcas y modelos del paso 1.
+   The makes and models catalogue for step 1.
 
-   De aquí sale todo lo que el asistente sabe de un vehículo antes de
-   preguntárselo al cliente: qué modelos ofrece cada marca, qué carrocería
-   tiene cada modelo y con qué imagen se lo muestra.
+   Everything the wizard knows about a vehicle before asking the customer
+   comes from here: which models each make offers, which body each model has
+   and which picture shows it.
 
-   Vive en un archivo y no en la base de datos a propósito. Es una tabla de
-   referencia que cambia una o dos veces al año (cuando entra un modelo
-   nuevo), la consulta el navegador antes de que exista ninguna solicitud, y
-   ponerla en Postgres obligaría a un viaje al servidor —y a tener servidor—
-   para poder llenar dos <select>. Editar este archivo es todo el
-   mantenimiento que necesita.
+   It lives in a file and not in the database on purpose. It is a reference
+   table that changes once or twice a year (when a new model comes in), the
+   browser reads it before any request exists, and putting it in Postgres
+   would force a round trip to the server (and require a server) just to
+   fill two <select>s. Editing this file is all the upkeep it needs.
 
-   Cómo agregar un modelo:
+   How to add a model:
 
        { id: "corolla", name: "Corolla", type: "sedan", family: "corolla" }
 
-   `id`      identifica al modelo dentro de su marca y nombra su foto en
-             stock-models/; no se cambia una vez publicado. The request
+   `id`      identifies the model within its make and names its photo in
+             stock-models/; it does not change once published. The request
              stores `name`, not `id`.
-   `type`    la carrocería, de las de BODY_TYPES. De ella sale sola la
-             categoría con la que trabaja el visor 3D del paso 3.
-   `family`  el nombre del modelo tal como lo escribe el proveedor de fotos
-             de pago (ver carPhotoUrl() en repair.js).
+   `type`    the body, one of BODY_TYPES. The category the step 3 3D viewer
+             works with follows from it.
+   `family`  the model name as the paid photo provider spells it (see
+             carPhotoUrl() in repair.js).
 
-   La foto de cada modelo no se declara: el archivo se llama
-   `<marca>-<modelo>.jpg` dentro de imgs/assets/stock-models/, así que sale
-   sola de los dos ids (photoFor(), abajo). Un modelo nuevo solo necesita
-   que se deje ahí su foto con ese nombre; si falta, la ficha del paso 1
-   cae al logo de la marca en vez de quedarse en blanco.
+   Each model's photo is not declared: the file is called
+   `<make>-<model>.jpg` inside imgs/assets/stock-models/, so it follows from
+   the two ids (photoFor(), below). A new model only needs its photo dropped
+   there under that name; if it is missing, the step 1 card falls back to the
+   make's logo instead of going blank.
    ========================================================================== */
 
 (function () {
     "use strict";
 
-    // Cada carrocería se dibuja en el paso 3 con uno de los cuatro modelos 3D
-    // que existen (van, wagon, pickup, suv), porque son los únicos para los
-    // que hay piezas seleccionables. `vehicle` es esa equivalencia: un sedán
-    // y un hatchback se pintan sobre la silueta de auto (wagon). El cliente
-    // ve el nombre de `label`, que sí es el de su vehículo.
+    // Each body is drawn in step 3 with one of the four 3D models that exist
+    // (van, wagon, pickup, suv), because they are the only ones with
+    // selectable panels. `vehicle` is that mapping: a sedan and a hatchback
+    // are painted on the car silhouette (wagon). The customer sees the
+    // `label` name, which is their actual vehicle's.
     //
-    // Las SUV tienen silueta propia desde que existe el modelo `suv`. Antes
-    // se pintaban sobre la de la pickup, que era la única alta y con ese
-    // volumen; eran 48 de los 108 modelos del catálogo, así que casi la mitad
-    // del catálogo elegía piezas sobre una carrocería que no era la suya.
+    // SUVs have had their own silhouette since the `suv` model arrived.
+    // Before that they were painted on the pickup's, the only tall one with
+    // that bulk; they were 48 of the catalogue's 108 models, so almost half
+    // the catalogue picked panels on a body that was not theirs.
     var BODY_TYPES = {
         sedan: { label: "Sedán", vehicle: "wagon" },
         hatchback: { label: "Hatchback", vehicle: "wagon" },
@@ -55,8 +54,8 @@
         van: { label: "Furgoneta", vehicle: "van" }
     };
 
-    // Las rutas de los logos son relativas a pgs/, where both pages that load
-    // this catalogue live (repair.html and taller.html).
+    // Logo paths are relative to pgs/, where both pages that load this
+    // catalogue live (repair.html and taller.html).
     var BRANDS = [
         {
             id: "toyota",
@@ -248,8 +247,8 @@
         }
     ];
 
-    // Las fotos son de Wikimedia Commons y cada una conserva su licencia y su
-    // autor en imgs/assets/stock-models/CREDITS.md.
+    // The photos come from Wikimedia Commons and each keeps its licence and
+    // author in imgs/assets/stock-models/CREDITS.md.
     var PHOTO_DIR = "../imgs/assets/stock-models/";
 
     function photoFor(brandId, modelId) {

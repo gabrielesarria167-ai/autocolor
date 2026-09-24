@@ -1,13 +1,13 @@
 /* =========================================================================
-   staff.js — panel del taller (pgs/taller.html)
+   staff.js: the workshop panel (pgs/taller.html)
 
-   Lista las solicitudes que entraron por el asistente y deja cambiarles el
-   estado, que es lo que antes se hacía a mano en psql.
+   Lists the requests that came in through the wizard and lets their status
+   be changed, which used to be done by hand in psql.
 
-   Nada de lo que hay aquí protege los datos: la contraseña se comprueba en el
-   servidor (server/auth.js) y esta página solo reacciona a lo que responda.
-   Un 401 significa «no hay sesión» y saca el formulario de acceso; el listado
-   nunca llega al navegador sin la cookie.
+   Nothing here protects the data: the password is checked on the server
+   (server/auth.js) and this page only reacts to what it answers. A 401 means
+   «no session» and brings up the login form; the listing never reaches the
+   browser without the cookie.
    ========================================================================= */
 
 (function () {
@@ -140,17 +140,17 @@
     var defineSaveEl = document.getElementById("paintDefineSave");
     var defineCancelEl = document.getElementById("paintDefineCancel");
 
-    // Vacío es el mismo origen. El panel solo funciona contra el servidor Node
-    // que tiene la base al lado; en una publicación estática (GitHub Pages) no
-    // hay API y la primera consulta lo dirá.
+    // Empty is the same origin. The panel only works against the Node server
+    // that has the database next to it; on a static deploy (GitHub Pages)
+    // there is no API and the first request will say so.
     var API_BASE = window.AUTOCOLOR_API_BASE || "";
     var API_MISSING_STATUS = [404, 405, 501];
     var API_MISSING_MESSAGE = "Este sitio se publicó sin la API detrás, así que el panel no tiene de dónde leer.";
     var NETWORK_MESSAGE = "No pudimos conectar con el servidor. Revisa que esté encendido.";
 
-    // Los estados, su orden y sus etiquetas viven en src/statuses.js, que esta
-    // página carga antes que este archivo. Son los mismos que admite la
-    // columna `status` de la tabla (ver server/schema.sql).
+    // The statuses, their order and their labels live in src/statuses.js,
+    // which this page loads before this file. They are the same ones the
+    // table's `status` column accepts (see server/schema.sql).
     var STATUS_LABELS = window.AUTOCOLOR_STATUSES.LABELS;
     var STATUS_ORDER = window.AUTOCOLOR_STATUSES.ORDER;
     var FILTER_LABELS = window.AUTOCOLOR_STATUSES.FILTER_LABELS;
@@ -184,8 +184,8 @@
     /* ---------------------------------------------------------------------
        The 3D viewer module
 
-       Two screens mount it — the walk-in form's part picker and the table's
-       parts viewer — and it is the same file for both: fetched once, with a
+       Two screens mount it (the walk-in form's part picker and the table's
+       parts viewer) and it is the same file for both: fetched once, with a
        viewer built per screen. A retry needs a URL the browser has not
        already written off (its module map remembers a failed fetch), hence
        the query string, which is only ever added after a failure.
@@ -245,14 +245,14 @@
         return holders.map(function (holder) { return holder.workerId; }).join(",");
     }
 
-    // Lo último que devolvió el servidor, ya filtrado por estado. El buscador
-    // sí recorta sobre esto sin volver a preguntar: son como mucho 200 filas ya
-    // en memoria, y un viaje al servidor por cada tecla sería peor de todas las
-    // formas.
+    // The last thing the server returned, already filtered by status. The
+    // search box does trim this without asking again: it is at most 200 rows
+    // already in memory, and a server round trip per keystroke would be worse
+    // in every way.
     var allRequests = [];
     var statusFilter = "";
     var searchTerm = "";
-    // «Mis vehículos»: recorta a los que tiene ocupados quien está mirando.
+    // «Mis vehículos»: trims to the ones held by whoever is looking.
     var mineOnly = false;
     var mineBtn = null;
 
@@ -265,48 +265,49 @@
     // Which of the two tables the switch above the title shows.
     var panelTab = "vehicles";
 
-    // Quién entró: lo manda el servidor con el listado (ver /api/staff/requests).
-    // Con esto se decide qué filas puede tocar —una ocupada solo la mueve quien
-    // la tiene—, pero es solo para la interfaz: la regla de verdad la aplica el
-    // servidor, que no se fía de lo que diga el navegador.
+    // Who logged in: the server sends it with the listing (see
+    // /api/staff/requests). It decides which rows they can touch (an occupied
+    // one is only moved by whoever holds it), but it is only for the
+    // interface: the real rule is applied by the server, which does not trust
+    // what the browser says.
     //
     // `isBoss` arrives with the listing and only decides which profile gets
     // painted: the boss gets the monitor where everybody else has «Iniciar
-    // sesión». Who may ask for the monitor — and who may take a vehicle — is
+    // sesión». Who may ask for the monitor, and who may take a vehicle, is
     // decided by the server (see requireBoss and refuseBoss in
     // server/server.js), which does not trust any of this.
     var viewer = { workerId: "", name: "", isBoss: false, note: null };
 
-    // What is on screen: the login, the worker's profile, the table, or — for
-    // the boss only — the monitor or the walk-in form. loadRequests brings the
+    // What is on screen: the login, the worker's profile, the table, or (for
+    // the boss only) the monitor or the walk-in form. loadRequests brings the
     // data, but does not decide this.
     var view = "login";
 
-    // Se entró a mirar —«Ver solicitudes» en la ficha— y no a trabajar: la
-    // tabla se pinta entera pero sin un solo control.
+    // They came in to look («Ver solicitudes» on the profile) and not to
+    // work: the table is painted in full but without a single control.
     //
-    // Es la interfaz y nada más. El servidor no sabe de estos dos modos: para
-    // él hay una sesión, y con ella se puede tomar un vehículo y moverle el
-    // estado. Así que esto no encierra a nadie —quien entró a mirar podría
-    // cambiar cosas por su cuenta desde la consola—; es la elección de quien
-    // entra, no una barrera. Lo que sí impide el servidor es tocar lo que
-    // tiene otro (ver server/db.js), y eso vale en los dos modos.
+    // It is the interface and nothing more. The server knows nothing of these
+    // two modes: to it there is a session, and with it a vehicle can be taken
+    // and its status moved. So this locks nobody in (whoever came to look
+    // could change things on their own from the console); it is the choice of
+    // whoever logs in, not a barrier. What the server does prevent is touching
+    // what someone else holds (see server/db.js), and that holds in both modes.
     var readOnly = false;
 
     /* ---------------------------------------------------------------------
-       Reloj
+       Clock
 
-       Solo aparece con el panel a la vista, para que el trabajador tenga a
-       mano la hora y sepa cuándo cerrar el turno. No es un cronómetro de
-       nada: es la hora del reloj, que se refresca cada segundo.
+       It only shows with the panel in view, so the worker has the time at
+       hand and knows when to end the shift. It is not a stopwatch for
+       anything: it is the wall-clock time, refreshed every second.
     --------------------------------------------------------------------- */
 
     var clockTimer = null;
 
     function paintClock() {
-        // Se arma a mano en vez de toLocaleTimeString: el locale es-PE devuelve
-        // «08:15:49 p. m.» —minúsculas, con puntos y espacio—, y aquí se quiere
-        // «08:15:49 PM», con AM/PM en mayúsculas y sin puntos.
+        // Built by hand instead of toLocaleTimeString: the es-PE locale returns
+        // «08:15:49 p. m.» (lower case, with dots and a space), and here we
+        // want «08:15:49 PM», with AM/PM in capitals and no dots.
         var now = new Date();
         var hours = now.getHours();
         var suffix = hours >= 12 ? "PM" : "AM";
@@ -351,8 +352,8 @@
 
     function cell(row, text, className) {
         var td = document.createElement("td");
-        // textContent y no innerHTML: marca, modelo y nombre los escribió el
-        // cliente en el asistente, y aquí se muestran tal cual.
+        // textContent and not innerHTML: make, model and name were typed by
+        // the customer in the wizard, and are shown here as they are.
         td.textContent = text == null || text === "" ? "—" : text;
         if (className) td.className = className;
         row.appendChild(td);
@@ -360,13 +361,13 @@
     }
 
     /* ---------------------------------------------------------------------
-       Filtros y buscador
+       Filters and search
     --------------------------------------------------------------------- */
 
-    // Un filtro que no es de estado: recorta por quién tiene el vehículo, no
-    // por la etapa del trabajo. Por eso es un interruptor aparte y no una
-    // opción más del grupo —se combinan: «los míos, en pintura»—, y por eso va
-    // al principio de la fila, con su raya y su propio color al encenderse.
+    // A filter that is not a status: it trims by who holds the vehicle, not
+    // by the stage of the job. That is why it is a separate switch and not one
+    // more option in the group (they combine: «mine, in paint»), and why it
+    // goes first in the row, with its divider and its own colour when on.
     function buildMineFilter() {
         mineBtn = document.createElement("button");
         mineBtn.type = "button";
@@ -396,9 +397,9 @@
         mineBtn.addEventListener("click", function () {
             mineOnly = !mineOnly;
             mineBtn.setAttribute("aria-pressed", String(mineOnly));
-            // Se recorta sobre lo que ya está en memoria, como hace el
-            // buscador: quién ocupa cada solicitud viene en la propia fila, así
-            // que no hay nada que volver a preguntarle al servidor.
+            // Trimmed over what is already in memory, like the search box:
+            // who holds each request comes in the row itself, so there is
+            // nothing to ask the server again.
             applySearch();
         });
 
@@ -418,17 +419,17 @@
             button.type = "button";
             button.className = "staff-chip";
             button.textContent = choice.label;
-            // aria-pressed y no una clase «activo»: son botones que alternan, y
-            // así el lector de pantalla anuncia cuál está puesto.
+            // aria-pressed and not an «active» class: they are toggle buttons,
+            // and this way the screen reader announces which one is on.
             button.setAttribute("aria-pressed", String(choice.value === statusFilter));
             button.addEventListener("click", function () {
                 if (statusFilter === choice.value) return;
                 statusFilter = choice.value;
                 syncFilters();
-                // El estado lo filtra el servidor y no esta función: la
-                // consulta trae como mucho 200 filas, así que recortar aquí
-                // dejaría fuera las canceladas viejas que sí caben en una
-                // consulta pedida solo de canceladas.
+                // The status is filtered by the server and not by this
+                // function: the query brings at most 200 rows, so trimming
+                // here would leave out the old cancelled ones that do fit in
+                // a query asking only for cancelled.
                 loadRequests();
             });
             button.dataset.value = choice.value;
@@ -437,16 +438,16 @@
     }
 
     function syncFilters() {
-        // Solo los de estado: el de «Mis vehículos» no lleva data-value y se
-        // enciende por su cuenta.
+        // Status ones only: «Mis vehículos» carries no data-value and turns
+        // on by itself.
         var buttons = filtersEl.querySelectorAll(".staff-chip[data-value]");
         Array.prototype.forEach.call(buttons, function (button) {
             button.setAttribute("aria-pressed", String(button.dataset.value === statusFilter));
         });
     }
 
-    // El texto sobre el que busca el buscador. Se arma una vez por fila, al
-    // recibirla del servidor (ver loadRequests), y no en cada tecla.
+    // The text the search box searches. Built once per row, when it arrives
+    // from the server (see loadRequests), and not on every keystroke.
     function haystack(request) {
         return [
             request.id,
@@ -460,16 +461,16 @@
     }
 
     /* ---------------------------------------------------------------------
-       Cambiar el estado: píldora con su propio desplegable
+       Changing the status: a pill with its own dropdown
 
-       El <select> nativo no deja pintar sus opciones, y aquí la lista
-       coloreada es la mitad de para qué sirve. A cambio hay que reponer a
-       mano lo que el nativo daba gratis: cerrar al hacer clic fuera, cerrar
-       con Escape, moverse con las flechas y devolver el foco al cerrar.
+       The native <select> does not let its options be painted, and here the
+       coloured list is half of what it is for. In exchange, what the native
+       one gave for free has to be rebuilt by hand: close on an outside click,
+       close on Escape, move with the arrows and give focus back on closing.
     --------------------------------------------------------------------- */
 
-    // Solo puede haber un menú abierto. Se guarda el de turno para poder
-    // cerrarlo desde los escuchas globales de más abajo.
+    // Only one menu can be open. The current one is kept so it can be closed
+    // from the global listeners further down.
     var openMenu = null;
 
     function closeMenu(returnFocus) {
@@ -481,16 +482,16 @@
         if (returnFocus) pill.focus();
     }
 
-    // El menú es `fixed` (ver styles.css): se escapa así del recorte del
-    // contenedor que hace scroll horizontal, pero la posición hay que
-    // calcularla, y se recalcula cada vez porque la fila pudo haberse movido.
+    // The menu is `fixed` (see styles.css): that way it escapes the clipping
+    // of the horizontally scrolling container, but its position has to be
+    // computed, and it is recomputed each time because the row may have moved.
     function placeMenu(pill, menu) {
         var box = pill.getBoundingClientRect();
         var margin = 8;
 
         var top = box.bottom + 4;
-        // Si abajo no cabe, se abre hacia arriba: en las últimas filas de una
-        // lista larga es lo normal.
+        // If it does not fit below, it opens upwards: normal on the last rows
+        // of a long list.
         if (top + menu.offsetHeight > window.innerHeight - margin) {
             top = Math.max(margin, box.top - menu.offsetHeight - 4);
         }
@@ -519,8 +520,8 @@
             noun: "de la solicitud",
             patch: patchStatus,
             lockedTitle: function (request) {
-                // Por qué no se puede: se entró solo a mirar, o —con la sesión
-                // iniciada— está libre y hay que tomarlo, o lo tienen otros.
+                // Why it cannot: they came in only to look, or (with the
+                // session started) it is free and has to be taken, or others hold it.
                 var holding = holdersOf(request);
                 return readOnly
                     ? "Inicia sesión para cambiar el estado"
@@ -529,15 +530,15 @@
                         : "Toma el vehículo para cambiarle el estado";
             },
             saved: function (request, updated) {
-                // Con un filtro puesto, la fila deja de pertenecer a la
-                // lista que se está viendo: se vuelve a pedir para no
-                // dejarla ahí contradiciendo al filtro.
+                // With a filter on, the row stops belonging to the list being
+                // viewed: it is fetched again so it is not left there
+                // contradicting the filter.
                 if (statusFilter && statusFilter !== updated.status) {
                     loadRequests();
                     return;
                 }
                 // A finished status (entregado, cancelado) releases the
-                // vehicle on the server — from both holders at once — so
+                // vehicle on the server, from both holders at once, so
                 // the «Ocupado» cell has to follow. Compared by code and
                 // not by identity: every answer brings a fresh array.
                 var fresh = updated.holders || [];
@@ -558,7 +559,7 @@
         wrap.className = "staff-status";
         wrap.dataset.status = request.status;
 
-        /* --- la píldora --- */
+        /* --- the pill --- */
         var pill = document.createElement("button");
         pill.type = "button";
         pill.className = "staff-status__pill";
@@ -566,10 +567,10 @@
         pill.setAttribute("aria-expanded", "false");
         pill.setAttribute("aria-label", "Estado " + spec.noun);
 
-        // Un vehículo ocupado por otro no se toca: la píldora queda inerte. Es
-        // solo comodidad —el servidor rechaza el cambio igual (403)—, pero
-        // evita el clic que no iba a ninguna parte. Un botón deshabilitado no
-        // recibe clic ni teclas, así que no hace falta guardar cada escucha.
+        // A vehicle held by someone else is not touched: the pill stays inert.
+        // It is only a convenience (the server refuses the change anyway with
+        // 403), but it avoids the click that led nowhere. A disabled button
+        // gets no clicks or keys, so each listener need not be guarded.
         if (!editable) {
             pill.disabled = true;
             pill.classList.add("staff-status__pill--locked");
@@ -589,7 +590,7 @@
         pill.appendChild(label);
         pill.appendChild(caret);
 
-        /* --- el menú --- */
+        /* --- the menu --- */
         var menu = document.createElement("div");
         menu.className = "staff-status__menu";
         menu.setAttribute("role", "listbox");
@@ -621,19 +622,19 @@
         }
 
         function open() {
-            closeMenu(false);          // el que hubiera abierto en otra fila
-            menu.hidden = false;        // visible antes de medirlo
+            closeMenu(false);          // whichever was open on another row
+            menu.hidden = false;        // visible before measuring it
             placeMenu(pill, menu);
             pill.setAttribute("aria-expanded", "true");
             openMenu = { pill: pill, menu: menu, move: move };
 
-            // El foco arranca en el estado actual, que es desde donde uno se
-            // mueve con las flechas.
+            // Focus starts on the current status, which is where one moves
+            // from with the arrows.
             var current = menu.querySelector('[aria-selected="true"]');
             (current || options()[0]).focus();
         }
 
-        // Flechas dentro del menú, con vuelta circular.
+        // Arrows inside the menu, wrapping around.
         function move(step) {
             var list = Array.prototype.slice.call(options());
             var index = list.indexOf(document.activeElement);
@@ -675,24 +676,24 @@
                     Array.prototype.forEach.call(options(), function (option) {
                         option.setAttribute("aria-selected", String(option.dataset.status === updated.status));
                     });
-                    // La copia en memoria también, o el próximo filtrado
-                    // seguiría creyendo lo anterior.
+                    // The in-memory copy too, or the next filtering would
+                    // still believe the old value.
                     request.status = updated.status;
                     spec.saved(request, updated);
                 })
                 .catch(function (err) {
-                    // Sesión vencida —o servidor reiniciado, que se lleva las
-                    // que tiene en memoria—: sin esto el listado se quedaba a
-                    // la vista con los teléfonos de los clientes y cada clic
-                    // repetía el mismo error, sin manera de saber que lo que
-                    // hace falta es volver a entrar.
+                    // Session expired (or server restarted, which takes the
+                    // in-memory sessions with it): without this the listing
+                    // stayed on view with the customers' phones and each click
+                    // repeated the same error, with no way to tell that what
+                    // is needed is to log in again.
                     if (err.unauthorized) {
                         showLogin();
                         setError("Tu sesión venció. Vuelve a entrar para guardar el cambio.");
                         return;
                     }
-                    // El cambio no llegó a la base: la píldora se queda como
-                    // estaba y el error sale arriba.
+                    // The change never reached the database: the pill stays as
+                    // it was and the error shows at the top.
                     setError(err.message);
                 })
                 .then(function () {
@@ -713,7 +714,7 @@
        The column has always carried the number of panels, which says how much
        work a row is but not which work: «6 piezas» is a bonnet and a wing as
        easily as two doors and both bumpers. The arrow beside the number opens
-       the vehicle itself — the very 3D model the parts were chosen on, turning
+       the vehicle itself: the very 3D model the parts were chosen on, turning
        on its own, with those panels lit up, and their names listed beside it.
 
        It is the wizard's viewer (mountCar3D in src/carVisual.js) mounted
@@ -733,8 +734,8 @@
 
         var parts = request.parts || [];
         // Nothing to draw: an old row saved before the wizard asked for
-        // panels, or one whose silhouette never arrived. The number stays —
-        // it is the column's data — and there is simply no arrow to press.
+        // panels, or one whose silhouette never arrived. The number stays
+        // (it is the column's data) and there is simply no arrow to press.
         if (!request.vehicle || parts.length === 0) {
             td.textContent = request.partCount;
             row.appendChild(td);
@@ -763,8 +764,8 @@
         row.appendChild(td);
     }
 
-    // The request being looked at, the arrow it was opened from — to give the
-    // focus back on closing — and the mounted viewer, if there is one.
+    // The request being looked at, the arrow it was opened from (to give the
+    // focus back on closing) and the mounted viewer, if there is one.
     var partsViewRequest = null;
     var partsViewTrigger = null;
     var partsView3d = null;
@@ -790,7 +791,7 @@
         partsViewSubtitleEl.textContent = [
             request.plate || "Sin placa",
             [request.brand, request.model].filter(Boolean).join(" ")
-        ].filter(Boolean).join(" · ");
+        ].filter(Boolean).join(", ");
 
         renderPartsViewList(parts);
         show(partsViewEl, true);
@@ -889,13 +890,13 @@
     }
 
     // `restoreFocus` is false when the focus already has somewhere to go: on
-    // opening another row. The arrow may have gone in the meantime — the row is
-    // rebuilt on taking or releasing a vehicle — hence the check.
+    // opening another row. The arrow may have gone in the meantime (the row is
+    // rebuilt on taking or releasing a vehicle), hence the check.
     function closePartsView(restoreFocus) {
         // First, and not only when there is a viewer to tear down: a mount
         // still waiting on its import() has nothing for destroy() to reach,
-        // and without this it would go on to build its viewer — WebGL context,
-        // turntable and all — onto a layer nobody is looking at any more.
+        // and without this it would go on to build its viewer (WebGL context,
+        // turntable and all) onto a layer nobody is looking at any more.
         partsViewMountId++;
         if (partsView3d) {
             partsView3d.destroy();
@@ -914,8 +915,8 @@
 
     partsViewCloseEl.addEventListener("click", function () { closePartsView(true); });
     // Tapping outside closes, as on any layer of this kind. The backdrop is an
-    // element of its own and not the whole layer, so a click on the panel — on
-    // the canvas, on the list — never reaches this.
+    // element of its own and not the whole layer, so a click on the panel (on
+    // the canvas, on the list) never reaches this.
     partsViewBackdropEl.addEventListener("click", function () { closePartsView(true); });
 
     document.addEventListener("keydown", function (event) {
@@ -955,38 +956,39 @@
        only reflects it.
     --------------------------------------------------------------------- */
 
-    // Desplaza la tabla lo justo para que el «Liberar» de una píldora propia se
-    // vea entero, cuando la tabla no cabe y esa columna queda contra el borde.
-    // `free.scrollWidth` da el ancho de «Liberar» aunque esté plegado (max-width
-    // 0 no lo esconde del cálculo), así que no hay que esperar a la transición.
-    // Guarda el desplazamiento previo para volver a él al salir.
+    // Scrolls the table just enough for an own pill's «Liberar» to show in
+    // full, when the table does not fit and that column sits against the edge.
+    // `free.scrollWidth` gives the width of «Liberar» even while folded
+    // (max-width 0 does not hide it from the measurement), so there is no need
+    // to wait for the transition. Keeps the previous scroll to return to it.
     function revealRelease(pill, free) {
         var scroller = document.querySelector(".staff-table__scroll");
         if (!scroller) return;
-        // Si la tabla cabe entera no hay nada que desplazar: la píldora ya se ve.
+        // If the whole table fits there is nothing to scroll: the pill shows.
         if (scroller.scrollWidth <= scroller.clientWidth) return;
-        var edge = 12;                          // aire hasta el borde
-        var grow = 8 + free.scrollWidth;        // margen + «Liberar» al estirarse
+        var edge = 12;                          // breathing room to the edge
+        var grow = 8 + free.scrollWidth;        // margin + «Liberar» once stretched
         var expandedRight = pill.getBoundingClientRect().right + grow;
-        if (expandedRight <= scroller.getBoundingClientRect().right - edge) return; // ya se ve
-        // «Ocupado» es la última columna y la píldora vive contra el borde de su
-        // columna reservada, así que llevar la tabla al tope de la derecha la
-        // enseña entera —nombre y «Liberar»— sin depender de una cuenta al píxel
-        // que el ancho inestable de la vista volvería frágil. No se vuelve sola
-        // al salir: devolver la tabla mientras el ratón sigue encima provoca un
-        // vaivén —la píldora se corre bajo el cursor y dispara entrar/salir—, y
-        // una vez a la vista la columna, pasar por otra píldora ya no mueve nada
-        // (esta comprobación de «ya se ve» corta antes). La barra horizontal
-        // sigue ahí para volver a mano.
+        if (expandedRight <= scroller.getBoundingClientRect().right - edge) return; // already visible
+        // «Ocupado» is the last column and the pill sits against the edge of
+        // its reserved column, so taking the table to its right end shows it
+        // whole (name and «Liberar») without relying on a pixel count that the
+        // view's unstable width would make fragile. It does not scroll back on
+        // leaving: returning the table while the mouse is still over it causes
+        // a see-saw (the pill slides under the cursor and fires enter/leave),
+        // and once the column is in view, passing over another pill moves
+        // nothing (the «already visible» check above stops it first). The
+        // horizontal scrollbar is still there to go back by hand.
         scroller.scrollTo({ left: scroller.scrollWidth - scroller.clientWidth, behavior: "smooth" });
     }
 
-    // Abrir «Liberar» (clase, no :hover, para que no se cierre mientras la tabla
-    // se mueve) y correr la tabla para que se vea entero.
+    // Open «Liberar» (a class, not :hover, so it does not close while the
+    // table moves) and scroll the table so it shows whole.
     function startPeek(td, pill, free) {
-        // revealRelease mide la píldora aún sin estirar (su borde ya estirado es
-        // el actual más `8 + free.scrollWidth`, que suma), así que se llama antes
-        // de abrir el «Liberar»; si no, contaría el estirón dos veces.
+        // revealRelease measures the pill still unstretched (its stretched
+        // edge is the current one plus `8 + free.scrollWidth`, which it adds),
+        // so it is called before opening «Liberar»; otherwise it would count
+        // the stretch twice.
         revealRelease(pill, free);
         td.classList.add("is-peeking");
     }
@@ -1011,14 +1013,14 @@
         var holders = holdersOf(request);
 
         // The cell is a list: up to two people, each bringing their own thing
-        // — my pill with «Liberar», the other person's name — plus the button
+        // (my pill with «Liberar», the other person's name), plus the button
         // to join while there is room.
         var list = document.createElement("div");
         list.className = "staff-occupied__holders";
         td.appendChild(list);
 
-        // A mirar y nada más: quiénes lo tienen, en texto. Un botón aquí
-        // prometería un cambio que este modo no hace.
+        // Look only: who holds it, as text. A button here would promise a
+        // change this mode does not make.
         if (readOnly) {
             if (holders.length === 0) {
                 list.appendChild(holderText("Disponible"));
@@ -1033,7 +1035,7 @@
 
         holders.forEach(function (holder) {
             if (holder.workerId !== viewer.workerId) {
-                // Lo tiene otro: solo el nombre, sin tocar.
+                // Someone else holds it: just the name, hands off.
                 list.appendChild(holderText(holderName(holder)));
                 return;
             }
@@ -1044,8 +1046,8 @@
             var mine = document.createElement("button");
             mine.type = "button";
             mine.className = "staff-occupied__mine";
-            // Sin title: la píldora ya muestra «Liberar» al pasar por encima, y
-            // el globo nativo encima de eso sobra y tapa.
+            // No title: the pill already shows «Liberar» on hover, and the
+            // native tooltip on top of that is too much and covers it.
             mine.setAttribute("aria-label", "Liberar el vehículo de la solicitud " + request.id);
 
             var name = document.createElement("span");
@@ -1059,14 +1061,13 @@
 
             mine.addEventListener("click", function () { setOccupied(request, false); });
             list.appendChild(mine);
-            // Al ser la última columna, el «Liberar» que sale al pasar por
-            // encima puede quedar tapado por el borde derecho cuando la tabla no
-            // cabe entera. Se desplaza la tabla a la derecha para enseñarlo y se
-            // vuelve al salir. Los escuchas van en la CELDA, no en la píldora:
-            // al desplazar, la píldora se corre bajo el cursor, y en la píldora
-            // el mouseleave saltaría y desharía el gesto —la celda, más ancha,
-            // aguanta el puntero—. Y el «Liberar» se abre con una clase, no con
-            // :hover, para que no se cierre mientras la tabla se mueve.
+            // Being the last column, the «Liberar» that appears on hover can
+            // be hidden by the right edge when the table does not fit. The
+            // table scrolls right to show it. The listeners go on the CELL,
+            // not the pill: when scrolling, the pill slides under the cursor,
+            // and on the pill mouseleave would fire and undo the gesture (the
+            // cell, being wider, keeps the pointer). And «Liberar» opens with
+            // a class, not :hover, so it does not close while the table moves.
             td.addEventListener("mouseenter", function () { startPeek(td, mine, free); });
             td.addEventListener("mouseleave", function () { endPeek(td); });
             mine.addEventListener("focus", function () { startPeek(td, mine, free); });
@@ -1076,7 +1077,7 @@
         // There is room and I am not in it: join. With nobody holding it the
         // button reads «Disponible», which is the state of the vehicle; with
         // one person already on it, «Acompañar», because what happens is not
-        // taking it but standing beside them. Full — two — has no button at
+        // taking it but standing beside them. Full (two) has no button at
         // all: the server would refuse it (409) and offering it would promise
         // what is not there.
         if (!holdsIt(request, viewer.workerId) && holders.length < MAX_HOLDERS) {
@@ -1117,9 +1118,9 @@
                     return;
                 }
                 setError(err.message);
-                // La ocupación cambió por debajo —otro lo tomó, o ya no lo
-                // teníamos—: se vuelve a pedir la lista para que la columna
-                // muestre quién lo tiene de verdad y no un estado inventado.
+                // Occupancy changed underneath (someone else took it, or we
+                // no longer had it): the list is fetched again so the column
+                // shows who really holds it and not an invented state.
                 loadRequests();
             });
     }
@@ -1144,8 +1145,8 @@
         });
     }
 
-    // Los escuchas van una sola vez en el documento y no uno por fila: con
-    // doscientas solicitudes serían doscientos escuchas haciendo lo mismo.
+    // The listeners go once on the document and not one per row: with two
+    // hundred requests that would be two hundred listeners doing the same.
     document.addEventListener("click", function (event) {
         if (!openMenu) return;
         if (openMenu.pill.contains(event.target) || openMenu.menu.contains(event.target)) return;
@@ -1164,15 +1165,15 @@
             event.preventDefault();
             openMenu.move(-1);
         } else if (event.key === "Tab") {
-            // Salir del menú con el tabulador lo cierra, como haría cualquier
-            // desplegable; si no, quedaría abierto y flotando.
+            // Tabbing out of the menu closes it, as any dropdown would;
+            // otherwise it would stay open and floating.
             closeMenu(false);
         }
     });
 
-    // Al ser `fixed`, el menú no acompaña a la fila cuando algo se desplaza:
-    // se cierra, que es lo que hace el desplegable nativo. En captura para
-    // enterarse también del scroll de la tabla, que no llega a window.
+    // Being `fixed`, the menu does not follow the row when something scrolls:
+    // it closes, which is what the native dropdown does. In capture so it also
+    // hears the table's scroll, which does not reach window.
     window.addEventListener("scroll", function () { closeMenu(false); }, true);
     window.addEventListener("resize", function () { closeMenu(false); });
 
@@ -1186,8 +1187,8 @@
             return response.json().catch(function () { return null; }).then(function (body) {
                 if (!response.ok) {
                     var error = new Error((body && body.error) || "No pudimos guardar el estado.");
-                    // Marcado para que quien llama saque el formulario de
-                    // acceso, como hace loadRequests con su propio 401.
+                    // Flagged so the caller brings up the login form, as
+                    // loadRequests does with its own 401.
                     if (response.status === 401) error.unauthorized = true;
                     throw error;
                 }
@@ -1202,13 +1203,13 @@
        Listado
     --------------------------------------------------------------------- */
 
-    // El buscador solo esconde y muestra las filas que ya están hechas. Antes
-    // llamaba a render(), que las rehace todas: con doscientas solicitudes eran
-    // unas dos mil doscientas opciones de estado —cada una con su escucha— por
-    // cada carácter escrito.
+    // The search box only hides and shows rows that are already built. It
+    // used to call render(), which rebuilds them all: with two hundred
+    // requests that was some two thousand two hundred status options (each
+    // with its listener) per character typed.
     function applySearch() {
-        // Un menú abierto en una fila que se acaba de esconder quedaría
-        // flotando: es `fixed` y no acompaña a su fila.
+        // A menu open on a row that was just hidden would stay floating: it
+        // is `fixed` and does not follow its row.
         closeMenu(false);
 
         var term = searchTerm.trim().toLowerCase();
@@ -1228,7 +1229,7 @@
             }).length;
             countEl.textContent = !paintLoaded ? ""
                 : (shown === orders ? orders + " " + noun2 : shown + " de " + orders + " " + noun2)
-                    + (open ? " · " + open + " por preparar" : "");
+                    + (open ? ", " + open + " por preparar" : "");
             return;
         }
 
@@ -1243,9 +1244,9 @@
 
         show(emptyEl, shown === 0);
 
-        // «N de M» solo cuando el buscador recorta; con todo a la vista,
-        // repetir el número dos veces no dice nada. M es lo que trajo la
-        // consulta, que ya viene filtrada por el estado elegido.
+        // «N de M» only when the search trims; with everything in view,
+        // repeating the number twice says nothing. M is what the query
+        // brought, which already comes filtered by the chosen status.
         var total = allRequests.length;
         var noun = total === 1 ? "solicitud" : "solicitudes";
         countEl.textContent = shown === total
@@ -1253,11 +1254,11 @@
             : shown + " de " + total + " " + noun;
     }
 
-    // Solo se le cambia el estado a un vehículo que uno mismo ocupa: ni a los
-    // libres (hay que tomarlos primero) ni a los que solo tienen otros.
-    // Cualquiera de quienes lo tienen puede, que son dos como mucho. Ocupar sí
-    // queda abierto: mientras quede sitio, cualquiera se suma desde la columna
-    // «Ocupado». El servidor aplica la misma regla (ver server/db.js).
+    // A vehicle's status is only changed by someone who holds it: not free
+    // ones (they must be taken first) nor ones only others hold. Any of its
+    // holders can, and there are two at most. Taking stays open: while there
+    // is room, anyone joins from the «Ocupado» column. The server applies the
+    // same rule (see server/db.js).
     function canEditStatus(request) {
         if (readOnly) return false;
         return holdsIt(request, viewer.workerId);
@@ -1290,15 +1291,15 @@
         cell(row, QUALITY_LABELS[request.quality] || request.quality, "staff-table__nowrap");
         buildStatusCell(row, request, canEditStatus(request));
         buildOccupiedCell(row, request);
-        // Guardada para que el buscador la esconda en vez de rehacerla, y para
-        // poder rehacerla sola cuando cambia la ocupación (ver rebuildRow).
+        // Kept so the search box hides it instead of rebuilding it, and so it
+        // can be rebuilt alone when occupancy changes (see rebuildRow).
         request.row = row;
         return row;
     }
 
     function render() {
-        // Las filas se rehacen enteras: un menú abierto quedaría apuntando a
-        // un nodo que ya no está en la página.
+        // Rows are rebuilt whole: an open menu would be left pointing at a
+        // node no longer on the page.
         closeMenu(false);
 
         rowsEl.textContent = "";
@@ -1309,15 +1310,15 @@
         applySearch();
     }
 
-    // Al ocupar o liberar cambia también si la píldora de estado se puede tocar,
-    // así que se rehace la fila entera en vez de parchear la celda: es un clic
-    // deliberado y de vez en cuando, no el buscador tecleando.
+    // Taking or releasing also changes whether the status pill can be touched,
+    // so the whole row is rebuilt instead of patching the cell: it is a
+    // deliberate, occasional click, not the search box typing.
     function rebuildRow(request) {
         if (!request.row || !request.row.parentNode) return;
         var fresh = makeRow(request);
         request.row.parentNode.replaceChild(fresh, request.row);
-        // makeRow ya dejó request.row apuntando a `fresh`. applySearch repone la
-        // visibilidad y el contador, que el reemplazo no conserva.
+        // makeRow already left request.row pointing at `fresh`. applySearch
+        // restores the visibility and the counter, which the swap does not keep.
         applySearch();
     }
 
@@ -1332,7 +1333,7 @@
        worker on shift moves an order along (PATCH /api/staff/paint-orders).
 
        The one thing only the boss does here is define an order read at the
-       counter — method 'in_person', which arrives with no colour, container
+       counter: method 'in_person', which arrives with no colour, container
        or price because the customer is bringing the vehicle to be measured.
        His «Definir» button opens the form at the bottom of this section.
     --------------------------------------------------------------------- */
@@ -1472,7 +1473,7 @@
             code.className = "paint-colour__code";
             code.textContent = order.colorCode || "";
             meta.appendChild(code);
-            if (order.brand) meta.appendChild(document.createTextNode(" · " + order.brand));
+            if (order.brand) meta.appendChild(document.createTextNode(", " + order.brand));
         }
 
         text.appendChild(name);
@@ -1704,7 +1705,7 @@
 
         defineSubtitleEl.textContent = [order.company,
             [order.firstName, order.lastName].filter(Boolean).join(" "), order.id]
-            .filter(Boolean).join(" · ");
+            .filter(Boolean).join(", ");
         defineBrandEl.value = order.brand || "";
         defineCodeEl.value = order.colorCode || "";
         defineNameEl.value = order.colorName || "";
@@ -1817,10 +1818,10 @@
     fillDefineChoices();
 
     /* ---------------------------------------------------------------------
-       Las tres vistas: acceso, ficha y tabla
+       The three views: login, profile and table
 
-       Una sola función enseña y esconde, para que no haya dos sitios que
-       puedan dejar media pantalla puesta.
+       A single function shows and hides, so there are not two places that
+       could leave half a screen up.
     --------------------------------------------------------------------- */
 
     function paintView() {
@@ -1831,11 +1832,11 @@
         show(intakeEl, view === "intake");
         show(panelEl, view === "panel");
 
-        // El botón de arriba a la derecha dice en cada pantalla lo que hace.
-        // Solo en la ficha cierra la sesión; desde la tabla nunca se sale del
-        // todo, se vuelve a la ficha —y la sesión sigue abierta, que es lo que
-        // deja entrar otra vez sin la contraseña—. En modo consulta ni siquiera
-        // se había empezado un turno: ahí lo único que cabe es volver.
+        // The top-right button says on each screen what it does. Only on the
+        // profile does it end the session; from the table one never leaves
+        // entirely but goes back to the profile (and the session stays open,
+        // which is what lets them back in without the password). In look-only
+        // mode no shift was even started: there the only option is going back.
         show(logoutBtn, view !== "login");
         logoutBtn.textContent = view === "login" || view === "profile"
             ? "Salir"
@@ -1876,8 +1877,8 @@
         show(paintFiltersEl, onPaint);
         panelTitleEl.textContent = onPaint ? "Pedidos de matizado" : "Vehículos en el taller";
         searchEl.placeholder = onPaint
-            ? "Buscar por taller, color o código…"
-            : "Buscar por placa, cliente o código…";
+            ? "Buscar por taller, color o código"
+            : "Buscar por placa, cliente o código";
         if (view !== "panel") closePaintDefine(false);
 
         show(readOnlyEl, view === "panel" && readOnly);
@@ -1896,27 +1897,27 @@
         // «Mis vehículos» goes too: the boss takes none, so that filter could
         // only ever empty the table.
         if (mineBtn) show(mineBtn, !viewer.isBoss);
-        // Sin controles no hay nada que se guarde solo.
+        // Without controls there is nothing that saves itself.
         show(noteEl, view === "panel" && !readOnly);
     }
 
     function showLogin() {
         view = "login";
         readOnly = false;
-        // El siguiente que entre empieza con la fila de filtros limpia.
+        // The next one to log in starts with a clean filter row.
         mineOnly = false;
         if (mineBtn) mineBtn.setAttribute("aria-pressed", "false");
         paintView();
         workerIdInput.focus();
     }
 
-    // De vuelta a la ficha. El modo se olvida: al entrar otra vez se vuelve a
-    // elegir con cuál de los dos botones.
+    // Back to the profile. The mode is forgotten: on coming in again it is
+    // chosen again with one of the two buttons.
     function showProfile() {
         view = "profile";
         readOnly = false;
         paintView();
-        // Se mide con la ficha ya visible: escondida no ocupa y daría cero.
+        // Measured with the profile already visible: hidden it takes no room and would give zero.
         sizePhoto();
     }
 
@@ -1931,9 +1932,9 @@
         loadWorkers();
     }
 
-    // Se llega aquí desde la ficha, con las solicitudes ya cargadas: se elige
-    // el modo y se repinta la tabla, que es lo que decide si las filas llevan
-    // controles o no.
+    // Arrives here from the profile, with the requests already loaded: the
+    // mode is chosen and the table repainted, which is what decides whether
+    // the rows carry controls or not.
     function showPanel(browseOnly) {
         saveNotes();
         readOnly = !!browseOnly;
@@ -1945,43 +1946,44 @@
     }
 
     /* ---------------------------------------------------------------------
-       Ficha del trabajador
+       The worker's profile
 
-       Las notas son recordatorios suyos, no datos del taller: se quedan en
-       este navegador, guardadas bajo su código, y no pasan por el servidor
-       —que hoy no tiene dónde ponerlas—. Cambiar de máquina es empezar una
-       libreta nueva.
+       The notes are their own reminders, not workshop data: they stay in
+       this browser, stored under their code, and never go through the server
+       (which today has nowhere to put them). Switching machines means
+       starting a new notepad.
     --------------------------------------------------------------------- */
 
-    /* La foto es tan alta como la columna de al lado —nombre, código y notas—,
-       hasta un tope, y guarda la proporción de un retrato. Las dos medidas se
-       escriben aquí; el CSS solo pone de qué tamaño se ve si esto no corre.
+    /* The photo is as tall as the column beside it (name, code and notes), up
+       to a cap, and keeps a portrait's proportion. Both sizes are written
+       here; the CSS only sets the size it shows at if this does not run.
 
-       Se escriben las dos y no solo el ancho, y la fila alinea arriba y no
-       estira, porque estirando había un trinquete: una caja estirada mide lo
-       que mide la fila, no su propio contenido, y la fila la estaba levantando
-       la propia foto a través de su `aspect-ratio`. Así, al borrar las notas la
-       medida seguía siendo la de antes y la foto no volvía a bajar nunca. Con
-       el alto puesto a mano —y siempre menor o igual que el de la columna— la
-       foto ya no puede inflar lo que la mide.
+       Both are written, not just the width, and the row aligns to the top
+       instead of stretching, because stretching caused a ratchet: a
+       stretched box measures what the row measures, not its own content, and
+       the row was being lifted by the photo itself through its
+       `aspect-ratio`. So after clearing the notes the measurement stayed the
+       old one and the photo never came back down. With the height set by
+       hand (and always less than or equal to the column's) the photo can no
+       longer inflate what measures it.
 
-       El tope es lo que impide que una lista larga de recordatorios convierta
-       la foto en un cartel. La caja de notas tiene el suyo (ver styles.css) y
-       este cubre lo que quede.
+       The cap is what stops a long list of reminders from turning the photo
+       into a poster. The notes box has its own (see styles.css) and this one
+       covers whatever is left.
 
-       Al estrechar la foto, la columna de al lado se ensancha y su texto puede
-       recolocarse, y entonces el alto ya no es el que se midió. Por eso se
-       repite hasta que deje de moverse, con un límite de vueltas: el caso
-       corriente cierra a la primera. */
+       Narrowing the photo widens the column beside it and its text may
+       reflow, and then the height is no longer the one measured. So it
+       repeats until it stops moving, with a cap on rounds: the usual case
+       settles on the first. */
     var PHOTO_RATIO = 4 / 5;
     var PHOTO_MAX_HEIGHT = 420;
     var PHOTO_STACKED = "(max-width: 700px)";
 
     function sizePhoto() {
-        // Sin la ficha a la vista no hay nada que medir: las cajas escondidas
-        // no ocupan, y saldría cero.
+        // Without the profile in view there is nothing to measure: hidden
+        // boxes take no room, and it would come out as zero.
         if (view !== "profile") return;
-        // Apilada, la foto tiene sus medidas en el CSS: se le devuelven.
+        // Stacked, the photo has its sizes in the CSS: give them back.
         if (window.matchMedia(PHOTO_STACKED).matches) {
             profilePhotoEl.style.width = "";
             profilePhotoEl.style.height = "";
@@ -2001,8 +2003,8 @@
 
     var NOTES_PREFIX = "autocolor.taller.notas.";
     var notesTimer = null;
-    // Lo último que se guardó, para no reescribir lo mismo cada vez que se sale
-    // de la ficha ni anunciar un guardado que no hizo falta.
+    // The last thing saved, so the same thing is not rewritten every time the
+    // profile is left, nor a save announced that was not needed.
     var notesSaved = "";
 
     function notesKey() {
@@ -2014,8 +2016,8 @@
         profileCodeEl.textContent = viewer.workerId || "";
 
         // The boss's profile differs by one button: where everybody else starts
-        // their shift, he opens the monitor. The rest — the photo, the code, the
-        // notepad — is the same, because it is his too.
+        // their shift, he opens the monitor. The rest (the photo, the code, the
+        // notepad) is the same, because it is his too.
         show(profileRoleEl, !!viewer.isBoss);
         show(profileMonitorBtn, !!viewer.isBoss);
         show(profileIntakeBtn, !!viewer.isBoss);
@@ -2032,9 +2034,9 @@
 
         var key = notesKey();
         var saved = "";
-        // El navegador puede tener el almacenamiento cerrado (ventana privada,
-        // ajustes): sin notas se sigue trabajando igual, así que no se avisa de
-        // nada que el trabajador no pueda arreglar.
+        // The browser may have storage closed (private window, settings):
+        // without notes work goes on the same, so nothing is reported that
+        // the worker cannot fix.
         if (key) {
             try {
                 saved = window.localStorage.getItem(key) || "";
@@ -2063,12 +2065,12 @@
         }
     }
 
-    // Al escribir no se guarda en cada tecla: se espera a que pare.
+    // Typing does not save on every key: it waits for a pause.
     notesEl.addEventListener("input", function () {
         if (notesTimer) window.clearTimeout(notesTimer);
         notesTimer = window.setTimeout(saveNotes, 600);
-        // La caja de notas crece con lo escrito (ver `field-sizing` en
-        // styles.css), así que la foto tiene que seguirla.
+        // The notes box grows with what is written (see `field-sizing` in
+        // styles.css), so the photo has to follow it.
         sizePhoto();
     });
 
@@ -2077,15 +2079,15 @@
     profileIntakeBtn.addEventListener("click", showIntake);
     profileBrowseBtn.addEventListener("click", function () { showPanel(true); });
 
-    // Desde el aviso del modo consulta se pasa a trabajar sin volver a pedir
-    // nada: la sesión ya está abierta, lo que faltaba era decidirlo.
+    // From the look-only notice one switches to working without being asked
+    // for anything: the session is already open, what was missing was the decision.
     readOnlyEnterBtn.addEventListener("click", function () { showPanel(false); });
 
     /* ---------------------------------------------------------------------
        The boss's monitor
 
        One card per worker with the vehicles they are holding right now. It is
-       not a record of shifts — the workshop keeps none: it is the table's
+       not a record of shifts (the workshop keeps none): it is the table's
        «Ocupado» column read the other way round, by person instead of by
        vehicle.
 
@@ -2095,8 +2097,8 @@
        its worker look free.
     --------------------------------------------------------------------- */
 
-    // Half a minute. Occupancy changes while the boss watches — somebody takes a
-    // vehicle, somebody drops another — and a stale board is worse than none.
+    // Half a minute. Occupancy changes while the boss watches (somebody takes a
+    // vehicle, somebody drops another) and a stale board is worse than none.
     var MONITOR_MS = 30000;
     var monitorTimer = null;
 
@@ -2115,7 +2117,7 @@
         monitorTimer = null;
     }
 
-    // The monitor's status badge. Not the table's pill — nothing changes here —
+    // The monitor's status badge. Not the table's pill (nothing changes here),
     // but it carries the same `data-status`, which is where the colours of the
     // eleven statuses come from (see styles.css).
     function statusBadge(status) {
@@ -2235,7 +2237,7 @@
     var noteEditorFor = "";
 
     // While an editor is open the half-minute refresh is off. It repaints the
-    // whole list, which would throw away whatever was half-typed — and the
+    // whole list, which would throw away whatever was half-typed, and the
     // board being thirty seconds stale matters less than losing a sentence.
     function holdMonitorRefresh(open) {
         noteEditorFor = open;
@@ -2253,7 +2255,8 @@
         dots.setAttribute("aria-haspopup", "menu");
         dots.setAttribute("aria-expanded", "false");
         dots.setAttribute("aria-label", "Nota para " + (worker.name || worker.workerId));
-        dots.textContent = "…";
+        dots.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+            '<circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>';
 
         var menu = document.createElement("div");
         menu.className = "staff-cardmenu";
@@ -2353,7 +2356,7 @@
         input.id = fieldId;
         input.rows = 3;
         input.maxLength = NOTE_MAX;
-        input.placeholder = "Lo que tiene que saber…";
+        input.placeholder = "Lo que tiene que saber";
         input.value = worker.note ? worker.note.text : "";
         box.appendChild(input);
 
@@ -2386,7 +2389,7 @@
         input.focus();
     }
 
-    // Writes the note, or removes it when the text is empty — the same request
+    // Writes the note, or removes it when the text is empty: the same request
     // either way, which is why the route is a PUT.
     function putNote(worker, note, card, save) {
         setError("");
@@ -2488,8 +2491,8 @@
        Registering a walk-in vehicle
 
        A car driven to the shop instead of booked through the website. It
-       becomes the same kind of row as any other — the queue does not care how
-       one arrived — but the form asks fewer things than the website, because
+       becomes the same kind of row as any other (the queue does not care how
+       one arrived), but the form asks fewer things than the website, because
        the customer is at the counter. Nothing can be edited afterwards, so
        everything it asks for except the notes is required.
 
@@ -2645,8 +2648,8 @@
 
        At least one panel is required to register, the same as on the website
        (WALK_IN_REQUIRED in server/server.js). Picking a different silhouette
-       still empties the selection — an id from the pickup does not exist on
-       the van — so a boss who changes the model after choosing panels is
+       still empties the selection (an id from the pickup does not exist on
+       the van), so a boss who changes the model after choosing panels is
        asked for them again rather than sent on with panels nobody can point
        at.
     --------------------------------------------------------------------- */
@@ -2707,7 +2710,7 @@
     // walks someone through a price with a subtotal, a discount line and a
     // hint: at the counter the boss needs the number to say out loud. So every
     // finish's total is on screen at once, discount already taken off, the one
-    // picked is marked, and tapping another picks it — the customer asks
+    // picked is marked, and tapping another picks it: the customer asks
     // "¿y el más barato?" and the answer is already there. One line under it
     // says which discount is in the figures. Same prices and steps as the
     // wizard (src/parts.js), so the two never quote differently.
@@ -2790,7 +2793,7 @@
         // Bumped first, and not only when there is a viewer to tear down: a
         // mount still waiting on its import has nothing for `destroy()` to
         // reach, and without this its handler would pass the mountId check and
-        // build the viewer anyway — onto a screen nobody is looking at, where
+        // build the viewer anyway, onto a screen nobody is looking at, where
         // a WebGL context and a render loop would sit until the form is opened
         // again. Leaving the screen mid-load is the ordinary way to hit it:
         // the module, three.js and a GLB of tens of megabytes take a while on
@@ -2825,8 +2828,8 @@
         intake3dVehicle = vehicle;
         resetIntakeOverlay();
 
-        // The module is fetched once — by loadCar3d, shared with the parts
-        // viewer of the table — and only the viewer inside it is rebuilt per
+        // The module is fetched once (by loadCar3d, shared with the parts
+        // viewer of the table) and only the viewer inside it is rebuilt per
         // silhouette.
         var mountId = ++intake3dMountId;
         var canvasEl = intake3dCanvasEl;
@@ -2834,8 +2837,8 @@
         // Two handlers and not a trailing .catch(): the second argument to
         // then() sees the import's own rejection and nothing else, which keeps
         // a module that failed to DOWNLOAD apart from one that downloaded and
-        // then failed to MOUNT. They want opposite things — one needs the
-        // cached promise thrown away, the other needs it kept — and a trailing
+        // then failed to MOUNT. They want opposite things (one needs the
+        // cached promise thrown away, the other needs it kept) and a trailing
         // .catch() would catch both and treat them as the first.
         loadCar3d().then(function (mod) {
             // A later choice already claimed the canvas while this import was
@@ -2855,8 +2858,8 @@
                     onPartToggle: toggleIntakePart
                 });
             } catch (err) {
-                // The file arrived; building the viewer is what failed —
-                // typically a phone that will not hand out another WebGL
+                // The file arrived; building the viewer is what failed,
+                // typically on a phone that will not hand out another WebGL
                 // context. The cached module stays: refetching something that
                 // downloaded perfectly well costs a few hundred kilobytes and
                 // fixes nothing.
@@ -2916,12 +2919,12 @@
             firstName: intakeFirstNameEl.value.trim(),
             lastName: intakeLastNameEl.value.trim(),
             email: intakeEmailEl.value.trim(),
-            // El servidor lo exige con el prefijo, igual que en el asistente.
+            // The server requires it with the prefix, same as in the wizard.
             phone: "+51" + intakePhoneEl.value.replace(/\D/g, ""),
             brand: car.brand,
             model: car.model,
-            // La carrocería sale del modelo elegido, si se eligió uno. La
-            // silueta no: esa la eligió el jefe mirando el vehículo.
+            // The body comes from the chosen model, if one was chosen. The
+            // silhouette does not: the boss picked that looking at the vehicle.
             bodyType: car.bodyType,
             plate: plate,
             // The one thing the form does not insist on: a customer who said
@@ -3064,23 +3067,23 @@
                         throw new Error((body && body.error) || "No pudimos cargar las solicitudes.");
                     }
                     setError("");
-                    // Quién entró, para decidir qué filas puede tocar. Si el
-                    // servidor no lo mandó, queda vacío y todo se ve como de
-                    // otro —el servidor rechazaría el cambio igual—.
+                    // Who logged in, to decide which rows they can touch. If
+                    // the server did not send it, it stays empty and everything
+                    // looks like someone else's (the server would refuse anyway).
                     viewer = body.viewer || { workerId: "", name: "" };
                     allRequests = body.requests || [];
                     allRequests.forEach(function (request) {
                         request.searchText = haystack(request);
                     });
                     paintProfile();
-                    // Recién entrado —o recién abierta la página con la sesión
-                    // puesta— se pasa por la ficha, que es donde se elige cómo
-                    // seguir. Si ya se estaba en la tabla —un filtro, un
-                    // reintento— no se mueve de ahí.
+                    // Freshly logged in (or the page just opened with the
+                    // session on), they pass through the profile, which is
+                    // where they choose how to go on. If they were already on
+                    // the table (a filter, a retry) it stays there.
                     if (view === "login" || view === "profile") view = "profile";
                     paintView();
-                    // Después de pintar: la ficha escondida no ocupa y la foto
-                    // saldría de cero.
+                    // After painting: the hidden profile takes no room and the
+                    // photo would come out at zero.
                     sizePhoto();
                     render();
                     paintTabs();
@@ -3100,15 +3103,15 @@
        Acceso
     --------------------------------------------------------------------- */
 
-    // Dos letras y cinco dígitos. La comprobación de verdad la hace el
-    // servidor contra la lista de códigos; esto solo evita un viaje cuando lo
-    // que se escribió ni siquiera tiene la forma.
+    // Two letters and five digits. The real check is done by the server
+    // against the list of codes; this only saves a trip when what was typed
+    // does not even have the shape.
     var WORKER_ID_RE = /^[A-Za-z]{2}[0-9]{5}$/;
 
     loginForm.addEventListener("submit", function (event) {
         event.preventDefault();
-        // Se normaliza igual que en el servidor: sin espacios y en mayúsculas,
-        // para que «ab12345» entre igual que «AB12345».
+        // Normalised as on the server: no spaces and upper case, so that
+        // «ab12345» gets in the same as «AB12345».
         var workerId = workerIdInput.value.trim().toUpperCase();
         var password = passwordInput.value;
         if (!workerId) {
@@ -3142,7 +3145,7 @@
                     if (!response.ok) {
                         throw new Error((body && body.error) || "No pudimos iniciar sesión.");
                     }
-                    // Ni el código ni la contraseña se quedan escritos.
+                    // Neither the code nor the password stays filled in.
                     workerIdInput.value = "";
                     passwordInput.value = "";
                     return loadRequests();
@@ -3158,18 +3161,18 @@
     });
 
     logoutBtn.addEventListener("click", function () {
-        // Desde la tabla no se sale de la sesión: se termina el turno y se
-        // vuelve a la ficha. Los datos de los clientes dejan de verse, que es
-        // lo que importa de un vistazo, y volver a la tabla no pide contraseña.
+        // From the table the session is not left: the shift ends and it goes
+        // back to the profile. The customers' data stops showing, which is
+        // what matters at a glance, and going back to the table asks for no password.
         if (view !== "profile") {
             showProfile();
             return;
         }
 
-        // Desde la ficha sí. El listado se quita llegue o no la petición al
-        // servidor: el clic es para dejar de tener los datos de los clientes a
-        // la vista, y una red caída no es razón para dejarlos ahí creyendo que
-        // se salió.
+        // From the profile it is. The listing is removed whether or not the
+        // request reaches the server: the click is to stop having the
+        // customers' data in view, and a network outage is no reason to leave
+        // it there believing one has logged out.
         var clear = function () {
             saveNotes();
             allRequests = [];
@@ -3193,7 +3196,7 @@
     buildFilters();
     buildPaintFilters();
 
-    // Al abrir la página no se sabe si hay sesión: se pregunta, y el 401 —si
-    // llega— es lo que decide mostrar el formulario de acceso.
+    // On opening the page nobody knows whether there is a session: it asks,
+    // and the 401 (if it comes) is what decides to show the login form.
     loadRequests();
 })();

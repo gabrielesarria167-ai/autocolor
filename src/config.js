@@ -1,40 +1,40 @@
 /* =========================================================================
-   config.js — a qué servidor le habla el sitio
+   config.js: which server the site talks to
 
-   El asistente necesita un servidor (el de server/) para guardar las
-   solicitudes y para consultarlas por código. Un alojamiento estático como
-   GitHub Pages sirve el HTML pero no puede correr ese servidor: ahí el
-   formulario responde 405 porque no hay nadie que atienda el POST.
+   The wizard needs a server (the one in server/) to store requests and to
+   look them up by code. A static host such as GitHub Pages serves the HTML
+   but cannot run that server, so there the form answers 405: nobody is
+   listening for the POST.
 
-   Con AUTOCOLOR_API_BASE vacío, el sitio le habla al mismo origen desde el
-   que se sirvió — que es lo correcto cuando `npm start` sirve las dos cosas.
-   Si el sitio vive en un sitio estático y la API en otro lado, aquí va el
-   origen de la API, sin barra final:
+   With AUTOCOLOR_API_BASE empty, the site talks to the origin it was served
+   from, which is right when `npm start` serves both. If the site lives on a
+   static host and the API somewhere else, put the API origin here, with no
+   trailing slash:
 
        window.AUTOCOLOR_API_BASE = "https://api.autocolor.pe";
 
-   Ese origen tiene que incluir al del sitio en su ALLOWED_ORIGINS (ver
-   server/server.js), o el navegador bloqueará las peticiones.
+   That origin has to list the site's origin in its ALLOWED_ORIGINS (see
+   server/server.js), or the browser will block the requests.
    ========================================================================= */
 
 window.AUTOCOLOR_API_BASE = "";
 
 
 /* -------------------------------------------------------------------------
-   Fotos de los vehículos (paso 1)
+   Vehicle photos (step 1)
 
-   La ficha del paso 1 muestra el vehículo que el cliente acaba de elegir.
-   Sin tocar nada usa las fotos del propio sitio: una por modelo, en
-   imgs/assets/stock-models/, que no dependen de ningún servicio.
+   The step 1 card shows the vehicle the customer just picked. Out of the box
+   it uses the site's own photos: one per model, in imgs/assets/stock-models/,
+   with no outside service involved.
 
-   imagin.studio entrega en cambio fotos recortadas, sin fondo y por año del
-   modelo. Es de pago y cada cliente tiene su clave; poniéndola aquí, la
-   ficha las prefiere a las del sitio:
+   imagin.studio instead serves cut-out photos, with no background and by
+   model year. It is paid and each customer gets a key; set it here and the
+   card prefers those photos over the site's:
 
        window.AUTOCOLOR_CAR_IMAGE_CUSTOMER = "autocolor-pe";
 
-   Si la foto que toque no carga —sea del sitio o del servicio—, la ficha
-   muestra el logo de la marca (imgs/brands/) y nunca se queda en blanco.
+   If the photo it needs does not load, from the site or from the service,
+   the card shows the brand logo (imgs/brands/) and is never left blank.
    ------------------------------------------------------------------------- */
 
 window.AUTOCOLOR_CAR_IMAGE_CUSTOMER = "";

@@ -1,43 +1,43 @@
 'use strict';
 
 /* =============================================================================
-   netcheck.js — a dónde llega este alojamiento y a dónde no
+   netcheck.js: where this host can reach and where it cannot
 
-   Existe porque «no se pudo conectar» no distingue tres situaciones que se
-   arreglan de maneras distintas:
+   It exists because «could not connect» does not tell apart three situations
+   that are fixed in different ways:
 
-     1. No hay salida a internet, o el DNS no contesta. Entonces no es cosa
-        del correo y hay que mirar el alojamiento.
-     2. Se sale bien, pero la API de Brevo no responde. Entonces no hay nada
-        que arreglar aquí: es esperar, que para eso están los reintentos.
-     3. Se llega a todo, y lo que falla es la llave, el remitente sin verificar
-        o el mensaje. Eso lo dice el motivo que dio la comprobación.
+     1. There is no way out to the internet, or DNS does not answer. Then it
+        is not a mail problem and the host is what needs looking at.
+     2. Traffic gets out fine, but the Brevo API does not answer. Then there
+        is nothing to fix here: it is a matter of waiting, which is what the
+        retries are for.
+     3. Everything is reachable, and what fails is the key, the unverified
+        sender or the message. The reason the check gave says so.
 
-   Se prueba abriendo un socket y nada más: ni se habla HTTP ni se manda un
-   byte. Lo único que se mide es si el saludo TCP llega a completarse.
+   It tests by opening a socket and nothing else: no HTTP is spoken and not a
+   byte is sent. All that is measured is whether the TCP handshake completes.
 
-   ESTO SE ESCRIBIÓ PARA EL PROBLEMA ANTERIOR, cuando los correos salían por el
-   SMTP de Gmail y morían en «Connection timeout» sin decir por qué (ver la
-   cabecera de server/mail.js). Se queda, apuntado al transporte de ahora,
-   porque la pregunta que contesta —«¿llega este alojamiento a donde tiene que
-   llegar?»— es la misma el día que algo vuelva a fallar.
+   THIS WAS WRITTEN FOR THE EARLIER PROBLEM, when emails went out through
+   Gmail's SMTP and died on «Connection timeout» without saying why (see the
+   header of server/mail.js). It stays, pointed at the current transport,
+   because the question it answers («does this host reach where it has to?»)
+   is the same the day something fails again.
 
-   NO SE CORRE NUNCA SI EL CORREO FUNCIONA. Lo dispara server.js solo cuando la
-   comprobación del arranque falla, así que en un despliegue sano esto no
-   cuesta nada y no aparece en el registro.
+   IT NEVER RUNS IF MAIL WORKS. server.js only fires it when the startup check
+   fails, so on a healthy deploy this costs nothing and does not show in the log.
    ========================================================================== */
 
 const net = require('node:net');
 
-// Un tope corto a propósito: esto es un diagnóstico y va detrás de un correo
-// que ya falló. Una conexión sana a cualquiera de estos tarda milésimas (la de
-// Gmail, 22 ms medidos), así que ocho segundos es de sobra generoso y mantiene
-// el arranque por debajo de eso: las tres pruebas van a la vez.
+// A short cap on purpose: this is a diagnostic and it runs after an email
+// that already failed. A healthy connection to any of these takes
+// milliseconds (Gmail's, 22 ms measured), so eight seconds is more than
+// generous and keeps startup under that: the probes run at the same time.
 const PROBE_TIMEOUT_MS = 8000;
 
-// Las tres preguntas, en el orden en que se leen: el destino que usamos, otro
-// del mismo tipo para saber si el problema es suyo o nuestro, y un tercero que
-// solo comprueba que este contenedor sale a internet.
+// The questions, in the order they are read: the destination we use, another
+// of the same kind to tell whether the problem is theirs or ours, and a third
+// that only checks this container gets out to the internet.
 const PROBES = [
     { label: 'la API de Brevo (la que usamos)', host: 'api.brevo.com', port: 443 },
     { label: 'otro sitio cualquiera por HTTPS', host: 'www.cloudflare.com', port: 443 },
@@ -45,13 +45,13 @@ const PROBES = [
 ];
 
 /**
- * ¿Se completa el saludo TCP contra este destino?
+ * Does the TCP handshake complete against this destination?
  *
  * `family: 4` because Render has no outbound IPv6 (server/mail.js no longer
- * resolves anything by hand; it just uses fetch). Render no tiene salida IPv6, y una prueba que salga por IPv6 diría «no
- * llego» de un destino perfectamente alcanzable.
+ * resolves anything by hand; it just uses fetch), and a probe going out over
+ * IPv6 would say «cannot reach» about a perfectly reachable destination.
  *
- * No lanza: devuelve el resultado, que aquí es el dato.
+ * It does not throw: it returns the result, which here is the data.
  */
 function probe({ label, host, port }) {
     return new Promise((resolve) => {
@@ -69,13 +69,13 @@ function probe({ label, host, port }) {
 }
 
 /**
- * Corre las cuatro y devuelve { lines, verdict } ya redactados.
+ * Runs the probes and returns { lines, verdict } already worded.
  *
- * Devuelve texto y no datos porque el único consumidor es el registro del
- * despliegue, que es donde se mira esto.
+ * It returns text and not data because the only consumer is the deploy log,
+ * which is where this gets looked at.
  *
- * `probes` se puede pasar para probar la función misma contra destinos
- * conocidos; en producción se llama sin argumentos.
+ * `probes` can be passed to test the function itself against known
+ * destinations; in production it is called with no arguments.
  */
 async function run(probes = PROBES) {
     const results = await Promise.all(probes.map(probe));

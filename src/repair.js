@@ -3,9 +3,9 @@
     var TOTAL_STEPS = 4;
     var CONFIRM_LABELS = { 1: "Guardar y continuar", 4: "Enviar solicitud" };
     var current = 1;
-    // `vehicle` ya no lo elige el cliente: sale de la carrocería del modelo
-    // que escribe en el paso 1, y es la silueta 3D sobre la que elegirá las
-    // piezas en el paso 3.
+    // The customer no longer picks `vehicle`: it follows from the body of the
+    // model they enter in step 1, and it is the 3D silhouette they will pick
+    // panels on in step 3.
     var state = { vehicle: null, parts: [], quality: null };
 
     var steps = Array.prototype.slice.call(document.querySelectorAll(".step"));
@@ -83,15 +83,15 @@
     var menuToggle = document.getElementById("menuToggle");
     var navPanel = document.getElementById("navPanel");
 
-    // Part names — the label the client reads for each panel they pick. They
+    // Part names: the label the client reads for each panel they pick. They
     // live in src/parts.js, loaded before this file, because the walk-in form
     // in the workshop panel and the two emails name the same panels (see
     // src/staff.js and server/mail.js).
     //
     // Guarded, and not `window.AUTOCOLOR_PARTS.LABELS`: this file is one long
     // IIFE, so a parts.js that never arrived would throw on this line and take
-    // every listener below it with it — a wizard that does nothing at all when
-    // touched. Without the names it still works; the list just reads
+    // every listener below it with it, leaving a wizard that does nothing at
+    // all when touched. Without the names it still works; the list just reads
     // «rear_hatch» instead of «Portón trasero».
     var partLabel = window.AUTOCOLOR_PARTS
         ? window.AUTOCOLOR_PARTS.label
@@ -114,7 +114,7 @@
 
     // The checklist under the viewer: the same parts as the 3D model, as
     // checkboxes. It is the way in for a keyboard or a screen reader, and the
-    // way through when the viewer, three.js or the model does not load — before
+    // way through when the viewer, three.js or the model does not load. Before
     // it, a failed viewer meant no part could be added and no quote sent.
     function renderPartsPicker(vehicle) {
         if (!partsPickerList || pickerVehicle === vehicle) return;
@@ -154,7 +154,7 @@
     }
 
     // ==================================================================
-    // 3D viewer (step 3) — lazy-loaded, then shown/hidden as the wizard
+    // 3D viewer (step 3): lazy-loaded, then shown/hidden as the wizard
     // steps back and forth. Each vehicle has its own model, so the viewer
     // is torn down and rebuilt whenever the chosen vehicle changes and only
     // one is ever alive. The module owns no selection state itself; it
@@ -295,7 +295,7 @@
 
     function ensureCar3D(vehicle) {
         if (!vehicle || !carView3dCanvas) return;
-        // Already mounted — or still mounting — for this vehicle. A viewer
+        // Already mounted (or still mounting) for this vehicle. A viewer
         // whose GLB never arrived does not count: it is torn down and mounted
         // again, because otherwise the error sits there for good and step 3
         // can never be completed (no panel is clickable, so the Continue
@@ -315,7 +315,7 @@
         //
         // A retry needs a URL the browser has not already written off. Its
         // module map remembers a failed fetch, so re-importing the same
-        // specifier fails again without touching the network — measured, not
+        // specifier fails again without touching the network. Measured, not
         // assumed: after a 404 the retry logged no request at all. The query
         // string makes carVisual.js itself refetch. It does not reach
         // three.js: those imports resolve through the import map to the same
@@ -360,7 +360,7 @@
 
             // One automatic retry before the checklist. The failure this
             // catches is almost always a dropped fetch of three.js or of the
-            // module itself, and asking again a moment later usually works —
+            // module itself, and asking again a moment later usually works,
             // whereas waiting for the customer to leave step 3 and come back,
             // which is what used to trigger the retry, is something nobody
             // does on their own. The delay is so the retry does not go out
@@ -371,7 +371,7 @@
                 car3dImportRetried = true;
                 setTimeout(function () {
                     // A newer mount (the customer changed vehicle while we
-                    // waited) already owns the canvas — it does its own
+                    // waited) already owns the canvas. It does its own
                     // import, and the flag goes back so that one still gets
                     // its own retry instead of inheriting this one's.
                     if (mountId !== car3dMountId) {
@@ -527,28 +527,28 @@
     });
 
     // ==================================================================
-    // Envío de la solicitud
+    // Sending the request
     //
-    // El taller recibe cada solicitud en la tabla `requests` de la base
-    // `autocolor` (ver server/), que responde con el código de 10 dígitos
-    // con el que el cliente puede consultar su estado más abajo. Hasta que
-    // el servidor confirma no se muestra la pantalla de éxito: prometer que
-    // llegó algo que no se guardó es peor que pedir reintentar.
+    // The workshop receives each request in the `requests` table of the
+    // `autocolor` database (see server/), which answers with the 10-digit
+    // code the customer can look up further down. The success screen does
+    // not show until the server confirms: promising that something arrived
+    // when it was not saved is worse than asking to retry.
     // ==================================================================
 
-    // Vacío = mismo origen (es lo normal: `npm start` sirve el sitio y la API
-    // juntos). Ver src/config.js para cuando la API vive en otro dominio.
+    // Empty = same origin (the normal case: `npm start` serves the site and
+    // the API together). See src/config.js for when the API lives elsewhere.
     var REQUESTS_ENDPOINT = (window.AUTOCOLOR_API_BASE || "") + "/api/requests";
     var submitting = false;
 
-    // El sitio puede estar publicado en un alojamiento estático, sin la API
-    // detrás: ahí el POST no llega a ejecutarse y el servidor de archivos
-    // responde 405 (o 404, según el proveedor). Vale la pena distinguirlo de
-    // un error pasajero, porque decirle a alguien que reintente cuando no hay
-    // nada que atienda su solicitud solo le hace perder el tiempo.
+    // The site may be published on a static host with no API behind it:
+    // there the POST never runs and the file server answers 405 (or 404,
+    // depending on the provider). It is worth telling apart from a passing
+    // error, because telling someone to retry when nothing is there to take
+    // their request only wastes their time.
     var API_MISSING_STATUS = [404, 405, 501];
-    // El número está también en index.html (dos veces) y en lookup.js. Son
-    // cuatro copias; centralizarlas es un cambio aparte y más grande que esto.
+    // The number is also in index.html (twice) and in lookup.js. That is
+    // four copies; centralising them is a separate, bigger change.
     var API_MISSING_MESSAGE = "Todavía no podemos recibir solicitudes desde esta versión del sitio. " +
         "Escríbenos por WhatsApp al +51 935 646 304 con la marca, el modelo y las zonas a pintar, " +
         "y te preparamos el presupuesto.";
@@ -565,9 +565,9 @@
             vehicle: state.vehicle,
             quality: state.quality,
             parts: state.parts,
-            // El taller necesita el vehículo con nombre y apellido, no solo la
-            // silueta: la marca y el modelo van tal como se muestran, y el
-            // tipo de carrocería como lo llama el catálogo.
+            // The workshop needs the vehicle by name, not just the
+            // silhouette: make and model go as displayed, and the body type
+            // as the catalogue calls it.
             brand: car ? car.brand.name : "",
             model: car ? car.model.name : "",
             bodyType: car ? car.model.type : "",
@@ -579,9 +579,9 @@
             lastName: lastNameInput.value,
             department: departmentSelect ? departmentSelect.value : "",
             province: provinceSelect ? provinceSelect.value : "",
-            // Se arma aquí y no se toma de #phoneFull porque ese campo se
-            // llena en el evento "input", que un autocompletado del navegador
-            // no siempre dispara.
+            // Built here and not taken from #phoneFull because that field is
+            // filled on the "input" event, which browser autofill does not
+            // always fire.
             phone: "+51" + phoneInput.value.replace(/\D/g, ""),
             email: emailInput.value,
             notes: document.getElementById("notes").value
@@ -614,9 +614,9 @@
             showSuccess(created.id);
         }).catch(function (err) {
             console.error("[repair] Could not send the request:", err);
-            // fetch solo rechaza así cuando la petición nunca llegó a destino
-            // (servidor apagado, sin conexión); cualquier respuesta del
-            // servidor, incluso un error, ya trae su propio mensaje.
+            // fetch only rejects like this when the request never reached
+            // its destination (server down, offline); any server answer,
+            // even an error, carries its own message.
             var offline = err instanceof TypeError;
             setSubmitError(offline
                 ? "No pudimos conectar con el servidor. Revisa tu conexión e inténtalo nuevamente."
@@ -632,8 +632,8 @@
 
     function showSuccess(id) {
         if (successCode) successCode.textContent = id || "";
-        // Le deja el código puesto al formulario de consulta, ahí abajo, para
-        // que probarlo sea un clic y no un copiado a mano.
+        // Leaves the code filled in on the lookup form further down, so
+        // trying it is one click and not a manual copy.
         var lookupInput = document.getElementById("lookupId");
         if (lookupInput && id) lookupInput.value = id;
 
@@ -664,8 +664,8 @@
                     copyCodeBtn.classList.remove("is-copied");
                 }, 2000);
             }).catch(function () {
-                // El portapapeles puede estar bloqueado por permisos: el código
-                // sigue visible y seleccionable, así que no hay nada que avisar.
+                // The clipboard may be blocked by permissions: the code stays
+                // visible and selectable, so there is nothing to report.
             });
         });
     }
@@ -685,7 +685,7 @@
         emailError.hidden = true;
         phoneFullInput.value = "";
         setSubmitError("");
-        if (successCode) successCode.textContent = "··········";
+        if (successCode) successCode.textContent = "";
         if (departmentSelect) {
             departmentSelect.value = "";
             departmentSelect.classList.add("is-placeholder");
@@ -712,12 +712,12 @@
     });
 
     // ==================================================================
-    // Paso 1 — datos del vehículo
+    // Step 1: vehicle details
     //
-    // El cliente ya no elige una silueta: escribe qué vehículo tiene y el
-    // resto sale de ahí. La marca llena la lista de modelos, el modelo trae
-    // su carrocería desde el catálogo (src/carModels.js) y la carrocería
-    // decide sola sobre cuál de los cuatro modelos 3D se pintará en el paso 3.
+    // The customer no longer picks a silhouette: they enter the vehicle they
+    // have and the rest follows. The make fills the model list, the model
+    // brings its body from the catalogue (src/carModels.js) and the body
+    // alone decides which of the four 3D models step 3 paints on.
     // ==================================================================
 
     var NO_CATALOG = function () { return null; };
@@ -735,18 +735,18 @@
     var MILEAGE_MAX = 2000000;
     var MILEAGE_MESSAGE = "El kilometraje no puede pasar de 2 000 000 km.";
 
-    // La foto del vehículo:
+    // The vehicle photo:
     //
-    //   1. imagin.studio —recortada, sin fondo, por año— when the shop has a
+    //   1. imagin.studio (cut out, no background, by year) when the shop has a
     //      key configured (see src/config.js), which then takes precedence;
     //   2. otherwise the site's own, one per model, in imgs/assets/stock-models/;
-    //   3. el logo de la marca, si la foto no carga.
+    //   3. the make's logo, if the photo does not load.
     //
-    // Las del sitio son fotos de verdad, con su calle y su fondo detrás, y no
-    // dependen de nadie; la ficha las llama «imagen referencial» porque eso
-    // son: el modelo, no el vehículo del cliente.
+    // The site's are real photos, with their street and background behind
+    // them, and depend on nobody; the card calls them «imagen referencial»
+    // because that is what they are: the model, not the customer's vehicle.
     var CAR_IMAGE_CUSTOMER = window.AUTOCOLOR_CAR_IMAGE_CUSTOMER || "";
-    // imagin escribe algunas marcas distinto que nosotros.
+    // imagin spells some makes differently from us.
     var IMAGE_MAKES = { mercedes: "mercedes-benz" };
 
     function carPhotoUrl(brand, model, year) {
@@ -785,9 +785,9 @@
         return { brand: brand, model: model, body: CATALOG.bodyTypes[model.type] || null };
     }
 
-    // El único punto donde cambia state.vehicle. Cambiarlo invalida las piezas
-    // ya elegidas: cada modelo 3D nombra y reparte sus paneles a su manera, así
-    // que una selección hecha sobre una silueta no significa lo mismo en otra.
+    // The only place state.vehicle changes. Changing it invalidates the panels
+    // already picked: each 3D model names and splits its panels its own way,
+    // so a selection made on one silhouette does not mean the same on another.
     function setVehicle(next) {
         if (state.vehicle === next) return;
         if (state.parts.length) {
@@ -824,11 +824,11 @@
         carPreviewTitle.textContent = car.brand.name + " " + car.model.name;
         carPreviewType.textContent = car.body.label;
 
-        // Cuando la carrocería no tiene modelo 3D propio (un sedán, una
-        // pickup) se pinta sobre el más parecido. Vale más decirlo aquí que
-        // dejar que la sorpresa llegue en el paso 3. Se comparan las claves y
-        // no las etiquetas: 'wagon' se llama «Station wagon» en el catálogo y
-        // «Familiar» en el visor, pero es la misma silueta.
+        // When the body has no 3D model of its own (a sedan, a pickup) it is
+        // painted on the closest one. Better to say so here than to let the
+        // surprise arrive in step 3. Keys are compared, not labels: 'wagon'
+        // is «Station wagon» in the catalogue and «Familiar» in the viewer,
+        // but it is the same silhouette.
         var scheme = VEHICLE_LABELS[car.body.vehicle];
         var borrowed = car.model.type !== car.body.vehicle;
         carPreviewNote.textContent = borrowed
@@ -857,8 +857,8 @@
             brandSelect.appendChild(opt);
         });
 
-        // Una foto que no llega (sin conexión, modelo que el proveedor no
-        // tiene) no deja el hueco vacío: cae al logo de la marca.
+        // A photo that does not arrive (offline, a model the provider lacks)
+        // does not leave an empty hole: it falls back to the make's logo.
         carPreviewPhoto.addEventListener("error", function () {
             var car = selectedCar();
             if (car) showBrandLogo(car.brand);
@@ -877,9 +877,9 @@
             refreshConfirm();
         });
 
-        // Año: cuatro dígitos dentro de un rango razonable. El proveedor de
-        // imágenes lo usa para traer la generación correcta, así que un año
-        // nuevo vuelve a pedir la foto.
+        // Year: four digits within a sensible range. The image provider uses
+        // it to fetch the right generation, so a new year asks for the photo
+        // again.
         carYearInput.addEventListener("input", function () {
             var digits = carYearInput.value.replace(/\D/g, "").slice(0, 4);
             if (digits !== carYearInput.value) carYearInput.value = digits;
@@ -896,8 +896,8 @@
                 "Ingresa un año entre " + YEAR_MIN + " y " + YEAR_MAX + ".");
         });
 
-        // Placa peruana: tres caracteres, guion y tres más (ABC-123). El guion
-        // lo pone el campo para que nadie tenga que adivinar el formato.
+        // Peruvian plate: three characters, a dash and three more (ABC-123).
+        // The field adds the dash so nobody has to guess the format.
         carPlateInput.addEventListener("input", function () {
             var raw = carPlateInput.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
             var formatted = raw.length > 3 ? raw.slice(0, 3) + "-" + raw.slice(3) : raw;
@@ -939,7 +939,7 @@
         setFieldValidity(carMileageInput, carMileageError, true);
     }
 
-    // ---------- Paso 2: selección de acabado ----------
+    // ---------- Step 2: finish selection ----------
     function selectQuality(card) {
         qualityCards.forEach(function (c) {
             c.classList.remove("is-selected");
@@ -955,10 +955,10 @@
         card.addEventListener("click", function () { selectQuality(card); });
     });
 
-    // Quien llega desde una tarjeta de acabado de la portada trae su elección
-    // en ?acabado=; el token es el mismo data-value de la tarjeta, así que no
-    // hay tabla que mantener. Llega elegido, pero se puede cambiar: el paso 2
-    // sigue siendo un paso del asistente, no una decisión ya tomada.
+    // Whoever arrives from a finish card on the home page brings their choice
+    // in ?acabado=; the token is the card's own data-value, so there is no
+    // table to maintain. It arrives selected but can be changed: step 2 is
+    // still a wizard step, not a decision already made.
     var wantedQuality = new URLSearchParams(window.location.search).get("acabado");
 
     if (wantedQuality) {
@@ -967,11 +967,11 @@
         });
     }
 
-    // ---------- Paso 4: formulario de contacto ----------
+    // ---------- Step 4: contact form ----------
 
-    // Ubicación en dos pasos: Departamento -> Provincia, poblada desde
-    // la base de datos hardcodeada en cities.js (PERU_DEPARTMENTS). La
-    // provincia permanece deshabilitada hasta que se elige un departamento.
+    // Location in two steps: Department -> Province, filled from the
+    // hardcoded data in cities.js (PERU_DEPARTMENTS). The province stays
+    // disabled until a department is picked.
     function sortEs(list) {
         return list.slice().sort(function (a, b) { return a.localeCompare(b, "es"); });
     }
@@ -1021,9 +1021,9 @@
         }
     }
 
-    // Teléfono: el campo visible solo admite dígitos (máx. PHONE_DIGITS
-    // caracteres); el prefijo +51 es fijo en la interfaz y se recompone
-    // en el input oculto #phoneFull para cuando se envíe el formulario.
+    // Phone: the visible field only accepts digits (at most PHONE_DIGITS
+    // characters); the +51 prefix is fixed in the UI and is recombined in
+    // the hidden #phoneFull input for when the form is sent.
     var PHONE_PATTERN = new RegExp("^[0-9]{" + PHONE_DIGITS + "}$");
     phoneInput.addEventListener("input", function () {
         var digits = phoneInput.value.replace(/\D/g, "").slice(0, PHONE_DIGITS);
@@ -1039,8 +1039,8 @@
             "Ingresa " + PHONE_DIGITS + " dígitos después de +51.");
     });
 
-    // Email: filtra caracteres fuera de lo permitido mientras se escribe
-    // y valida el formato completo (usuario@dominio.tld) al salir del campo.
+    // Email: filters disallowed characters while typing and validates the
+    // full format (user@domain.tld) on leaving the field.
     var EMAIL_DISALLOWED = /[^a-zA-Z0-9._%+@-]/g;
     var EMAIL_PATTERN = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     emailInput.addEventListener("input", function () {
@@ -1055,10 +1055,10 @@
         refreshConfirm();
     });
     emailInput.addEventListener("blur", function () {
-        // El correo dejó de ser opcional: es por donde llega la confirmación
-        // con el código de seguimiento. Vacío y mal escrito son dos fallos
-        // distintos y se dicen distinto, porque «ingresa un email válido»
-        // delante de un campo en blanco no dice qué hacer.
+        // Email is no longer optional: it is how the confirmation with the
+        // tracking code arrives. Empty and misspelt are two different
+        // failures and are said differently, because «ingresa un email
+        // válido» in front of a blank field does not say what to do.
         if (emailInput.value === "") {
             setFieldValidity(emailInput, emailError, false,
                 "Escribe tu email: ahí te enviamos tu código de seguimiento.");

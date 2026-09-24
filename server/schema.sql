@@ -1,30 +1,30 @@
 -- =============================================================================
--- Autocolor — esquema de la base de datos `autocolor`
+-- Autocolor: schema of the `autocolor` database
 --
--- Crear la base (una sola vez) y luego aplicar este archivo:
+-- Create the database (once) and then apply this file:
 --
 --     createdb autocolor
 --     psql -v ON_ERROR_STOP=1 -d autocolor -f server/schema.sql
 --
--- El archivo es idempotente: se puede volver a aplicar sin perder datos.
+-- The file is idempotent: it can be applied again without losing data.
 -- =============================================================================
 
--- Estados por los que pasa una solicitud, en orden de avance. Se guardan como
--- texto con CHECK en lugar de un ENUM para que agregar un estado nuevo sea un
--- ALTER TABLE y no una migración de tipo.
+-- Statuses a request goes through, in order of progress. They are stored as
+-- text with a CHECK instead of an ENUM so adding a new status is an ALTER
+-- TABLE and not a type migration.
 CREATE TABLE IF NOT EXISTS requests (
-    -- El código de 10 dígitos que se le entrega al cliente al enviar el
-    -- formulario. Es la clave primaria y además la única credencial para
-    -- consultar la solicitud, por eso se genera al azar (ver server/db.js) y
-    -- no de forma correlativa: un código correlativo dejaría adivinar los
-    -- datos de otros clientes probando números vecinos.
+    -- The 10-digit code handed to the customer when the form is sent. It is
+    -- the primary key and also the only credential for looking up the
+    -- request, which is why it is generated at random (see server/db.js) and
+    -- not sequentially: a sequential code would let other customers' data be
+    -- guessed by trying neighbouring numbers.
     id          char(10)    PRIMARY KEY CHECK (id ~ '^[0-9]{10}$'),
 
-    -- El vehículo tal como lo describió el cliente en el paso 1. Marca y
-    -- modelo se guardan con el nombre que se le mostró en pantalla, no con
-    -- el id del catálogo (src/carModels.js): el taller lee esta tabla y
-    -- 'Yaris Sedán' le dice más que 'yaris-sedan'. Son NULL solo en las
-    -- solicitudes anteriores a que el asistente los pidiera.
+    -- The vehicle as the customer described it in step 1. Make and model are
+    -- stored with the name shown on screen, not the catalogue id
+    -- (src/carModels.js): the workshop reads this table and 'Yaris Sedán'
+    -- tells it more than 'yaris-sedan'. They are NULL only on requests from
+    -- before the wizard asked for them.
     brand       text,
     model       text,
     body_type   text        CHECK (body_type IN ('sedan', 'hatchback', 'coupe', 'wagon',
@@ -34,16 +34,16 @@ CREATE TABLE IF NOT EXISTS requests (
     mileage     integer     CHECK (mileage >= 0),
     color_code  text,
 
-    -- La silueta 3D sobre la que se eligieron las piezas. Se deduce de
-    -- body_type (ver BODY_TYPES en src/carModels.js) porque hay cuatro
-    -- modelos 3D y ocho carrocerías: un sedán se pinta sobre la silueta
-    -- 'wagon', y una minivan sobre la 'van'.
+    -- The 3D silhouette the panels were picked on. It follows from body_type
+    -- (see BODY_TYPES in src/carModels.js) because there are four 3D models
+    -- and eight bodies: a sedan is painted on the 'wagon' silhouette, and a
+    -- minivan on the 'van'.
     vehicle     text        NOT NULL CHECK (vehicle IN ('van', 'wagon', 'pickup', 'suv')),
     quality     text        NOT NULL CHECK (quality IN ('standard', 'premium', 'custom')),
-    -- Los ids de panel que usa el visor 3D ('hood', 'rear_door_left', …). Son
-    -- distintos por modelo, así que se guardan tal cual llegan, como arreglo:
-    -- una solicitud sigue siendo una sola fila y el taller ve las piezas de un
-    -- vistazo. Sus etiquetas en español viven en src/parts.js.
+    -- The panel ids the 3D viewer uses ('hood', 'rear_door_left', and so on).
+    -- They differ per model, so they are stored as they arrive, as an array: a
+    -- request stays a single row and the workshop sees the panels at a
+    -- glance. Their Spanish labels live in src/parts.js.
     parts       text[]      NOT NULL DEFAULT '{}',
 
     -- Datos de contacto (paso 4). Only name, surname and phone are NOT NULL
@@ -57,14 +57,14 @@ CREATE TABLE IF NOT EXISTS requests (
     email       text,
     notes       text,
 
-    -- Esta lista es la última palabra sobre los estados: los cuatro que ve el
-    -- cliente ('recibido', 'listo', 'entregado', 'cancelado') y las siete
-    -- etapas por las que el taller mueve el trabajo entre medias. Se repite en
-    -- otros dos sitios que no pueden leerla: STATUSES en server/server.js
-    -- (valida lo que entra por PATCH) y src/statuses.js (lo que ve el
-    -- cliente). Tocar la lista son esos dos más una migración sobre este
-    -- CHECK, porque CREATE TABLE IF NOT EXISTS no lo toca sobre una tabla que
-    -- ya existe.
+    -- This list has the last word on statuses: the four the customer sees
+    -- ('recibido', 'listo', 'entregado', 'cancelado') and the seven stages
+    -- the workshop moves the job through in between. It is repeated in two
+    -- other places that cannot read it: STATUSES in server/server.js
+    -- (validates what comes in through PATCH) and src/statuses.js (what the
+    -- customer sees). Touching the list means those two plus a migration on
+    -- this CHECK, because CREATE TABLE IF NOT EXISTS does not touch it on a
+    -- table that already exists.
     status      text        NOT NULL DEFAULT 'recibido'
                             CHECK (status IN ('recibido',
                                               'planchado', 'desmontaje_montaje',
@@ -85,7 +85,7 @@ CREATE TABLE IF NOT EXISTS requests (
     -- it is a rule of the workshop, not of one screen.
     --
     -- The CHECK on the shape of the codes reads the array joined by commas: a
-    -- subquery — an unnest() with bool_and — is not allowed inside a CHECK,
+    -- subquery (an unnest() with bool_and) is not allowed inside a CHECK,
     -- and with two elements at most the regular expression says the same
     -- thing. `array_position(..., NULL)` keeps out a stray NULL, which
     -- array_to_string would skip without a word, and comparing the two
@@ -104,9 +104,9 @@ CREATE TABLE IF NOT EXISTS requests (
     updated_at  timestamptz NOT NULL DEFAULT now()
 );
 
--- Las columnas del vehículo llegaron después de las primeras solicitudes, así
--- que para una base ya creada se agregan aquí. En una base nueva el CREATE de
--- arriba ya las trae y estos ALTER no hacen nada.
+-- The vehicle columns arrived after the first requests, so for an existing
+-- database they are added here. On a new database the CREATE above already
+-- has them and these ALTERs do nothing.
 ALTER TABLE requests ADD COLUMN IF NOT EXISTS brand      text;
 ALTER TABLE requests ADD COLUMN IF NOT EXISTS model      text;
 ALTER TABLE requests ADD COLUMN IF NOT EXISTS body_type  text
@@ -158,27 +158,26 @@ ALTER TABLE requests ADD CONSTRAINT requests_occupied_by_check
                '^([A-Z]{2}[0-9]{5}(,[A-Z]{2}[0-9]{5})?)?$');
 
 
--- Hubo una silueta 'suv' que pasó a llamarse 'pickup' cuando se separaron
--- las dos carrocerías: el modelo 3D de entonces siempre fue el de una pickup
--- (una Hilux doble cabina), así que aquellas solicitudes se refieren al mismo
--- archivo y se renombran.
+-- There was a 'suv' silhouette that was renamed 'pickup' when the two bodies
+-- were split: the 3D model back then was always a pickup's (a double-cab
+-- Hilux), so those requests refer to the same file and are renamed.
 --
--- OJO con el corte por fecha, que no es decorativo. Hoy 'suv' vuelve a existir
--- y esta vez es de verdad: su propio modelo 3D, con sus propias piezas. Sin el
--- corte, cada `npm run db:schema` reescribiría a 'pickup' todas las
--- solicitudes nuevas de una SUV, y sus piezas —'tailgate', 'rear_bumper'— no
--- existen en la pickup, así que el taller vería una lista que no se puede
--- dibujar. La fecha es la del commit que agregó el modelo: antes de ella no
--- había ninguna SUV real que proteger.
+-- CAREFUL with the date cutoff, which is not decorative. Today 'suv' exists
+-- again and this time it is real: its own 3D model, with its own panels.
+-- Without the cutoff, every `npm run db:schema` would rewrite every new SUV
+-- request to 'pickup', and its panels ('tailgate', 'rear_bumper') do not
+-- exist on the pickup, so the workshop would see a list that cannot be
+-- drawn. The date is that of the commit that added the model: before it
+-- there was no real SUV to protect.
 --
--- Lleva el huso escrito. Sin él, Postgres resuelve la fecha en el TimeZone de
--- la sesión, y el corte cae cinco horas más tarde aplicando esto desde la
--- máquina de trabajo (America/Lima) que contra Neon (UTC): una SUV de verdad
--- creada en esa franja se reescribiría a 'pickup', que es exactamente lo que
--- el corte existe para impedir.
+-- It carries the time zone written in. Without it, Postgres resolves the date
+-- in the session's TimeZone, and the cutoff lands five hours later when this
+-- is applied from the work machine (America/Lima) than against Neon (UTC): a
+-- real SUV created in that window would be rewritten to 'pickup', which is
+-- exactly what the cutoff exists to prevent.
 --
--- El CHECK se retira antes del UPDATE: el de la base vieja no nombra 'suv' y
--- rechazaría las filas nuevas.
+-- The CHECK is dropped before the UPDATE: the old database's does not name
+-- 'suv' and would reject the new rows.
 ALTER TABLE requests DROP CONSTRAINT IF EXISTS requests_vehicle_check;
 UPDATE requests SET vehicle = 'pickup'
  WHERE vehicle = 'suv' AND created_at < timestamptz '2026-09-04 00:00+00';
@@ -186,18 +185,18 @@ ALTER TABLE requests ADD CONSTRAINT requests_vehicle_check
     CHECK (vehicle IN ('van', 'wagon', 'pickup', 'suv'));
 
 
--- 'presupuestado' y 'en_taller' se retiraron cuando el taller pidió nombrar
--- sus siete etapas reales. Las solicitudes que quedaron paradas en uno de los
--- dos se mueven al estado nuevo más cercano: lo presupuestado todavía no había
--- entrado al local, así que vuelve a 'recibido'; lo que estaba «en el taller»
--- pasa a 'desmontaje_montaje', que es por donde empieza el trabajo dentro.
+-- 'presupuestado' and 'en_taller' were retired when the workshop asked to
+-- name its seven real stages. Requests left sitting in either are moved to
+-- the closest new status: what had been quoted had not yet entered the shop,
+-- so it goes back to 'recibido'; what was «in the workshop» moves to
+-- 'desmontaje_montaje', which is where the work inside begins.
 --
--- Aquí no hace falta el corte por fecha que sí lleva el renombrado de vehículo
--- de arriba: aquellos dos nombres no van a volver a existir, así que un
--- `npm run db:schema` repetido no tiene nada que pisar.
+-- The date cutoff the vehicle rename above carries is not needed here: those
+-- two names will never exist again, so a repeated `npm run db:schema` has
+-- nothing to overwrite.
 --
--- El CHECK se retira antes del UPDATE porque el de la base vieja no nombra
--- ninguna de las siete etapas y rechazaría las filas nuevas.
+-- The CHECK is dropped before the UPDATE because the old database's names
+-- none of the seven stages and would reject the new rows.
 ALTER TABLE requests DROP CONSTRAINT IF EXISTS requests_status_check;
 UPDATE requests SET status = 'recibido'           WHERE status = 'presupuestado';
 UPDATE requests SET status = 'desmontaje_montaje' WHERE status = 'en_taller';
@@ -209,12 +208,12 @@ ALTER TABLE requests ADD CONSTRAINT requests_status_check
                       'listo', 'entregado', 'cancelado'));
 
 
--- La cola de trabajo del taller: lo pendiente, lo más antiguo primero.
+-- The workshop's work queue: what is pending, oldest first.
 CREATE INDEX IF NOT EXISTS requests_status_created_at_idx
     ON requests (status, created_at DESC);
 
--- updated_at se mantiene solo, para que cambiar el estado a mano desde psql
--- no deje la fecha desactualizada.
+-- updated_at maintains itself, so changing the status by hand from psql does
+-- not leave the date stale.
 CREATE OR REPLACE FUNCTION requests_touch_updated_at() RETURNS trigger AS $$
 BEGIN
     NEW.updated_at := now();
@@ -229,13 +228,13 @@ CREATE TRIGGER requests_touch_updated_at
 
 
 -- =============================================================================
--- paint_orders — matizado sold over the counter to other companies
+-- paint_orders: matizado sold over the counter to other companies
 -- =============================================================================
 --
 -- The orders that come from pgs/paintings.html: a workshop, a dealership or a
 -- body shop buying paint mixed to one colour. It is a different trade from
--- `requests` —nobody leaves a vehicle here, there are no panels and no
--- status ladder through the shop— so it is a different table rather than more
+-- `requests` (nobody leaves a vehicle here, there are no panels and no
+-- status ladder through the shop) so it is a different table rather than more
 -- nullable columns on that one.
 --
 -- The tracking code is the same kind of credential and is generated the same
@@ -248,8 +247,8 @@ CREATE TABLE IF NOT EXISTS paint_orders (
     -- page's list by model and year, without reading the label: the shop
     -- should confirm it. 'in_person' is the one that arrives with
     -- no colour and no container: the customer is bringing the vehicle so the
-    -- shop can read it with the spectrophotometer, and the formula —and with
-    -- it the size and the price— does not exist yet. That is why every column
+    -- shop can read it with the spectrophotometer, and the formula (and with
+    -- it the size and the price) does not exist yet. That is why every column
     -- describing the colour and the order below is nullable.
     method      text        NOT NULL CHECK (method IN ('code', 'model', 'reading', 'in_person')),
 
@@ -283,9 +282,10 @@ CREATE TABLE IF NOT EXISTS paint_orders (
     -- counter knows what was promised on screen.
     price       integer     CHECK (price >= 0),
 
-    -- Quien compra. Basta el nombre del taller: el matizado se prepara y se
-    -- entrega en el mostrador, y la factura la cierra el taller aparte. El RUC
-    -- ya no se pide, pero la columna queda (nullable) para los pedidos viejos.
+    -- The buyer. The workshop's name is enough: the matizado is prepared and
+    -- handed over at the counter, and the workshop closes the invoice
+    -- separately. The RUC is no longer asked for, but the column stays
+    -- (nullable) for old orders.
     company     text        NOT NULL CHECK (length(btrim(company)) > 0),
     ruc         text,
 
@@ -297,11 +297,11 @@ CREATE TABLE IF NOT EXISTS paint_orders (
     email       text,
     notes       text,
 
-    -- Cinco estados y no los once de `requests`: un matizado se recibe, se
-    -- prepara, está listo y se entrega. No pasa por planchado ni por horno.
-    -- La lista se repite en PAINT_STATUSES (server/server.js); este CHECK es
-    -- la última palabra, y ampliarlo sobre una base ya creada es una
-    -- migración, porque CREATE TABLE IF NOT EXISTS no lo toca.
+    -- Five statuses and not the eleven of `requests`: a matizado is received,
+    -- prepared, ready and handed over. It goes through neither panel beating
+    -- nor the oven. The list is repeated in PAINT_STATUSES (server/server.js);
+    -- this CHECK has the last word, and widening it on an existing database
+    -- is a migration, because CREATE TABLE IF NOT EXISTS does not touch it.
     status      text        NOT NULL DEFAULT 'recibido'
                             CHECK (status IN ('recibido', 'preparacion', 'listo',
                                               'entregado', 'cancelado')),
@@ -310,7 +310,7 @@ CREATE TABLE IF NOT EXISTS paint_orders (
     updated_at  timestamptz NOT NULL DEFAULT now()
 );
 
--- La cola del mostrador: lo pendiente, lo más reciente primero.
+-- The counter's queue: what is pending, newest first.
 CREATE INDEX IF NOT EXISTS paint_orders_status_created_at_idx
     ON paint_orders (status, created_at DESC);
 
@@ -332,11 +332,11 @@ ALTER TABLE paint_orders DROP CONSTRAINT IF EXISTS paint_orders_method_check;
 ALTER TABLE paint_orders ADD CONSTRAINT paint_orders_method_check
     CHECK (method IN ('code', 'model', 'reading', 'in_person'));
 
--- El formulario dejó de pedir RUC y volvió opcional el email: basta el nombre
--- del taller y el teléfono. En una base creada antes, `ruc` y `email` seguían
--- siendo NOT NULL y `ruc` cargaba su CHECK de formato, así que un pedido sin
--- esos datos daba error al guardar. Se aflojan aquí; las columnas quedan para
--- los pedidos viejos que sí los traían.
+-- The form stopped asking for the RUC and made email optional: the
+-- workshop's name and the phone are enough. On a database created earlier,
+-- `ruc` and `email` were still NOT NULL and `ruc` carried its format CHECK,
+-- so an order without them failed on save. They are relaxed here; the
+-- columns stay for the old orders that did carry them.
 ALTER TABLE paint_orders DROP CONSTRAINT IF EXISTS paint_orders_ruc_check;
 ALTER TABLE paint_orders ALTER COLUMN ruc DROP NOT NULL;
 ALTER TABLE paint_orders ALTER COLUMN email DROP NOT NULL;
@@ -350,8 +350,8 @@ ALTER TABLE paint_orders ALTER COLUMN email DROP NOT NULL;
 ALTER TABLE paint_orders ADD COLUMN IF NOT EXISTS hex text
     CHECK (hex ~ '^#[0-9a-f]{6}$');
 
--- Mismo trigger que `requests`, por lo mismo: cambiar el estado a mano desde
--- psql no debe dejar la fecha desactualizada.
+-- Same trigger as `requests`, for the same reason: changing the status by
+-- hand from psql must not leave the date stale.
 DROP TRIGGER IF EXISTS paint_orders_touch_updated_at ON paint_orders;
 CREATE TRIGGER paint_orders_touch_updated_at
     BEFORE UPDATE ON paint_orders
@@ -359,7 +359,7 @@ CREATE TRIGGER paint_orders_touch_updated_at
 
 
 -- =============================================================================
--- worker_notes — what the boss has told each worker
+-- worker_notes: what the boss has told each worker
 -- =============================================================================
 --
 -- One row per worker, so writing a note replaces the one before it: the panel
@@ -369,7 +369,7 @@ CREATE TRIGGER paint_orders_touch_updated_at
 -- The worker sees it on their profile, above their own notepad, and cannot edit
 -- it; only the boss writes here (see PUT /api/staff/workers/:code/note in
 -- server/server.js). The notepad below it on the same screen is the worker's
--- own and never leaves their browser — these are two different things that look
+-- own and never leaves their browser. These are two different things that look
 -- alike, which is why one lives in the database and the other does not.
 --
 -- No foreign key to anybody: the roster lives in the environment
@@ -387,10 +387,10 @@ CREATE TABLE IF NOT EXISTS worker_notes (
 
 
 -- =============================================================================
--- Consultas útiles para el taller
+-- Useful queries for the workshop
 -- =============================================================================
 --
--- Solicitudes pendientes, las más recientes primero:
+-- Pending requests, newest first:
 --
 --   SELECT id, created_at::date AS fecha, first_name || ' ' || last_name AS cliente,
 --          brand || ' ' || model AS vehiculo, model_year, plate,
@@ -399,14 +399,14 @@ CREATE TABLE IF NOT EXISTS worker_notes (
 --    WHERE status NOT IN ('entregado', 'cancelado')
 --    ORDER BY created_at DESC;
 --
--- Ver una solicitud completa:
+-- See a full request:
 --
 --   SELECT * FROM requests WHERE id = '1234567890';
 --
--- Cambiar el estado (es lo que verá el cliente al consultar su código):
+-- Change the status (it is what the customer will see when looking up their code):
 --
 --   UPDATE requests SET status = 'pintura' WHERE id = '1234567890';
 --
--- Cuántas solicitudes hay por estado:
+-- How many requests there are per status:
 --
 --   SELECT status, count(*) FROM requests GROUP BY status ORDER BY count DESC;

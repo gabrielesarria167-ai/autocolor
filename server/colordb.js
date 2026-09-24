@@ -15,8 +15,8 @@
  * And it fails soft. server.js pings the requests database before it listens
  * and exits if that fails, which is right: without it there is no quote and no
  * panel. The colours are one feature of one page. If this database is missing,
- * misconfigured or down, the site still sells paint — the page falls back to
- * the local catalogue — so a failure here logs a line and disables itself
+ * misconfigured or down, the site still sells paint (the page falls back to
+ * the local catalogue), so a failure here logs a line and disables itself
  * rather than taking the process with it.
  */
 
@@ -205,14 +205,14 @@ function transient(err) {
     const code = err && err.code ? String(err.code) : '';
     if (TRANSIENT_CODES.has(code)) return true;
     // pg and pg-pool report these as plain Errors with no code.
-    // Tres redacciones distintas para lo mismo, y hay que nombrar las tres:
-    // pg-pool dice "timeout exceeded when trying to connect" cuando se agota
-    // esperando una conexión libre —que es justo lo que pasa con la base
-    // dormida—, el Client de pg dice "timeout expired", y "Connection
-    // terminated due to connection timeout" viene de un tercer sitio. Ninguna
-    // trae code. Lo que NO puede entrar aquí es "timeout" a secas: eso también
-    // dice "canceling statement due to statement timeout" (57014), que es una
-    // consulta lenta o un error nuestro, no una base que no está.
+    // Three different wordings for the same thing, and all three have to be
+    // named: pg-pool says "timeout exceeded when trying to connect" when it
+    // times out waiting for a free connection (exactly what happens with the
+    // database asleep), pg's Client says "timeout expired", and "Connection
+    // terminated due to connection timeout" comes from a third place. None
+    // carries a code. What must NOT go in here is a bare "timeout": that also
+    // matches "canceling statement due to statement timeout" (57014), which is
+    // a slow query or our own bug, not a database that is not there.
     return /timeout exceeded|timeout expired|connection timeout|connection terminated|socket hang up/i
         .test(err && err.message ? err.message : '');
 }
@@ -273,7 +273,7 @@ async function ping(options) {
  * returns them as an array because Jeep sells one blue as both KBX and PBX,
  * and a row per code put the same tile on the grid twice. The first is the
  * one that was searched for; the rest travel as `altCodes` so the page can
- * show "KBX · PBX" rather than pretending the other does not exist.
+ * show "KBX / PBX" rather than pretending the other does not exist.
  *
  * `code` is empty for the 5,782 colours that carry no factory code at all.
  * The page falls back to the Sherwin code, which is the only name they have. */

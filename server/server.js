@@ -1,39 +1,39 @@
 'use strict';
 
 /* =============================================================================
-   Servidor de Autocolor.
+   The Autocolor server.
 
-   Sirve el sitio estático y las dos rutas que necesita el asistente:
+   Serves the static site and the two routes the wizard needs:
 
-     POST /api/requests      guarda una solicitud y devuelve su código
-     GET  /api/requests/:id  consulta una solicitud por código
+     POST /api/requests      stores a request and returns its code
+     GET  /api/requests/:id  looks a request up by code
 
-   Y las del panel del taller (pgs/taller.html), todas detrás de la contraseña
-   compartida que se configura en server/auth.js:
+   And the workshop panel's (pgs/taller.html), all behind the shared
+   password configured in server/auth.js:
 
-     POST  /api/staff/login        abre sesión
-     POST  /api/staff/logout       la cierra
-     GET   /api/staff/requests             lista la cola de trabajo
+     POST  /api/staff/login        opens a session
+     POST  /api/staff/logout       closes it
+     GET   /api/staff/requests             lists the work queue
      POST  /api/staff/requests             registers a walk-in vehicle (boss only)
      GET   /api/staff/workers              who holds which vehicle (boss only)
      PUT   /api/staff/workers/:code/note   the boss's note on one worker
-     PATCH /api/staff/requests/:id           cambia el estado de una solicitud
-     PATCH /api/staff/requests/:id/occupancy ocupa o libera un vehículo
+     PATCH /api/staff/requests/:id           changes a request's status
+     PATCH /api/staff/requests/:id/occupancy takes or releases a vehicle
 
-   Sin framework a propósito: el sitio es HTML y JS a secas, y el servidor
-   necesita un puñado de rutas y archivos estáticos. La dependencia es una,
-   `pg`: los avisos por correo salen por HTTPS y no necesitan biblioteca.
+   No framework on purpose: the site is plain HTML and JS, and the server
+   needs a handful of routes and static files. There is one dependency,
+   `pg`: the email notices go out over HTTPS and need no library.
 
        npm install
-       npm run db:init           # crea y levanta el Postgres propio (puerto 5434)
+       npm run db:init           # creates and starts its own Postgres (port 5434)
        npm start                 # http://localhost:3000
 
-   PORT cambia el puerto del sitio. La base vive en su propio servidor
-   Postgres, aparte del general de la máquina — ver server/pgserver.sh.
+   PORT changes the site's port. The database lives on its own Postgres
+   server, apart from the machine's general one; see server/pgserver.sh.
    ========================================================================== */
 
-// El .env de la raíz, antes de leer cualquier variable de entorno (PORT,
-// PGDATABASE, ALLOWED_ORIGINS y la contraseña del panel salen de ahí si están).
+// The root .env, before reading any environment variable (PORT, PGDATABASE,
+// ALLOWED_ORIGINS and the panel password come from there if present).
 require('./env');
 
 const crypto = require('node:crypto');
@@ -63,14 +63,14 @@ const paints = require('../src/paints.js');
 
 const PORT = Number(process.env.PORT) || 3000;
 
-// Loopback por omisión: detrás de /api/staff hay teléfonos de clientes, y no
-// corresponde que aparezcan solos en la red del local por estar el servidor
-// encendido. HOST=0.0.0.0 lo abre a la red a propósito (probar desde el móvil).
+// Loopback by default: behind /api/staff there are customers' phone numbers,
+// and they should not show up on the shop's network just because the server
+// is on. HOST=0.0.0.0 opens it to the network on purpose (testing from a phone).
 const HOST = process.env.HOST || '127.0.0.1';
 
-// Cuántos proxies de confianza hay delante de este proceso. 0 —lo normal en
-// esta máquina— significa que nadie lo intermedia y que la dirección del socket
-// es la del cliente. Behind a proxy it is the number of hops that append to
+// How many trusted proxies sit in front of this process. 0 (the normal case
+// on this machine) means nobody sits in between and the socket address is the
+// client's. Behind a proxy it is the number of hops that append to
 // X-Forwarded-For: 3 on Render (see render.yaml), 1 behind a single nginx.
 // clientIp() below is the only thing that uses it.
 const TRUST_PROXY = Number(process.env.TRUST_PROXY) || 0;
@@ -112,14 +112,14 @@ function isPublic(pathname) {
     return PUBLIC_FILES.has(lower) || PUBLIC_DIRS.some((dir) => lower.startsWith(dir));
 }
 
-// Orígenes que pueden llamar a la API desde otro dominio, separados por comas:
+// Origins that may call the API from another domain, comma-separated:
 //
 //     ALLOWED_ORIGINS=https://gabrielesarria167-ai.github.io npm start
 //
-// Hace falta cuando el sitio se publica en un alojamiento estático (GitHub
-// Pages y compañía) y la API corre en otro lado. Vacío por omisión: si el
-// mismo servidor sirve el sitio y la API, no hay petición entre dominios que
-// permitir, y una lista vacía es mejor que un comodín.
+// Needed when the site is published on a static host (GitHub Pages and
+// friends) and the API runs elsewhere. Empty by default: if the same server
+// serves the site and the API, there is no cross-origin request to allow, and
+// an empty list beats a wildcard.
 const ALLOWED_ORIGINS = new Set(
     (process.env.ALLOWED_ORIGINS || '')
         .split(',')
@@ -128,33 +128,33 @@ const ALLOWED_ORIGINS = new Set(
 );
 
 /* -----------------------------------------------------------------------------
-   Validación
+   Validation
 
-   El navegador ya valida el formulario, pero eso solo ayuda a quien lo usa
-   como se espera: cualquiera puede llamar a la API directamente, así que lo
-   que se guarda se revisa otra vez aquí. Los límites de largo son lo que
-   impide que una solicitud llene la tabla de texto basura.
+   The browser already validates the form, but that only helps whoever uses it
+   as expected: anyone can call the API directly, so what gets stored is
+   checked again here. The length limits are what stop a request from filling
+   the table with junk text.
 -------------------------------------------------------------------------- */
 
 const VEHICLES = new Set(['van', 'wagon', 'pickup', 'suv']);
 const BODY_TYPES = new Set(['sedan', 'hatchback', 'coupe', 'wagon', 'suv', 'pickup', 'minivan', 'van']);
 const PLATE_RE = /^[A-Z0-9]{3}-[A-Z0-9]{3}$/;
 const YEAR_MIN = 1980;
-// Se calcula en cada solicitud y no una vez al cargar el módulo: el formulario
-// (src/repair.js) lo calcula al abrir la página, así que un proceso que sigue
-// vivo al pasar de año aceptaría en pantalla un año que después rechaza al
-// enviar, con el formulario ya completo y sin manera de seguir.
+// Worked out on every request and not once at module load: the form
+// (src/repair.js) works it out when the page opens, so a process still alive
+// at the turn of the year would accept on screen a year it then rejects on
+// sending, with the form already filled in and no way forward.
 function yearMax() {
     return new Date().getFullYear() + 1;
 }
 const MAX_MILEAGE = 2_000_000;
 const QUALITIES = new Set(['standard', 'premium', 'custom']);
-// Los estados por los que el taller mueve una solicitud.
+// The statuses the workshop moves a request through.
 //
-// Hay tres copias de esta lista y ninguna puede leer a las otras: esta, la de
-// src/statuses.js (lo que ve el cliente) y el CHECK de `status` en
-// server/schema.sql, que es la última palabra. Agregar un estado son los tres
-// sitios más la migración que amplíe el CHECK sobre la base existente.
+// There are three copies of this list and none can read the others: this one,
+// the one in src/statuses.js (what the customer sees) and the CHECK on
+// `status` in server/schema.sql, which has the last word. Adding a status
+// means those three places plus the migration that widens the CHECK.
 const STATUSES = new Set([
     'recibido',
     'planchado', 'desmontaje_montaje', 'pintura', 'preparacion',
@@ -166,20 +166,20 @@ const EMAIL_RE = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 const PART_RE = /^[A-Za-z0-9_]{1,40}$/;
 const MAX_PARTS = 40;
 
-// Los campos se nombran en minúscula ('el año', 'la placa') porque casi
-// siempre aparecen a mitad de frase; cuando abren una, suben la inicial.
+// Field names are lower case ('el año', 'la placa') because they nearly
+// always appear mid-sentence; when they open one, the initial goes up.
 function capitalize(field) {
     return field.charAt(0).toUpperCase() + field.slice(1);
 }
 
-// El adjetivo concuerda con el nombre del campo, que es un sintagma con su
-// género y su número: 'la placa' pide «válida», 'las notas' piden «largas» y
-// además el verbo en plural. Con una sola plantilla en masculino singular
-// salían «La placa no es válido.» y «Las notas es demasiado largo.», y estos
-// mensajes se le muestran tal cual al cliente.
+// The adjective agrees with the field name, which is a phrase with its own
+// gender and number: 'la placa' wants «válida», 'las notas' want «largas» and
+// a plural verb too. With a single masculine-singular template out came «La
+// placa no es válido.» and «Las notas es demasiado largo.», and these messages
+// are shown to the customer as they are.
 //
-// `agree` va en cada campo que no sea masculino singular, que es lo de por
-// omisión: 'f' femenino singular, 'fp' femenino plural.
+// `agree` goes on every field that is not masculine singular, the default:
+// 'f' feminine singular, 'fp' feminine plural.
 const INVALID = { m: 'no es válido', f: 'no es válida', fp: 'no son válidas' };
 const TOO_LONG = { m: 'es demasiado largo', f: 'es demasiado larga', fp: 'son demasiado largas' };
 
@@ -195,9 +195,9 @@ function text(value, { max, required = false, field, agree = 'm' }) {
     return trimmed === '' ? null : trimmed;
 }
 
-// Los números llegan del formulario como texto ('2020', ''). Se convierten
-// aquí, con su rango, para que la base reciba enteros o NULL y nunca la
-// cadena vacía.
+// Numbers arrive from the form as text ('2020', ''). They are converted here,
+// with their range, so the database gets integers or NULL and never the empty
+// string.
 function integer(value, { min, max, required = false, field, agree = 'm' }) {
     if (value === undefined || value === null || value === '' ) {
         if (required) throw new BadRequest(`Falta ${field}.`);
@@ -221,17 +221,17 @@ const WIZARD_REQUIRED = new Set([
 // than the website asks, but not much: the customer is standing at the
 // counter, which is the one moment the car itself can be looked at and the
 // plate read off it. Everything that describes the vehicle and the job is
-// wanted now — marca, modelo, placa and the panels to paint — because a row
+// wanted now (marca, modelo, placa and the panels to paint) because a row
 // that arrives without them is one somebody has to chase the customer for
 // later, and by then the car has been in the shop for a week.
 //
 // `notes` is the only thing left out, and it is the only one that can be:
 // there is nothing to write down when the customer had nothing to say.
 //
-// What the website still asks for and this does not — `year`, `department`,
-// `province`, `bodyType` — is not a judgement call, it is that the counter
-// has no reason to ask. The body type arrives anyway, derived from the model
-// (see intakePayload in src/staff.js).
+// What the website still asks for and this does not (`year`, `department`,
+// `province`, `bodyType`) is not a judgement call: the counter simply has no
+// reason to ask. The body type arrives anyway, derived from the model (see
+// intakePayload in src/staff.js).
 //
 // Anything outside the set is still checked when it arrives: a malformed plate
 // is refused here exactly as it is on the website. Optional means it may be
@@ -259,25 +259,25 @@ function validateRequest(body, required) {
     if (need('bodyType') || body.bodyType) {
         if (!BODY_TYPES.has(body.bodyType)) throw new BadRequest('Carrocería no válida.');
     }
-    // El catálogo de marcas y modelos vive en el navegador (src/carModels.js),
-    // así que aquí no hay contra qué contrastarlos: se comprueba que vengan y
-    // que sean texto corto, igual que con las piezas del visor 3D.
+    // The makes and models catalogue lives in the browser (src/carModels.js),
+    // so there is nothing here to check them against: they must be present
+    // and be short text, same as the 3D viewer's panels.
     const plate = text(body.plate, { max: 7, required: need('plate'), field: 'la placa', agree: 'f' });
     if (plate && !PLATE_RE.test(plate.toUpperCase())) throw new BadRequest('La placa no es válida.');
     if (!QUALITIES.has(body.quality)) throw new BadRequest('Nivel de acabado no válido.');
 
-    // Los dos formularios piden piezas, así que en la práctica el arreglo
-    // vacío ya no llega de ninguno. Se sigue aceptando la ausencia como un
-    // arreglo vacío —que es lo que la columna trae por omisión— y es
-    // `required` quien lo rechaza abajo: así el error dice qué falta en vez
-    // de «cuerpo inválido».
+    // Both forms ask for panels, so in practice an empty array no longer
+    // arrives from either. A missing value is still accepted as an empty
+    // array (what the column holds by default) and `required` rejects it
+    // below: that way the error says what is missing instead of «cuerpo
+    // inválido».
     const parts = Array.isArray(body.parts) ? body.parts : (body.parts == null ? [] : null);
     if (!parts) throw new BadRequest('Selecciona al menos una pieza.');
     if (need('parts') && parts.length === 0) throw new BadRequest('Selecciona al menos una pieza.');
     if (parts.length > MAX_PARTS) throw new BadRequest('Demasiadas piezas.');
-    // Los ids de pieza salen del GLB de cada modelo ('hood', 'rear_door_left',
-    // 'Object_26', …), así que se valida la forma y no una lista cerrada:
-    // agregar un modelo nuevo no debería obligar a tocar el servidor.
+    // Panel ids come from each model's GLB ('hood', 'rear_door_left',
+    // 'Object_26', and so on), so the shape is validated, not a closed list:
+    // adding a new model should not force a change on the server.
     for (const part of parts) {
         if (typeof part !== 'string' || !PART_RE.test(part)) {
             throw new BadRequest('Pieza no válida.');
@@ -287,10 +287,9 @@ function validateRequest(body, required) {
     const phone = text(body.phone, { max: 20, required: need('phone'), field: 'el teléfono' });
     if (phone && !PHONE_RE.test(phone)) throw new BadRequest('El teléfono debe tener 9 dígitos.');
 
-    // El correo es obligatorio en los dos formularios: es por donde sale la
-    // confirmación con el código de seguimiento (server/mail.js), así que una
-    // solicitud sin él deja al cliente sin más forma de recuperarlo que llamar
-    // al taller.
+    // Email is required on both forms: it is how the confirmation with the
+    // tracking code goes out (server/mail.js), so a request without it leaves
+    // the customer no way to get it back other than calling the workshop.
     const email = text(body.email, { max: 254, required: need('email'), field: 'el email' });
     if (email && !EMAIL_RE.test(email)) throw new BadRequest('El email no es válido.');
 
@@ -316,33 +315,34 @@ function validateRequest(body, required) {
 }
 
 /* -----------------------------------------------------------------------------
-   Pedidos de matizado (pgs/paintings.html)
+   Matizado orders (pgs/paintings.html)
 
-   Otro formulario y otra tabla, así que otra validación — pero los mismos
-   ayudantes de arriba (text, integer) y los mismos mensajes en español, que es
-   lo que hace que los dos formularios fallen igual.
+   Another form and another table, so another validation, but the same
+   helpers as above (text, integer) and the same Spanish messages, which is
+   what makes both forms fail the same way.
 
-   La regla que no se ve a simple vista: un pedido 'in_person' llega SIN color
-   y SIN envase, y eso es correcto. El cliente va a traer el vehículo para que
-   se lo midan, así que la fórmula no existe todavía y no hay nada que cotizar.
-   Los otros dos caminos sí traen las dos cosas, y se exigen.
+   The rule that is not obvious at a glance: an 'in_person' order arrives
+   WITHOUT a colour and WITHOUT a container, and that is correct. The
+   customer is bringing the vehicle to be measured, so the formula does not
+   exist yet and there is nothing to quote. The other routes do bring both,
+   and they are required.
 -------------------------------------------------------------------------- */
 
 const PAINT_METHODS = new Set(['code', 'model', 'reading', 'in_person']);
 const PAINT_FINISHES = new Set(['solido', 'metalico', 'perlado', 'tricapa']);
-// Las seis fracciones de galón que vende el taller. La lista está también en
-// SIZES (src/paints.js), que es la que dibuja las tarjetas, y en el CHECK de
-// `size` (server/schema.sql), que es la última palabra.
+// The six gallon fractions the workshop sells. The list also lives in SIZES
+// (src/paints.js), which draws the cards, and in the CHECK on `size`
+// (server/schema.sql), which has the last word.
 const PAINT_SIZES = new Set(['1_32', '1_16', '1_8', '1_4', '1_2', '1_1']);
 const MAX_UNITS = 20;
-// El techo del precio guardado. No es una tarifa: es lo que impide que alguien
-// mande un número absurdo al campo que el mostrador va a leer como «esto se le
-// prometió en pantalla».
+// The ceiling for the stored price. It is not a rate: it is what stops anyone
+// sending an absurd number to the field the counter will read as «this is what
+// was promised on screen».
 const MAX_PAINT_PRICE = 100_000;
-// Los estados de un pedido de matizado. Otra lista y más corta que STATUSES:
-// un matizado se recibe, se prepara, está listo y se entrega. Las copias son
-// PAINT_ORDER en src/statuses.js y el CHECK de `paint_orders.status`
-// (server/schema.sql), que es la última palabra.
+// A matizado order's statuses. Another list, shorter than STATUSES: a
+// matizado is received, prepared, ready and handed over. The copies are
+// PAINT_ORDER in src/statuses.js and the CHECK on `paint_orders.status`
+// (server/schema.sql), which has the last word.
 const PAINT_STATUSES = new Set(['recibido', 'preparacion', 'listo', 'entregado', 'cancelado']);
 const HEX_RE = /^#?([0-9a-fA-F]{6})$/;
 
@@ -352,23 +352,23 @@ function normalizeHex(value) {
     return match ? '#' + match[1].toLowerCase() : null;
 }
 
-/** Un valor de la lectura CIELAB, o null si el pedido no trae medición. */
+/** One value of the CIELAB reading, or null if the order has no measurement. */
 function labValue(value, { min, max, field }) {
     if (value === undefined || value === null || value === '') return null;
     const number = typeof value === 'number' ? value : Number(String(value).trim());
     if (!Number.isFinite(number) || number < min || number > max) {
         throw new BadRequest(`${capitalize(field)} no es válido.`);
     }
-    // Dos decimales, que es lo que entrega un espectrofotómetro y lo que
-    // acepta la columna.
+    // Two decimals, which is what a spectrophotometer gives and what the
+    // column accepts.
     return Math.round(number * 100) / 100;
 }
 
 /**
  * What the boss sends when he defines an order read at the counter: the colour
  * the spectrophotometer found, the container and the price he closes. Unlike
- * the customer's form, everything that describes the tin is required — this
- * is the step that turns «bring the car in» into an order that can be mixed —
+ * the customer's form, everything that describes the tin is required (this
+ * is the step that turns «bring the car in» into an order that can be mixed)
  * except the swatch, which is only the table's hint of the colour.
  */
 function validatePaintDefinition(body) {
@@ -396,8 +396,8 @@ function validatePaintDefinition(body) {
 }
 
 // The swatch for a row of the workshop table: the one stored with the order,
-// else the page's local catalogue by brand and code — orders placed before
-// the column existed, or a colour the colour database had no hex for. Empty
+// else the page's local catalogue by brand and code (orders placed before
+// the column existed, or a colour the colour database had no hex for). Empty
 // when neither knows it; the table then draws the swatch as unknown rather
 // than guess one.
 function paintHex(order) {
@@ -420,12 +420,12 @@ function validatePaintOrder(body) {
 
     const inPerson = body.method === 'in_person';
 
-    // El color. Se exige en los dos caminos que lo resuelven en pantalla, y se
-    // acepta vacío en el que lo resuelve el taller.
+    // The colour. Required on the routes that settle it on screen, accepted
+    // empty on the one the workshop settles.
     const colorCode = text(body.colorCode, { max: 20, required: !inPerson, field: 'el código de color' });
-    // Opcional: sale de la base de colores, y un pedido resuelto con el
-    // catálogo local o en el taller no lo trae. Se comprueba la forma, no que
-    // exista: de eso se encarga la base, un paso más abajo.
+    // Optional: it comes from the colour database, and an order settled with
+    // the local catalogue or at the workshop does not carry it. The shape is
+    // checked, not its existence: the database handles that, one step below.
     const swCode = text(body.swCode, { max: 12, field: 'el código Sherwin' });
     if (swCode && !/^[0-9A-Za-z-]{1,12}$/.test(swCode)) {
         throw new BadRequest('El código de color no es válido.');
@@ -436,8 +436,8 @@ function validatePaintOrder(body) {
         if (!PAINT_FINISHES.has(body.finish)) throw new BadRequest('Acabado no válido.');
     }
 
-    // La lectura digital: o vienen los tres valores o no viene ninguno. Dos de
-    // tres no describen ningún color, y guardarlos sería guardar un dato falso.
+    // The digital reading: all three values come or none do. Two of three
+    // describe no colour, and storing them would be storing false data.
     const reading = body.reading && typeof body.reading === 'object' ? {
         L: labValue(body.reading.L, { min: 0, max: 100, field: 'el valor L*' }),
         a: labValue(body.reading.a, { min: -128, max: 128, field: 'el valor a*' }),
@@ -447,10 +447,10 @@ function validatePaintOrder(body) {
         throw new BadRequest('La lectura necesita los tres valores: L*, a* y b*.');
     }
 
-    // El envase. Los tres campos del pedido —envase, unidades y precio— van
-    // juntos: o están los tres o no está ninguno. Un pedido 'in_person' que
-    // trajera unidades sin envase dejaría en la base un «3» de nada, así que
-    // aquí se descartan en vez de guardarse a medias.
+    // The container. The order's three fields (container, units and price) go
+    // together: all three or none. An 'in_person' order carrying units with no
+    // container would leave a «3» of nothing in the database, so they are
+    // dropped here instead of being half stored.
     if (!inPerson && !PAINT_SIZES.has(body.size)) throw new BadRequest('Envase no válido.');
     if (inPerson && body.size) throw new BadRequest('Un pedido con lectura en el taller no lleva envase.');
 
@@ -462,8 +462,8 @@ function validatePaintOrder(body) {
     const phone = text(body.phone, { max: 20, required: true, field: 'el teléfono' });
     if (!PHONE_RE.test(phone)) throw new BadRequest('El teléfono debe tener 9 dígitos.');
 
-    // Opcional: si lo dejan, ahí mandamos el código del pedido; si no, el
-    // taller se lo entrega por WhatsApp con el teléfono, que sí es obligatorio.
+    // Optional: if they leave it, the order code goes there; if not, the
+    // workshop sends it over WhatsApp to the phone, which is required.
     const email = text(body.email, { max: 254, field: 'el email' });
     if (email && !EMAIL_RE.test(email)) throw new BadRequest('El email no es válido.');
 
@@ -490,8 +490,8 @@ function validatePaintOrder(body) {
     };
 }
 
-// Errores que sí se le cuentan al cliente, con su código. Cualquier otro se
-// convierte en un 500 genérico (ver el catch del servidor).
+// Errors that are told to the customer, with their code. Anything else
+// becomes a generic 500 (see the server's catch).
 class HttpError extends Error {
     constructor(status, message) {
         super(message);
@@ -506,63 +506,63 @@ class BadRequest extends HttpError {
 }
 
 /* -----------------------------------------------------------------------------
-   Límite de peticiones
+   Rate limiting
 
-   Una ventana fija por IP, en memoria. No pretende frenar un ataque serio —
-   para eso hace falta algo delante del proceso — pero sí que un script pueda
-   recorrer códigos de 10 dígitos a toda velocidad buscando nombres de
-   clientes, que es el único dato personal que expone la consulta.
+   A fixed window per IP, in memory. It does not pretend to stop a serious
+   attack (that needs something in front of the process) but it does stop a
+   script walking 10-digit codes at full speed looking for customer names,
+   which is the only personal data the lookup exposes.
 -------------------------------------------------------------------------- */
 
-// '203.0.113.7:53411' y '[2001:db8::1]:443' -> la dirección sola. Algunos
-// proxies añaden el puerto de origen; la mayoría, no.
+// '203.0.113.7:53411' and '[2001:db8::1]:443' -> the bare address. Some
+// proxies append the source port; most do not.
 function bareIp(value) {
     const trimmed = value.trim();
     const bracketed = /^\[(.+)\](?::\d+)?$/.exec(trimmed);
     if (bracketed) return bracketed[1];
-    // Un solo ':' es 'IPv4:puerto'. Varios, una IPv6 escrita sin corchetes,
-    // que hay que dejar entera.
+    // A single ':' is 'IPv4:port'. Several mean an IPv6 written without
+    // brackets, which has to be left whole.
     const first = trimmed.indexOf(':');
     if (first !== -1 && first === trimmed.lastIndexOf(':')) return trimmed.slice(0, first);
     return trimmed;
 }
 
 /**
- * La dirección del cliente: la clave de los tres límites por IP y lo que se
- * escribe en el registro de un intento fallido de contraseña.
+ * The client's address: the key for the three per-IP limits and what gets
+ * written in the log of a failed password attempt.
  *
- * Sin proxy delante es la del socket y no hay más que hablar. Con proxy, la del
- * socket es la del proxy —la misma para todo el mundo—, y usarla funde los tres
- * cubos en uno solo: cinco contraseñas erradas de cualquier visitante y el
- * taller no puede entrar durante un minuto. Por eso hay que leer la cabecera.
+ * With no proxy in front it is the socket's and that is that. With a proxy,
+ * the socket's is the proxy's (the same for everybody), and using it merges
+ * the three buckets into one: five wrong passwords from any visitor and the
+ * workshop cannot log in for a minute. That is why the header has to be read.
  *
- * X-Forwarded-For se construye por AÑADIDO: cada proxy pega al final la
- * dirección de quien le habló. Si el cliente manda una inventada,
+ * X-Forwarded-For is built by APPENDING: each proxy adds at the end the
+ * address of whoever talked to it. If the client sends a made-up one,
  *
  *     X-Forwarded-For: 9.9.9.9
  *
- * el proxy no la borra, añade la de verdad detrás:
+ * the proxy does not remove it, it appends the real one after it:
  *
  *     X-Forwarded-For: 9.9.9.9, 200.1.2.3
- *                      ^inventada  ^la que escribió nuestro proxy
+ *                      ^made up    ^written by our proxy
  *
- * Por eso se lee desde la DERECHA. Tomar el primer elemento —el error clásico,
- * y lo que recomienda la mitad de los tutoriales— le regala el límite a quien
- * ataca: cambia la dirección inventada en cada petición y el tope de cinco
- * intentos por minuto deja de existir; peor todavía, puede escribir la de otra
- * persona y dejarla fuera a ella.
+ * That is why it is read from the RIGHT. Taking the first element (the
+ * classic mistake, and what half the tutorials recommend) hands the limit to
+ * the attacker: they change the made-up address on each request and the cap
+ * of five attempts a minute stops existing; worse still, they can write
+ * someone else's and lock that person out.
  *
- * Con n proxies de confianza, los n últimos elementos son los que escribieron
- * ellos, y el cliente es el primero de esos n: list[list.length - n]. Leer
- * desde la izquierda se lo regala a quien inventa la cabecera; desde la
- * derecha, no, y sigue acertando aunque le pongan elementos de más delante.
+ * With n trusted proxies, the last n elements are the ones they wrote, and
+ * the client is the first of those n: list[list.length - n]. Reading from the
+ * left hands it to whoever forges the header; from the right it does not,
+ * and it stays right even if extra elements are put in front.
  *
- * Lo que NO cubre: un proxy que REEMPLACE la cabecera en vez de añadir. Con
- * TRUST_PROXY=3 la lista quedaría con un solo elemento, la comprobación de
- * largo de más abajo salta y todos los visitantes vuelven a compartir la
- * dirección del socket —y con ella un único cubo de límite—, que es justo lo
- * que esto existe para evitar. Falla del lado seguro, pero en silencio: por eso
- * el aviso, que se escribe una vez y no en cada petición.
+ * What it does NOT cover: a proxy that REPLACES the header instead of
+ * appending. With TRUST_PROXY=3 the list would have a single element, the
+ * length check below trips and every visitor shares the socket address again
+ * (and with it a single limit bucket), which is exactly what this exists to
+ * prevent. It fails safe, but silently: hence the warning, written once and
+ * not on every request.
  */
 let warnedShortChain = false;
 function clientIp(req) {
@@ -574,13 +574,13 @@ function clientIp(req) {
         .map(bareIp)
         .filter(Boolean);
 
-    // Menos saltos de los declarados: la petición no pasó por los proxies que
-    // se esperaban —una comprobación de salud interna, o alguien hablándole al
-    // contenedor directamente—. La del socket no la escribe nadie de fuera.
+    // Fewer hops than declared: the request did not come through the expected
+    // proxies (an internal health check, or someone talking to the container
+    // directly). Nobody outside writes the socket's address.
     if (forwarded.length < TRUST_PROXY) {
-        // Si esto sale con una cabecera puesta, la topología dejó de ser la que
-        // dice TRUST_PROXY y el límite por IP está contando a todos como uno.
-        // Comprobarlo con /api/staff/whoami y ajustar el número.
+        // If this shows up with a header set, the topology is no longer what
+        // TRUST_PROXY says and the per-IP limit is counting everyone as one.
+        // Check it with /api/staff/whoami and adjust the number.
         if (forwarded.length > 0 && !warnedShortChain) {
             warnedShortChain = true;
             console.warn(`\nAviso: x-forwarded-for trae ${forwarded.length} salto(s) y TRUST_PROXY=${TRUST_PROXY}.`);
@@ -591,14 +591,14 @@ function clientIp(req) {
 
     const candidate = forwarded[forwarded.length - TRUST_PROXY];
 
-    // Que sea una dirección de verdad, y no solo por higiene: la RFC 7239
-    // admite valores como 'unknown' o identificadores opacos, y esto termina de
-    // clave en el Map de `buckets`. Sin la comprobación, quien llama elige
-    // cadenas de cualquier largo que viven un minuto cada una.
+    // It must be a real address, and not only for hygiene: RFC 7239 allows
+    // values like 'unknown' or opaque identifiers, and this ends up as a key
+    // in the `buckets` Map. Without the check, the caller picks strings of any
+    // length that live a minute each.
     if (net.isIP(candidate) === 0) return socketIp;
 
-    // '::ffff:200.1.2.3' y '200.1.2.3' son el mismo cliente; sin esto tendría
-    // dos cubos y el doble de intentos.
+    // '::ffff:200.1.2.3' and '200.1.2.3' are the same client; without this it
+    // would get two buckets and twice the attempts.
     return candidate.startsWith('::ffff:') ? candidate.slice(7) : candidate;
 }
 
@@ -661,7 +661,7 @@ function rateLimit(key, limit) {
     return bucket.count <= limit;
 }
 
-// Las ventanas vencidas se acumularían para siempre si nadie las quita.
+// Expired windows would pile up forever if nobody removed them.
 setInterval(() => {
     const now = Date.now();
     for (const [key, bucket] of buckets) {
@@ -681,7 +681,7 @@ const colourDaily = new Map(); // clave -> { count, resetAt }
 let colourTotal = { count: 0, resetAt: Date.now() + DAY_MS };
 let colourCeilingLogged = false;
 
-// Devuelve '' si la petición pasa, o el motivo por el que no.
+// Returns '' if the request passes, or the reason it does not.
 function colourBudget(key) {
     const now = Date.now();
 
@@ -691,8 +691,8 @@ function colourBudget(key) {
     }
     colourTotal.count += 1;
     if (colourTotal.count > COLOUR_DAILY_TOTAL) {
-        // El renglón sale una vez al día y no una por petición: es una
-        // anomalía que hay que mirar, no un renglón de tráfico.
+        // The line goes out once a day and not once per request: it is an
+        // anomaly to look into, not a line of traffic.
         if (!colourCeilingLogged) {
             colourCeilingLogged = true;
             console.warn(`[colordb] techo diario alcanzado (${COLOUR_DAILY_TOTAL}).`
@@ -767,9 +767,9 @@ function readJsonBody(req) {
     });
 }
 
-// JSON.parse('null'), 'true' o '3' son JSON válido pero no un objeto, y leerles
-// una propiedad lanza TypeError: un 500 donde el cliente mandó algo mal. Es el
-// mismo guardia que validateRequest ya hace para el formulario público.
+// JSON.parse('null'), 'true' or '3' are valid JSON but not an object, and
+// reading a property off them throws TypeError: a 500 where the client sent
+// something wrong. It is the same guard validateRequest already applies to the public form.
 function requireObject(body) {
     if (body === null || typeof body !== 'object' || Array.isArray(body)) {
         throw new BadRequest('El cuerpo de la petición no es válido.');
@@ -864,9 +864,9 @@ function pruneFileCache(filePath, currentKey) {
 }
 
 async function serveStatic(req, res, pathname) {
-    // Un porcentaje suelto ('/%', '/%zz') hace que decodeURIComponent lance
-    // URIError. Sin esto sube hasta el catch general y sale un 500 con su
-    // rastro en el registro, cuando lo que hubo fue una dirección mal escrita.
+    // A stray percent sign ('/%', '/%zz') makes decodeURIComponent throw
+    // URIError. Without this it climbs to the general catch and comes out as a
+    // 500 with its trace in the log, when all that happened was a mistyped address.
     let decoded;
     try {
         decoded = decodeURIComponent(pathname);
@@ -876,8 +876,8 @@ async function serveStatic(req, res, pathname) {
 
     const filePath = path.join(ROOT, decoded === '/' ? 'index.html' : decoded);
 
-    // path.join ya resuelve los '..', pero un '..' de más saldría de la carpeta
-    // del proyecto y serviría cualquier archivo del disco: hay que comprobarlo.
+    // path.join already resolves the '..', but one '..' too many would leave
+    // the project folder and serve any file on disk: it has to be checked.
     if (filePath !== ROOT && !filePath.startsWith(ROOT + path.sep)) {
         res.writeHead(403).end('Prohibido');
         return;
@@ -963,28 +963,28 @@ const LOOKUP_PATH = /^\/api\/requests\/([0-9]{10})$/;
 const COLOUR_MODELS_PATH = /^\/api\/colours\/makes\/([0-9]{1,5})\/models$/;
 const COLOUR_ONE_PATH = /^\/api\/colours\/([0-9A-Za-z-]{1,12})$/;
 
-// Una hora para las dos listas que no cambian entre despliegues, cinco minutos
-// para los colores. `private` y no `public` en los colores a propósito: delante
-// hay Cloudflare, y una caché compartida serviría a quien esté copiando el
-// catálogo sin que ninguno de los contadores de arriba lo vea.
+// An hour for the two lists that do not change between deploys, five minutes
+// for the colours. `private` and not `public` on the colours on purpose:
+// Cloudflare sits in front, and a shared cache would serve whoever is copying
+// the catalogue without any of the counters above seeing it.
 const COLOUR_LIST_CACHE = 'public, max-age=3600';
 const COLOUR_ROW_CACHE = 'private, max-age=300';
 
-// Devuelve true si la petición ya quedó contestada (un preflight OPTIONS).
+// Returns true if the request has already been answered (an OPTIONS preflight).
 function applyCors(req, res) {
     const origin = req.headers.origin;
     if (origin && ALLOWED_ORIGINS.has(origin)) {
         res.setHeader('Access-Control-Allow-Origin', origin);
-        // El origen permitido depende de la cabecera Origin, así que las
-        // cachés intermedias tienen que saber que la respuesta varía con ella.
+        // The allowed origin depends on the Origin header, so intermediate
+        // caches have to know the response varies with it.
         res.setHeader('Vary', 'Origin');
         res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS');
         res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
         res.setHeader('Access-Control-Max-Age', '86400');
     }
     if (req.method === 'OPTIONS') {
-        // Sin cabeceras CORS arriba, el navegador rechazará el preflight por su
-        // cuenta; responder 204 igualmente evita dejar la petición colgando.
+        // With no CORS headers above, the browser rejects the preflight on its
+        // own; answering 204 anyway avoids leaving the request hanging.
         res.writeHead(204).end();
         return true;
     }
@@ -1005,7 +1005,7 @@ const MAX_NOTE = 500;
 // holding it. It is put together here and not in the database because the name
 // is looked up from the code (see server/names.js) and that is the only place
 // where it is decided. `occupiedBy` comes from the database; `holders` is the
-// server's doing, and it is the shape the panel reads — one entry per person,
+// server's doing, and it is the shape the panel reads: one entry per person,
 // up to the two the vehicle admits (MAX_HOLDERS in server/db.js).
 function withHolders(request) {
     const codes = request.occupiedBy || [];
@@ -1028,9 +1028,9 @@ function holderNames(codes) {
     return named.slice(0, -1).join(', ') + ' y ' + named[named.length - 1];
 }
 
-// Todas las rutas del panel pasan por aquí. Sin contraseña configurada no hay
-// panel: responder 503 y no 401 distingue «este servidor no lo tiene» de «tu
-// sesión venció», que es lo que necesita saber quien lo está montando.
+// Every panel route goes through here. With no password configured there is
+// no panel: answering 503 and not 401 tells «this server does not have it»
+// apart from «your session expired», which is what whoever sets it up needs to know.
 function requireStaff(req) {
     if (!auth.isConfigured()) {
         throw new HttpError(503, 'El panel del taller no está configurado en este servidor.');
@@ -1043,7 +1043,7 @@ function requireStaff(req) {
 // The monitor, writing a note on a worker and registering a walk-in vehicle are
 // the boss's and nobody else's: all three are for running the workshop, not for
 // working in it. A 403 and not a 404: whoever asks has a session and the route
-// exists — what they do not have is the boss's code.
+// exists; what they do not have is the boss's code.
 function requireBoss(req) {
     requireStaff(req);
     if (!auth.isBoss(auth.sessionWorkerId(req))) {
@@ -1061,22 +1061,22 @@ function refuseBoss(req) {
     }
 }
 
-// Qué dirección de cliente ve el servidor, y de qué cabecera la sacó.
+// Which client address the server sees, and which header it took it from.
 //
-// El límite por IP no se puede comprobar desde fuera: si falla, falla
-// pareciendo que todo va bien. Y qué cabecera trae la dirección de verdad
-// depende del alojamiento, no de lo que uno suponga — averiguarlo a ciegas,
-// mirando si el límite salta o no, lleva a conclusiones equivocadas.
+// The per-IP limit cannot be checked from outside: when it fails, it fails
+// looking as if everything works. And which header carries the real address
+// depends on the host, not on what one assumes; working it out blind, by
+// watching whether the limit trips, leads to wrong conclusions.
 //
-// Detrás de la contraseña del taller porque enseña la cadena de proxies. No
-// dice nada que quien la consulta no sepa ya: su propia dirección.
+// Behind the workshop password because it shows the proxy chain. It says
+// nothing the caller does not already know: their own address.
 function whoami(req, ip) {
     const workerId = auth.sessionWorkerId(req);
     const isBoss = auth.isBoss(workerId);
     const answer = {
-        clientIp: ip,                                  // lo que usa el límite
-        workerId,                                      // quién tiene la sesión
-        isBoss,                                        // y si es el jefe del taller
+        clientIp: ip,                                  // what the limit uses
+        workerId,                                      // who holds the session
+        isBoss,                                        // and whether they are the boss
     };
     // The proxy chain and the mail account are for whoever runs the workshop.
     // A worker checking their own session has no use for the shop inbox, the
@@ -1090,10 +1090,10 @@ function whoami(req, ip) {
         }
     }
     return Object.assign(answer, {
-        socket: req.socket.remoteAddress,              // el último salto
+        socket: req.socket.remoteAddress,              // the last hop
         trustProxy: TRUST_PROXY,
-        forwarding,                                    // de dónde podría salir
-        mail: mail.describe(),                         // a qué cuenta salen los avisos
+        forwarding,                                    // where it could come from
+        mail: mail.describe(),                         // which account notices go out from
     });
 }
 
@@ -1116,16 +1116,16 @@ async function handleStaff(req, res, pathname, ip) {
         if (failures && Date.now() <= failures.resetAt && failures.count >= 5) {
             return sendJson(res, 429, { error: 'Demasiados intentos. Espera un minuto.' });
         }
-        // Sin códigos de trabajador configurados el panel quedaría abierto
-        // a cualquiera con la contraseña: se responde 503, como cuando falta
-        // la propia contraseña, en vez de dejar entrar sin identificar a nadie.
+        // With no worker codes configured the panel would be open to anyone
+        // with the password: answer 503, as when the password itself is
+        // missing, instead of letting people in without identifying anyone.
         if (!auth.hasWorkerIds()) {
             return sendJson(res, 503, { error: 'El panel del taller no está configurado en este servidor.' });
         }
         const body = requireObject(await readJsonBody(req));
-        // Hacen falta los dos: un código de trabajador válido y la contraseña.
-        // El error no dice cuál de los dos falló, para no revelar qué códigos
-        // existen a quien prueba.
+        // Both are needed: a valid worker code and the password. The error
+        // does not say which one failed, so as not to reveal to a prober
+        // which codes exist.
         // Both checks always run: short-circuiting on an unknown code skipped
         // the password hashing, and the faster answer told a prober which codes
         // do not exist.
@@ -1136,9 +1136,9 @@ async function handleStaff(req, res, pathname, ip) {
             console.warn(`[taller] intento fallido desde ${ip}`);
             return sendJson(res, 401, { error: 'Código de trabajador o contraseña incorrectos.' });
         }
-        // console.log y no console.warn: aquí no ha pasado nada raro. En el
-        // resto del archivo un warn marca una anomalía, y mezclar con ellos el
-        // renglón más frecuente del registro los entierra.
+        // console.log and not console.warn: nothing odd happened here. In the
+        // rest of the file a warn marks an anomaly, and mixing the most
+        // frequent log line in with them buries them.
         console.log(`[taller] entró ${workerId} desde ${ip}`);
         res.setHeader('Set-Cookie', auth.cookieHeader(auth.createSession(workerId)));
         return sendJson(res, 200, { ok: true, workerId });
@@ -1155,16 +1155,16 @@ async function handleStaff(req, res, pathname, ip) {
         const wanted = new URL(req.url, 'http://localhost').searchParams.get('status');
         if (wanted && !STATUSES.has(wanted)) throw new BadRequest('El estado no es válido.');
         const requests = (await listRequests({ status: wanted })).map(withHolders);
-        // Quién está mirando: el panel lo necesita para saber qué filas puede
-        // tocar —una ocupada solo la mueve quien la tiene— sin volver a
-        // preguntar por cada una.
+        // Who is looking: the panel needs it to know which rows it can touch
+        // (an occupied one is only moved by whoever holds it) without asking
+        // again for each one.
         const viewerId = auth.sessionWorkerId(req);
-        // `isBoss` decides which profile gets painted — the monitor instead of
-        // the start-session button — and nothing else: it is the interface. Who
+        // `isBoss` decides which profile gets painted (the monitor instead of
+        // the start-session button) and nothing else: it is the interface. Who
         // may ask for the monitor and who may take a vehicle is decided by
         // requireBoss and refuseBoss, here, without trusting the browser.
         // Their own note from the boss, and nobody else's: it rides here so the
-        // profile — which this same response already paints — does not need a
+        // profile (which this same response already paints) does not need a
         // second request for one line of text. The boss reads everybody's from
         // the monitor instead.
         const own = viewerId ? await findWorkerNote(viewerId) : null;
@@ -1178,8 +1178,8 @@ async function handleStaff(req, res, pathname, ip) {
     }
 
     // A vehicle driven straight to the shop. Same table and same code as one
-    // that came through the website — the queue does not care how a car
-    // arrived — but fewer questions (WALK_IN_REQUIRED): the customer is at the
+    // that came through the website (the queue does not care how a car
+    // arrived) but fewer questions (WALK_IN_REQUIRED): the customer is at the
     // counter and has no reason to be asked for year, department or province.
     // Nothing can be edited from the panel afterwards, so what it does ask for
     // is required.
@@ -1228,8 +1228,8 @@ async function handleStaff(req, res, pathname, ip) {
             // answers «what is this person on», and leaving it off one of them
             // would show somebody as free while their hands are on a car.
             for (const workerId of row.occupiedBy) {
-                // A code that is no longer on the roster — somebody who left
-                // with a vehicle still taken — goes in anyway: leaving it out
+                // A code that is no longer on the roster (somebody who left
+                // with a vehicle still taken) goes in anyway: leaving it out
                 // would hide a vehicle that really is in somebody's hands.
                 if (!held.has(workerId)) held.set(workerId, []);
                 held.get(workerId).push({
@@ -1273,7 +1273,7 @@ async function handleStaff(req, res, pathname, ip) {
     // twice leaves the same single note, not two.
     //
     // A body with text sets it; an empty one takes it away. That is one round
-    // trip for both, and it matches what the card offers — a textarea you can
+    // trip for both, and it matches what the card offers: a textarea you can
     // empty.
     const noteMatch = WORKER_NOTE_PATH.exec(pathname);
     if (noteMatch && req.method === 'PUT') {
@@ -1361,9 +1361,9 @@ async function handleStaff(req, res, pathname, ip) {
             if (!result.ok && result.reason === 'not_found') {
                 return sendJson(res, 404, { error: 'No encontramos ninguna solicitud con ese código.' });
             }
-            // Solo quien ocupa el vehículo le cambia el estado. Si estaba
-            // libre, el error dice que hay que tomarlo; si lo tienen otros, los
-            // nombra para que quede claro a quién pedírselo.
+            // Only whoever holds the vehicle changes its status. If it was
+            // free, the error says it has to be taken; if others hold it, it
+            // names them so it is clear whom to ask.
             if (!result.ok) {
                 const holding = holderNames(result.occupiedBy);
                 const message = holding
@@ -1375,10 +1375,10 @@ async function handleStaff(req, res, pathname, ip) {
             return sendJson(res, 200, withHolders(result));
         }
 
-        // Ocupar o liberar un vehículo. Mientras quede sitio —dos personas a la
-        // vez como mucho— lo toma cualquiera; soltarlo solo puede quien lo
-        // tiene, y suelta su parte y no la del otro. Las dos reglas las hace
-        // cumplir la base (ver server/db.js), no este handler ni el navegador.
+        // Taking or releasing a vehicle. While there is room (two people at
+        // once at most) anyone takes it; only a holder can release it, and
+        // they release their share and not the other's. The database enforces
+        // both rules (see server/db.js), not this handler or the browser.
         const occ = OCCUPANCY_PATH.exec(pathname);
         if (occ) {
             requireStaff(req);
@@ -1394,9 +1394,9 @@ async function handleStaff(req, res, pathname, ip) {
                 if (!result.ok && result.reason === 'not_found') {
                     return sendJson(res, 404, { error: 'No encontramos ninguna solicitud con ese código.' });
                 }
-                // Lleno: ya lo tienen dos, que es el tope. Se nombra a los dos
-                // —es a ellos a quienes hay que pedirles sitio— y el 409 es el
-                // mismo de antes: la solicitud choca con cómo está la fila.
+                // Full: two already hold it, which is the cap. Both are named
+                // (they are the ones to ask for room) and the 409 is the same
+                // as before: the request clashes with the state of the row.
                 if (!result.ok) {
                     const holding = holderNames(result.occupiedBy) || 'otros trabajadores';
                     return sendJson(res, 409, { error: `${holding} ya tienen este vehículo. Son dos personas como mucho.` });
@@ -1422,21 +1422,21 @@ async function handleStaff(req, res, pathname, ip) {
 }
 
 /* -----------------------------------------------------------------------------
-   Colores
+   Colours
 
-   El catálogo de Sherwin-Williams: 68.717 colores y 693.636 asociaciones
-   vehículo-color, en una base aparte y de sólo lectura. Ver
+   The Sherwin-Williams catalogue: 68,717 colours and 693,636 vehicle-colour
+   associations, in a separate, read-only database. See
    server/colordb/README.md.
 
-   Todo lo que sale de aquí es del catálogo, no del cliente: no hay nada que
-   proteger de una fuga de datos personales. Lo que hay que encarecer es
-   copiarlo entero, y eso se hace en tres sitios a la vez —los límites dentro
-   de las funciones de la base, los contadores de aquí, y que no exista
-   ninguna consulta que devuelva «todos los colores»—.
+   Everything that comes out of here is the catalogue's, not the customer's:
+   there is no personal data to protect from a leak. What has to be made
+   expensive is copying it whole, and that is done in three places at once:
+   the limits inside the database functions, the counters here, and the fact
+   that no query returns «all the colours».
 -------------------------------------------------------------------------- */
 
-// Un entero de la cadena de consulta, o null si no lo es. Rechaza en vez de
-// redondear: `?make=12abc` es una petición mal formada, no la marca 12.
+// An integer from the query string, or null if it is not one. Rejects rather
+// than rounding: `?make=12abc` is a malformed request, not make 12.
 function intParam(params, name, min, max) {
     const raw = params.get(name);
     if (raw === null || raw === '') return null;
@@ -1450,9 +1450,9 @@ async function handleColours(req, res, pathname, ip) {
     if (req.method !== 'GET') {
         return sendJson(res, 405, { error: 'Método no permitido.' });
     }
-    // En un GET del propio sitio el navegador no manda Origin, así que la
-    // ausencia pasa. Lo que esto para es una página ajena leyendo el catálogo
-    // desde el navegador de otro; no para a curl, y no pretende hacerlo.
+    // On a GET from the site itself the browser sends no Origin, so its
+    // absence passes. What this stops is a foreign page reading the catalogue
+    // from someone else's browser; it does not stop curl, and does not try to.
     if (!isOwnOrigin(req)) {
         return sendJson(res, 403, { error: 'Consulta los colores desde el sitio.' });
     }
@@ -1502,18 +1502,18 @@ async function handleColours(req, res, pathname, ip) {
             const modelId = intParam(params, 'model', 1, 2147483647);
             const year = intParam(params, 'year', 1900, 2100);
             const from = intParam(params, 'from', 0, 600);
-            // Siempre hace falta una marca: aquí no hay ninguna consulta que
-            // conteste «todos los colores», que es justo la que serviría para
-            // llevarse el catálogo.
+            // A make is always required: there is no query here that answers
+            // «all the colours», which is exactly the one that would serve to
+            // walk off with the catalogue.
             if (!makeId) {
                 return sendJson(res, 400, { error: 'Elige la marca para ver sus colores.' });
             }
             if (modelId === undefined || year === undefined) {
                 return sendJson(res, 400, { error: 'El modelo o el año no son válidos.' });
             }
-            // Se rechaza en vez de recortar. La función de la base recorta a
-            // 600 igual, pero contestar 200 con la última página otra vez
-            // dejaría a «ver más» dando vueltas sobre las mismas filas.
+            // Rejected rather than trimmed. The database function trims to
+            // 600 anyway, but answering 200 with the last page again would
+            // leave «ver más» looping over the same rows.
             if (from === undefined) {
                 return sendJson(res, 400, {
                     error: 'Afina el modelo o el año para ver el resto de colores.',
@@ -1532,8 +1532,8 @@ async function handleColours(req, res, pathname, ip) {
             if (!makeId) {
                 return sendJson(res, 400, { error: 'Elige la marca del vehículo.' });
             }
-            // El mismo recorte que hace la función de la base, para no gastar
-            // un viaje en algo que va a rechazar igual.
+            // The same trim the database function applies, so as not to spend
+            // a round trip on something it will reject anyway.
             const key2 = code.toUpperCase().replace(/[^A-Z0-9]/g, '');
             if (key2.length < 2 || key2.length > 10) {
                 return sendJson(res, 400, { error: 'Escribe el código tal como viene en la etiqueta.' });
@@ -1552,8 +1552,8 @@ async function handleColours(req, res, pathname, ip) {
             return sendJson(res, 200, colour, COLOUR_ROW_CACHE);
         }
     } catch (err) {
-        // Una base caída es un 503 y se puede reintentar; cualquier otra cosa
-        // es un error nuestro y sube al 500 de siempre, que no cuenta nada.
+        // A database that is down is a 503 and can be retried; anything else
+        // is our bug and goes up to the usual 500, which tells nothing.
         if (err instanceof colordb.ColourDbUnavailable) {
             return sendJson(res, 503, {
                 error: 'El buscador de colores no está disponible ahora mismo.',
@@ -1565,21 +1565,21 @@ async function handleColours(req, res, pathname, ip) {
     return sendJson(res, 404, { error: 'Ruta no encontrada.' });
 }
 
-/* El nombre del color lo dice la base, no el formulario.
+/* The colour name is what the database says, not the form.
  *
- * Cuando el pedido trae un swCode, se vuelve a resolver aquí antes de guardar.
- * No es desconfianza del cliente: es que el correo y la orden de taller se leen
- * como si fueran la base, y un campo de formulario que se quedó viejo —o que
- * alguien cambió— acabaría impreso como si lo fuera.
+ * When the order carries a swCode, it is resolved again here before saving.
+ * It is not distrust of the customer: the email and the workshop order are
+ * read as if they were the database, and a form field that went stale (or
+ * that someone changed) would end up printed as if it were.
  *
- * Lo que NO se toca: colorCode sigue siendo el código de fábrica que el cliente
- * leyó en la etiqueta, y finish sigue siendo el que vio cuando se le cobró.
- * Pisar el primero pondría «20246» donde el taller espera «1F7» y dejaría a
- * colourHex() en mail.js sin encontrar la muestra; pisar el segundo cambiaría
- * el precio después de cobrarlo.
+ * What is NOT touched: colorCode stays the factory code the customer read off
+ * the label, and finish stays the one they saw when they were charged.
+ * Overwriting the first would put «20246» where the workshop expects «1F7»
+ * and leave colourHex() in mail.js unable to find the swatch; overwriting
+ * the second would change the price after charging it.
  *
- * Si la base no está, el pedido pasa igual. Un color sin confirmar se vende; un
- * pedido perdido, no.
+ * If the database is not there, the order goes through anyway. An
+ * unconfirmed colour still sells; a lost order does not.
  */
 async function confirmColour(data) {
     if (!data.swCode || !colordb.isEnabled()) return;
@@ -1600,10 +1600,10 @@ async function confirmColour(data) {
             + ` llegó "${data.colorName}", la base dice "${colour.name}"`);
         data.colorName = colour.name;
     }
-    // La muestra del correo. Antes colourHex() la buscaba en el catálogo local
-    // (server/paintCatalog.js, ~777 colores), así que un color de los 693k de
-    // la base salía sin muestra. Aquí ya tenemos la fila de la base, con su hex,
-    // así que lo guardamos para que el correo lo pinte sin volver a buscar.
+    // The email's swatch. colourHex() used to look it up in the local
+    // catalogue (server/paintCatalog.js, ~777 colours), so a colour from the
+    // database's 693k came out without one. Here we already have the database
+    // row, with its hex, so it is stored for the email to paint without looking again.
     data.hex = normalizeHex(colour.hex) || '';
 }
 
@@ -1637,21 +1637,21 @@ async function handleApi(req, res, pathname) {
         const created = await createRequest(data);
         console.log(`[requests] nueva solicitud ${created.id} (${data.vehicle}, ${data.parts.length} piezas)`);
         sendJson(res, 201, created);
-        // Los dos correos salen DESPUÉS de contestar: la fila ya está guardada
-        // y el cliente ya tiene su código, así que un tropiezo del correo no
-        // puede convertirse en un error de la solicitud.
+        // Both emails go out AFTER answering: the row is already stored and
+        // the customer already has their code, so a mail hiccup cannot turn
+        // into an error on the request.
         //
-        // Sin `await` y sin `.catch()` a propósito: notifyNewRequest() es
-        // síncrona, se limita a poner los dos mensajes en una cola y no lanza
-        // —ni siquiera si armar un cuerpo falla—, así que aquí no queda nada
-        // colgando. Lo que tarden en salir es asunto de server/mail.js.
+        // No `await` and no `.catch()` on purpose: notifyNewRequest() is
+        // synchronous, only queues the two messages and does not throw (not
+        // even if building a body fails), so nothing is left hanging here.
+        // How long they take to go out is server/mail.js's business.
         mail.notifyNewRequest(created, data);
         return;
     }
 
     if (req.method === 'POST' && pathname === '/api/paint-orders') {
-        // Las mismas tres puertas que /api/requests, por las mismas razones:
-        // JSON de verdad, desde el sitio, y con un techo por IP.
+        // The same three gates as /api/requests, for the same reasons: real
+        // JSON, from the site, and with a per-IP ceiling.
         if (!/^application\/json\b/i.test(String(req.headers['content-type'] || ''))) {
             return sendJson(res, 415, { error: 'El formulario debe enviarse como JSON.' });
         }
@@ -1669,9 +1669,9 @@ async function handleApi(req, res, pathname) {
             `${data.colorCode ? `, ${data.brand} ${data.colorCode}` : ''}` +
             `${data.size ? `, ${data.size} x${data.units}` : ''})`);
         sendJson(res, 201, created);
-        // Detrás de la respuesta y sin await, igual que los de una solicitud:
-        // la fila ya está guardada y el cliente ya tiene su código, así que un
-        // tropiezo del correo no puede convertirse en un error del pedido.
+        // After the response and without await, like a request's: the row is
+        // already stored and the customer already has their code, so a mail
+        // hiccup cannot turn into an error on the order.
         mail.notifyNewPaintOrder(created, data);
         return;
     }
@@ -1688,8 +1688,8 @@ async function handleApi(req, res, pathname) {
             }
             return sendJson(res, 200, request);
         }
-        // Un código con un largo distinto no llega a la base: se responde lo
-        // mismo que a uno inexistente para no delatar qué forma es la válida.
+        // A code of a different length never reaches the database: it gets the
+        // same answer as a nonexistent one, so as not to reveal the valid shape.
         if (pathname.startsWith('/api/requests/')) {
             return sendJson(res, 404, { error: 'No encontramos ninguna solicitud con ese código.' });
         }
@@ -1711,17 +1711,15 @@ const server = http.createServer(async (req, res) => {
     }
 
     try {
-        // La comprobación de salud del alojamiento. No toca la base a
-        // propósito: el alojamiento reinicia el servicio cuando esta ruta
-        // falla, así que preguntarle a Postgres convierte un tropiezo de la
-        // base —o el segundo que tarda en despertar— en un reinicio, y cada
-        // reinicio se lleva por delante las sesiones abiertas del panel. Lo
-        // que hay que contestar aquí es «este proceso atiende HTTP», que es
-        // exactamente lo que el alojamiento usa para decidir.
+        // The host's health check. It does not touch the database on purpose:
+        // the host restarts the service when this route fails, so asking
+        // Postgres turns a database hiccup (or the second it takes to wake)
+        // into a restart, and each restart takes the panel's open sessions
+        // with it. What must be answered here is «this process serves HTTP»,
+        // which is exactly what the host uses to decide.
         //
-        // Fuera de /api/ para que no pase por el CORS, ni por clientIp, ni por
-        // el límite de peticiones. sendJson ya responde con Cache-Control:
-        // no-store.
+        // Outside /api/ so it skips CORS, clientIp and the rate limit.
+        // sendJson already answers with Cache-Control: no-store.
         if (pathname === '/healthz') {
             sendJson(res, 200, { ok: true });
             return;
@@ -1740,15 +1738,16 @@ const server = http.createServer(async (req, res) => {
             sendJson(res, err.status, { error: err.message });
             return;
         }
-        // Una base que no responde no es un fallo del programa, y decir lo
-        // mismo de las dos cosas le cuesta un pedido al taller: el cliente lee
-        // «no pudimos procesar la solicitud», entiende que lo ha hecho mal y se
-        // va. La base gestionada se duerme y tarda en despertar (ver connect()
-        // en server/db.js, que ya reintenta tres veces antes de llegar aquí),
-        // así que esto es una espera, no una avería, y se dice como tal.
+        // A database that does not answer is not a bug in the program, and
+        // saying the same about both costs the workshop an order: the customer
+        // reads «no pudimos procesar la solicitud», assumes they did something
+        // wrong and leaves. The managed database sleeps and takes a while to
+        // wake (see connect() in server/db.js, which already retries three
+        // times before getting here), so this is a wait, not a fault, and it
+        // is said as such.
         //
-        // 503 y no 500 también para el registro: un 500 hay que ir a mirarlo,
-        // un 503 contra una base que duerme se explica solo.
+        // 503 and not 500 for the log too: a 500 has to be looked into, a 503
+        // against a sleeping database explains itself.
         if (unreachable(err)) {
             console.error('[db] no responde:', err.message);
             if (!res.headersSent) {
@@ -1759,8 +1758,8 @@ const server = http.createServer(async (req, res) => {
             }
             return;
         }
-        // El detalle queda en el log del servidor; al cliente solo le llega que
-        // falló, para no filtrar la estructura de la base en un mensaje de error.
+        // The detail stays in the server log; the client only learns that it
+        // failed, so the database structure does not leak in an error message.
         console.error('[error]', err);
         if (!res.headersSent) {
             sendJson(res, 500, { error: 'No pudimos procesar la solicitud. Inténtalo nuevamente.' });
@@ -1770,24 +1769,24 @@ const server = http.createServer(async (req, res) => {
 
 async function start() {
     try {
-        // Contra una base gestionada, varios intentos: suspende el cómputo
-        // cuando nadie la usa y el primero después de eso se agota mientras
-        // despierta. Aquí eso importa más que en cualquier otro sitio, porque
-        // este ping corre ANTES de abrir el puerto: si falla, el proceso muere
-        // sin escuchar y el alojamiento da el despliegue por fallido.
+        // Against a managed database, several attempts: it suspends compute
+        // when nobody uses it and the first attempt after that times out while
+        // it wakes. That matters more here than anywhere else, because this
+        // ping runs BEFORE the port opens: if it fails, the process dies
+        // without listening and the host marks the deploy as failed.
         //
-        // En local, un solo intento y como estaba: allí una base que no
-        // responde es una base apagada, y esperar no la va a encender.
+        // Locally, a single attempt as before: there a database that does not
+        // answer is a database that is off, and waiting will not turn it on.
         await ping({ attempts: DATABASE_URL ? 4 : 1 });
     } catch (err) {
-        // Al no haber nadie escuchando en el puerto, Node agrupa un intento por
-        // dirección (::1 y 127.0.0.1) en un AggregateError cuyo propio .message
-        // viene vacío; sin esto el aviso terminaría en dos puntos y nada.
+        // With nobody listening on the port, Node groups one attempt per
+        // address (::1 and 127.0.0.1) into an AggregateError whose own .message
+        // is empty; without this the notice would end in a colon and nothing.
         const detail = err.message || (err.errors || []).map((e) => e.message).join('; ') || err.code || err;
         console.error(`\nNo se pudo conectar a la base ${describe()}: ${detail}`);
         if (DATABASE_URL) {
-            // Mandar a levantar el Postgres de esta máquina sería mal consejo:
-            // la base que no responde está en otro lado.
+            // Telling them to start this machine's Postgres would be bad
+            // advice: the database that does not answer is elsewhere.
             console.error('\nRevisa DATABASE_URL en las variables del servicio.\n');
         } else {
             console.error('\nAutocolor usa su propio servidor Postgres, aparte del general de la');
@@ -1796,9 +1795,9 @@ async function start() {
         }
         process.exit(1);
     }
-    // El puerto ocupado es el tropiezo más común al arrancar, y sin esto sale
-    // como excepción no capturada con su rastro entero. Mismo trato que se le da
-    // más arriba a la base que no responde.
+    // A busy port is the most common stumble at startup, and without this it
+    // shows as an uncaught exception with its whole trace. Same treatment as
+    // the unresponsive database above.
     server.on('error', (err) => {
         if (err.code === 'EADDRINUSE') {
             console.error(`\nEl puerto ${PORT} ya está ocupado por otro proceso.`);
@@ -1812,43 +1811,43 @@ async function start() {
         process.exit(1);
     });
 
-    // Los dos avisos van contra la variable RENDER, que pone el propio
-    // alojamiento, y no contra una regla general del tipo «HOST es público y
-    // TRUST_PROXY está apagado»: esa saltaría con el HOST=0.0.0.0 que el README
-    // recomienda para probar desde el móvil, que es legítimo. Así no hay
-    // falsos positivos.
+    // Both warnings key off the RENDER variable, which the host sets itself,
+    // and not off a general rule like «HOST is public and TRUST_PROXY is
+    // off»: that one would trip on the HOST=0.0.0.0 the README recommends for
+    // testing from a phone, which is legitimate. This way there are no false
+    // positives.
     if (process.env.RENDER && ['127.0.0.1', 'localhost', '::1'].includes(HOST)) {
-        // Render da el despliegue por vivo escaneando el puerto, y solo ve lo
-        // que esté atado a 0.0.0.0. Con la dirección de bucle el despliegue se
-        // queda colgado sin más explicación que un tiempo agotado.
+        // Render marks the deploy live by scanning the port, and only sees
+        // what is bound to 0.0.0.0. With the loopback address the deploy
+        // just hangs, with no explanation beyond a timeout.
         console.warn(`\nAviso: HOST=${HOST} no es alcanzable desde fuera del contenedor. Hace falta HOST=0.0.0.0.\n`);
     }
     if (process.env.RENDER && TRUST_PROXY <= 0) {
-        // Ver clientIp(): sin esto los tres límites por IP se funden en uno
-        // solo, compartido por todos los visitantes.
+        // See clientIp(): without this the three per-IP limits merge into
+        // one, shared by every visitor.
         console.warn('\nAviso: falta TRUST_PROXY. El límite de peticiones cuenta a todos los visitantes como uno solo.\n');
     }
 
     server.listen(PORT, HOST, () => {
         console.log(`Autocolor en ${process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`}`);
-        // DE QUÉ CÓDIGO ES ESTE PROCESO. Las dos variables las pone Render
-        // sola; en esta máquina no hay ninguna y el renglón no sale.
+        // WHICH CODE THIS PROCESS IS. Render sets both variables itself; on
+        // this machine there are none and the line does not print.
         //
-        // Está aquí porque ya costó una tarde: se puso una variable nueva en
-        // el panel del alojamiento y no pasaba nada, y el motivo era que lo
-        // desplegado seguía siendo una versión anterior que ni siquiera leía
-        // esa variable. Todo lo que se mira para diagnosticar —los avisos del
-        // correo, los de abajo— habla del código que está corriendo, así que
-        // conviene que el registro diga cuál es antes que nada.
+        // It is here because it already cost an afternoon: a new variable was
+        // set on the host's dashboard and nothing happened, and the reason was
+        // that what was deployed was still an older version that did not even
+        // read that variable. Everything looked at to diagnose (the mail
+        // notices, the ones below) speaks about the running code, so the log
+        // should say which one it is before anything else.
         if (process.env.RENDER_GIT_COMMIT) {
             const branch = process.env.RENDER_GIT_BRANCH || 'rama desconocida';
             console.log(`Desplegado: ${branch} @ ${process.env.RENDER_GIT_COMMIT.slice(0, 7)}`);
         }
         console.log(`Base de datos: ${describe()}`);
-        // El panel pide las dos cosas: la contraseña y los códigos de
-        // trabajador. Se nombra la que falte —o las dos—, porque el panel
-        // apagado se ve desde dentro como un 503 y desde fuera como una
-        // página rota, y adivinar cuál de las dos era cuesta una tarde.
+        // The panel needs both: the password and the worker codes. Whichever
+        // is missing gets named (or both), because a switched-off panel looks
+        // like a 503 from inside and a broken page from outside, and guessing
+        // which of the two it was costs an afternoon.
         const faltan = [];
         if (!auth.isConfigured()) faltan.push('AUTOCOLOR_STAFF_PASSWORD');
         if (!auth.hasWorkerIds()) faltan.push('AUTOCOLOR_WORKER_IDS');
@@ -1856,15 +1855,15 @@ async function start() {
             const base = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
             console.log(`Panel del taller: ${base}/pgs/taller.html`);
         } else {
-            console.log(`Panel del taller: apagado — falta ${faltan.join(' y ')}.`);
+            console.log(`Panel del taller apagado: falta ${faltan.join(' y ')}.`);
             console.log('  Escríbelo en el .env de la raíz (hay un .env.example al lado).');
         }
-        // La base de colores se comprueba AQUÍ y no en start(), al revés
-        // que la de solicitudes: aquella corre antes de abrir el puerto y
-        // mata el proceso si falla, porque sin ella no hay presupuesto ni
-        // panel. Los colores son una función de una página. Si esta base
-        // no está, la página cae al catálogo local y el sitio sigue
-        // vendiendo, así que un fallo aquí se cuenta y no se muere.
+        // The colour database is checked HERE and not in start(), unlike the
+        // requests one: that runs before the port opens and kills the process
+        // if it fails, because without it there are no quotes and no panel.
+        // Colours are a feature of one page. If this database is not there,
+        // the page falls back to the local catalogue and the site keeps
+        // selling, so a failure here is reported and does not kill anything.
         if (colordb.isEnabled()) {
             colordb.ping({ attempts: 3 }).then(() => colordb.stats()).then((s) => {
                 const built = s ? new Date(s.built_at).toISOString().slice(0, 10) : '?';
@@ -1872,27 +1871,27 @@ async function start() {
                 console.log(`  ${Number(s.colours).toLocaleString('es-PE')} colores`
                     + ` y ${Number(s.makes).toLocaleString('es-PE')} marcas, del ${built}.`);
             }).catch((err) => {
-                console.error(`\nBase de colores: NO RESPONDE — ${err.message}`);
+                console.error(`\nBase de colores NO RESPONDE: ${err.message}`);
                 console.error('  El buscador contestará 503 y la página usará el catálogo local.');
             });
         } else {
-            console.log(`Base de colores: apagada — ${colordb.offMessage()}.`);
+            console.log(`Base de colores apagada: ${colordb.offMessage()}.`);
             console.log('  El buscador de colores usará solo el catálogo local'
                 + ' (777 colores, 10 marcas).');
         }
 
-        // Sin cuenta de correo el sitio funciona igual y las solicitudes se
-        // guardan; lo que no sale es el aviso. Se dice para que nadie se
-        // quede esperando un correo que nunca se intentó mandar.
+        // Without a mail account the site works the same and requests are
+        // stored; what does not go out is the notice. It is said so nobody
+        // waits for an email that was never even attempted.
         //
-        // Y si la hay, se prueba de verdad: conectar y autenticar sin mandar
-        // nada. El fallo del correo es invisible desde fuera —el sitio se ve
-        // perfecto y las solicitudes se guardan—, así que la alternativa a
-        // este renglón es enterarse días después, porque alguien no recibió
-        // su código. No se espera para atender: la comprobación va por su
-        // cuenta y el sitio ya está sirviendo.
+        // And if there is one, it is tested for real: connect and
+        // authenticate without sending anything. A mail failure is invisible
+        // from outside (the site looks perfect and requests are stored), so
+        // the alternative to this line is finding out days later, because
+        // someone did not get their code. Serving does not wait for it: the
+        // check runs on its own and the site is already serving.
         if (!mail.isConfigured()) {
-            console.log('Correos de aviso: apagados — falta AUTOCOLOR_BREVO_KEY.');
+            console.log('Correos de aviso apagados: falta AUTOCOLOR_BREVO_KEY.');
         } else {
             mail.verify().then((result) => {
                 if (result.ok) {
@@ -1900,15 +1899,15 @@ async function start() {
                     const account = result.account ? `, cuenta ${result.account}` : '';
                     console.log(`Correos de aviso: listos (Brevo, de ${m.from.name} <${m.from.email}>${account}).`);
                 } else {
-                    console.error(`\nCorreos de aviso: NO FUNCIONAN — ${result.error}`);
+                    console.error(`\nCorreos de aviso NO FUNCIONAN: ${result.error}`);
                     console.error('  Las solicitudes se siguen guardando; lo que no sale es el aviso.');
                     console.error('  Un 401 es la llave (AUTOCOLOR_BREVO_KEY); un 400 suele ser el');
                     console.error('  remitente, que tiene que estar verificado en Brevo → Senders.');
-                    // Y se mira a dónde llega este alojamiento, porque «no
-                    // funcionan» tiene tres causas que se arreglan de maneras
-                    // distintas y el motivo de arriba no las distingue: ver
-                    // server/netcheck.js. Solo cuando ya falló: en un
-                    // despliegue sano esto no llega a correr.
+                    // And check where this host can reach, because «no
+                    // funcionan» has three causes that are fixed in different
+                    // ways and the reason above does not tell them apart: see
+                    // server/netcheck.js. Only once it has failed: on a
+                    // healthy deploy this never runs.
                     return netcheck.run().then(({ lines, verdict }) => {
                         console.error('\n  A dónde llega este alojamiento:');
                         console.error(lines.join('\n'));
@@ -1917,8 +1916,8 @@ async function start() {
                     });
                 }
             }).catch((err) => {
-                // El arranque no se cae por un renglón informativo.
-                console.error(`Correos de aviso: no se pudo comprobar — ${err.message}`);
+                // Startup does not fall over for an informational line.
+                console.error(`Correos de aviso sin comprobar: ${err.message}`);
             });
         }
         if (ALLOWED_ORIGINS.size > 0) {
@@ -1927,22 +1926,22 @@ async function start() {
     });
 }
 
-// Una promesa rechazada sin dueño termina el proceso en Node 20 y siguientes.
-// En un servidor eso es tirar el sitio entero —y todas las sesiones abiertas
-// del panel— por un fallo de algo secundario, que casi siempre es un correo.
-// Registrarlo y seguir es lo correcto: lo que no podía seguir era la
-// solicitud, y esa ya se contestó mucho antes de llegar aquí.
+// An unhandled rejected promise ends the process in Node 20 and later. On a
+// server that means taking the whole site down (and every open panel session)
+// over a failure in something secondary, which is nearly always an email.
+// Logging it and carrying on is right: what could not carry on was the
+// request, and that was answered long before getting here.
 process.on('unhandledRejection', (reason) => {
     console.error(`[server] promesa rechazada sin manejar: ${reason instanceof Error ? reason.stack : reason}`);
 });
 
 for (const signal of ['SIGINT', 'SIGTERM']) {
     process.on(signal, () => {
-        // EL ORDEN IMPORTA. Primero se deja de aceptar y se termina lo que ya
-        // está en marcha; solo cuando no queda nadie sirviendo se abandonan la
-        // cola del correo y el pool de la base. Al revés —como estaba— cada
-        // despliegue y cada apagado por inactividad cortaba los avisos que
-        // estuvieran saliendo en ese momento.
+        // THE ORDER MATTERS. First stop accepting and finish what is already
+        // running; only when nobody is being served are the mail queue and the
+        // database pool dropped. The other way round (as it used to be) every
+        // deploy and every idle shutdown cut off the notices that were going
+        // out at that moment.
         server.close(() => {
             mail.close();
             pool.end().then(() => process.exit(0));

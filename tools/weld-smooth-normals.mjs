@@ -1,47 +1,47 @@
 /* =============================================================================
-   weld-smooth-normals.mjs — soldar los vértices de un modelo y rehacer sus
-   normales.
+   weld-smooth-normals.mjs: welds a model's vertices and rebuilds its normals.
 
-   Para qué. El export de Blender del van daba a cada esquina de triángulo su
-   propio vértice: 2 574 420 vértices para 953 000 triángulos, 2.70 por
-   triángulo, donde los otros tres modelos andan por 0.8–1.0. No es más detalle
-   —el familiar tiene MÁS triángulos y pesa la mitad—, son copias del mismo
-   punto que no se comparten. Eso hacía 20.5 MB de los que 19 eran geometría.
+   Why. Blender's export of the van gave every triangle corner its own
+   vertex: 2,574,420 vertices for 953,000 triangles, 2.70 per triangle, where
+   the other three models sit around 0.8 to 1.0. It is not more detail (the
+   wagon has MORE triangles and weighs half), they are copies of the same
+   point that are not shared. That made 20.5 MB, 19 of them geometry.
 
-   Por qué no basta `gltf-transform weld`. Ese suelda vértices bitwise
-   idénticos, y estos no lo son: cada copia trae una normal distinta, así que
-   no hay dos iguales que unir. Sobre 2.5 millones de vértices unió mil. Por lo
-   mismo `simplify` tampoco puede hacer nada —cada vértice es una costura y no
-   hay aristas que colapsar—: bajaba de 20.5 MB a 19.5.
+   Why `gltf-transform weld` is not enough. It welds bitwise-identical
+   vertices, and these are not: each copy carries a different normal, so
+   there are no two equal ones to join. Out of 2.5 million vertices it joined
+   a thousand. For the same reason `simplify` cannot do anything either
+   (every vertex is a seam and there are no edges to collapse): it went from
+   20.5 MB to 19.5.
 
-   Qué hace entonces. Quita las normales, suelda por posición y UV, y las vuelve
-   a calcular sobre la malla ya indexada, suavizadas y ponderadas por el área de
-   cada triángulo, que es lo mismo que hace THREE.computeVertexNormals. En el
-   van: 2 574 420 vértices -> 550 046, y 20.5 MB -> 6.9 MB.
+   So what it does. It drops the normals, welds by position and UV, and
+   recomputes them on the now-indexed mesh, smoothed and weighted by each
+   triangle's area, which is what THREE.computeVertexNormals does. On the
+   van: 2,574,420 vertices -> 550,046, and 20.5 MB -> 6.9 MB.
 
-   Se puede hacer porque las normales del van ya eran suaves. Comprobado, no
-   supuesto: recalcularlas y comparar el render contra el original da una
-   diferencia media de 0.3–0.6 sobre 255, y menos del 0.33 % de los píxeles del
-   vehículo se apartan lo bastante como para verse. En un modelo con aristas
-   duras de verdad —una arista marcada en Blender, no un simple borde entre
-   paneles— esto las redondearía, y ahí no sirve.
+   It can be done because the van's normals were already smooth. Checked, not
+   assumed: recomputing them and comparing the render against the original
+   gives a mean difference of 0.3 to 0.6 out of 255, and under 0.33% of the
+   vehicle's pixels differ enough to be seen. On a model with genuinely hard
+   edges (an edge marked sharp in Blender, not a mere border between panels)
+   this would round them off, and there it is no good.
 
-   Uso. No es dependencia del proyecto; se instala al vuelo, como el CLI. Node
-   resuelve los import desde la carpeta del SCRIPT, no desde donde se le llama,
-   así que el script se copia junto a la instalación y se corre desde ahí:
+   Usage. It is not a project dependency; it is installed on the fly, like the
+   CLI. Node resolves imports from the SCRIPT's folder, not from where it is
+   called, so the script is copied next to the install and run from there:
 
        mkdir -p /tmp/gltf && cd /tmp/gltf
        npm i @gltf-transform/core @gltf-transform/extensions \
              @gltf-transform/functions meshoptimizer
        cp ~/autocolor/tools/weld-smooth-normals.mjs .
-       node weld-smooth-normals.mjs entrada.glb salida.glb
+       node weld-smooth-normals.mjs input.glb output.glb
 
-   Va DESPUÉS de `prune` y ANTES de `reorder`: soldar reordena los vértices, y
-   reorder es justamente lo que los deja en el orden que le conviene a la caché.
-   La tubería entera y el porqué de cada paso están en el README, en «Cómo se
-   comprime un modelo».
+   It goes AFTER `prune` and BEFORE `reorder`: welding reorders the vertices,
+   and reorder is precisely what leaves them in the order the cache likes.
+   The whole pipeline and the reason for each step are in the README, under
+   «Cómo se comprime un modelo».
 
-   Después, siempre:  node tools/verify-3d.mjs original.glb salida.glb
+   Afterwards, always:  node tools/verify-3d.mjs original.glb output.glb
    ========================================================================== */
 
 import { NodeIO } from '@gltf-transform/core';
@@ -68,19 +68,19 @@ const vertices = () => getSceneVertexCount(scene, VertexCountMethod.UPLOAD);
 
 console.log(`vértices de partida: ${vertices().toLocaleString('es')}`);
 
-// Las normales por esquina son lo único que impide compartir vértices. Se
-// quitan para que weld pueda unir por posición y UV.
+// Per-corner normals are the only thing stopping vertices from being shared.
+// They are dropped so weld can join by position and UV.
 for (const mesh of doc.getRoot().listMeshes()) {
     for (const prim of mesh.listPrimitives()) prim.setAttribute('NORMAL', null);
 }
 await doc.transform(weld());
 console.log(`tras soldar:         ${vertices().toLocaleString('es')}`);
 
-// Normales suaves sobre la malla ya indexada. El producto vectorial NO se
-// normaliza antes de acumularlo: su longitud es el doble del área del
-// triángulo, así que los triángulos grandes pesan más en la media. Es lo que
-// hace THREE.computeVertexNormals, y por eso el resultado coincide con lo que
-// el visor dibujaría si el archivo llegara sin normales.
+// Smooth normals on the indexed mesh. The cross product is NOT normalised
+// before accumulating it: its length is twice the triangle's area, so large
+// triangles weigh more in the average. It is what THREE.computeVertexNormals
+// does, and why the result matches what the viewer would draw if the file
+// arrived with no normals.
 for (const mesh of doc.getRoot().listMeshes()) {
     for (const prim of mesh.listPrimitives()) {
         const position = prim.getAttribute('POSITION');
@@ -115,7 +115,7 @@ for (const mesh of doc.getRoot().listMeshes()) {
 }
 console.log('normales suaves recalculadas');
 
-// Sin comprimir: la compresión la pone `meshopt` al final de la tubería, con el
-// nivel que decide el README.
+// Uncompressed: `meshopt` adds compression at the end of the pipeline, at the
+// level the README decides.
 await io.write(dst, doc);
 console.log(`escrito ${dst}`);

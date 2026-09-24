@@ -58,7 +58,7 @@ svg {
 :root {
     /* The interface accent is the logo's ink: the brand is one colour, and
        the colour on the page belongs to the paint. --paint-red stays what it
-       always was — the colour of a selected body panel and of errors, not of
+       always was: the colour of a selected body panel and of errors, not of
        the interface. */
     --accent: #262d40;
     --accent-strong: #1b2130;
@@ -88,7 +88,7 @@ svg {
     --font-label: 'Archivo', 'Helvetica Neue', Arial, sans-serif;
 
     /* Type scale. Leading tightens as the type grows and tracking opens back
-       toward zero as it shrinks — a 74px line and a 22px line cannot share one
+       toward zero as it shrinks: a 74px line and a 22px line cannot share one
        ratio without one of them being wrong, which is what a flat 1.06 /
        -0.02em across every heading did here. Rules below pick a step from this
        list; none of them invents a number. */
@@ -121,15 +121,15 @@ svg {
     --brand-soft: rgba(38, 45, 64, 0.07);
     --brand-line: rgba(38, 45, 64, 0.32);
     --shell: 1180px;
-    /* Header height is deterministic because the logo has a fixed height —
-       anchor offsets, the menu panel and the wizard's sticky progress bar
+    /* Header height is deterministic because the logo has a fixed height.
+       Anchor offsets, the menu panel and the wizard's sticky progress bar
        all derive from this. */
     --header-h: 64px;
 
     /* The two finish levels that carry a colour of their own. The bright cut
        fills the chip, the badge and the card border. It is about 2:1 on
-       white, so anything that has to be read or has to show a state — the
-       price, the subtitle, the radio of the selected card — takes the -text
+       white, so anything that has to be read or has to show a state (the
+       price, the subtitle, the radio of the selected card) takes the -text
        cut, at least 4.5:1 on white and on the card's own tint. The
        recommended level is the ink. */
     --tier-standard: #2ecc71;
@@ -376,7 +376,7 @@ svg {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
-    /* Sin relleno abajo: lo pone el margen del último campo. */
+    /* No bottom padding: the last field's margin provides it. */
     padding: 16px 16px 0;
 }
 
@@ -405,11 +405,10 @@ svg {
     height: 21px;
 }
 
-/* Un año y una placa entran de a dos hasta en un teléfono, así que estas
-   filas no siguen el corte a una columna del formulario de contacto: se
-   rinden solas cuando de verdad no caben. Las que llevan --wide sí lo
-   siguen, porque su contenido (los nombres de modelo, un apellido) no se
-   deja leer en media pantalla. */
+/* A year and a plate fit two to a row even on a phone, so these rows do not
+   follow the contact form's one-column break: they give up on their own when
+   they really do not fit. The --wide ones do follow it, because their content
+   (model names, a surname) cannot be read in half a screen. */
 .data-card .field-row {
     grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
 }
@@ -426,8 +425,8 @@ svg {
     color: var(--text-faint);
 }
 
-/* Ficha del vehículo reconocido: aparece en cuanto marca y modelo bastan
-   para saber de qué auto se trata. */
+/* Card for the recognised vehicle: it appears as soon as make and model are
+   enough to know which car it is. */
 .car-preview {
     display: grid;
     gap: 12px;
@@ -490,10 +489,10 @@ svg {
     place-items: center;
 }
 
-/* La foto no vive dentro de una caja de proporción fija: cada modelo trae la
-   suya y las que no eran 16/9 se salían del recuadro al cargar. Ahora crece
-   hasta el ancho de la tarjeta y el alto lo pone su propia proporción, con un
-   tope para que una foto vertical no empuje el formulario fuera de pantalla. */
+/* The photo does not live inside a fixed-ratio box: each model brings its
+   own, and the ones that were not 16/9 spilled out of the frame on load. Now
+   it grows to the card's width and its own ratio sets the height, with a cap
+   so a portrait photo cannot push the form off screen. */
 .car-preview__photo {
     display: block;
     max-width: 100%;
@@ -503,8 +502,8 @@ svg {
     box-shadow: 0 2px 10px rgba(27, 33, 48, 0.12);
 }
 
-/* Sin foto del modelo, el logo de la marca — recortado con máscara para que
-   tome su color y no arrastre ningún fondo. */
+/* No model photo: the make's logo, cut out with a mask so it takes its
+   colour and drags no background along. */
 .car-preview__logo {
     display: block;
     width: min(110px, 45%);
@@ -624,7 +623,7 @@ svg {
     color: #fff;
     font-family: var(--font-label);
     font-variant-numeric: tabular-nums;
-    font-size: 0.68rem;
+    font-size: 0.72rem;
     font-weight: 500;
     letter-spacing: 0.08em;
     text-transform: uppercase;
@@ -709,7 +708,7 @@ svg {
 }
 
 /* Both pages that mount the picker sit it inside a card that is already the
-   right width — .wizard the wizard card, .staff the intake card — so the
+   right width (.wizard the wizard card, .staff the intake card), so the
    block takes the width it is given and no longer bleeds out of its column. */
 .car-view-3d {
     display: grid;
@@ -721,7 +720,7 @@ svg {
 @media (min-width: 760px) {
     .car-view-3d {
         grid-template-columns: 1.6fr 1fr;
-        /* No align-items: start — the resume panel stretches to the stage's
+        /* No align-items: start. The resume panel stretches to the stage's
            full height instead of hugging its own contents. */
     }
 }
@@ -741,9 +740,9 @@ svg {
 
 /* On a phone the stage no longer shares its row with the parts panel, so the
    height it gives up to that panel on a wide screen is free. A square frame
-   buys back about a third of the render — and the camera reframes itself from
-   the aspect ratio (computePresets in src/carVisual.js), so the car grows with
-   it — which is the difference between tapping a side skirt and missing it. */
+   buys back about a third of the render (and the camera reframes itself from
+   the aspect ratio, computePresets in src/carVisual.js, so the car grows with
+   it), which is the difference between tapping a side skirt and missing it. */
 @media (max-width: 759px) {
     .car-view-3d__canvas-wrap {
         aspect-ratio: 1 / 1;
@@ -864,12 +863,12 @@ svg {
 
 /* Side by side with the stage, the rule inverts: flex-basis 0 keeps the list
    out of the panel's natural height, so a long selection never drives the row
-   taller than the stage — it fills whatever space the stage leaves and scrolls
+   taller than the stage. It fills whatever space the stage leaves and scrolls
    past that, keeping "Quitar todas" pinned to the bottom of the panel.
    It belongs here and not in the base rule: below this breakpoint the picker
    is a single column and the panel's height is its content, so flex-basis 0
    has no free space to grow back out of and the list collapses to its
-   min-height — one row, whatever is selected.
+   min-height, one row, whatever is selected.
    The floor is three rows of names that wrap to two lines, plus their gaps:
    the hint and the estimate under the list take their share of the panel
    first, and without it a second part already sat below the fold of a list
@@ -1142,7 +1141,7 @@ svg {
     background: var(--surface-tint);
 }
 
-/* Prefijo de teléfono fijo (+51) — el input solo recibe los 8 dígitos */
+/* Fixed phone prefix (+51); the input only takes the local digits */
 .phone-input {
     display: flex;
     align-items: stretch;
@@ -1185,7 +1184,7 @@ svg {
     background: none;
 }
 
-/* Estado de error de validación (teléfono / email) */
+/* Validation error state (phone / email) */
 .field__error {
     margin: 6px 0 0;
     font-size: 0.8rem;
@@ -1323,8 +1322,8 @@ svg {
 
    The page is a laboratory, after the logo: white paper, one ink (#262D40,
    the logo's own), square corners like the mark, and hairlines instead of
-   cards. The brand stays one colour so the paint — the swatches, the vehicle,
-   the finish levels — is the only colour on the page.
+   cards. The brand stays one colour so the paint (the swatches, the vehicle,
+   the finish levels) is the only colour on the page.
    ========================================================================== */
 
 body.home {
@@ -1491,7 +1490,7 @@ html:has(body.home) {
     flex-shrink: 0;
 }
 
-/* The horizontal lockup: mark and wordmark, no tagline — the tagline is
+/* The horizontal lockup: mark and wordmark, no tagline. The tagline is
    unreadable at header size, and it opens the hero instead. */
 .site-header__logo {
     width: auto;
@@ -1843,16 +1842,16 @@ html:has(body.home) {
     height: auto;
 }
 
-/* Las dos capas de pintura se recortan con la misma máscara: un PNG del mismo
-   tamaño cuyo canal alfa vale 1 sobre la chapa y 0 sobre cristales, neumáticos,
-   llantas, cromados, faros, placa y logo. Se generó a partir de la propia foto
-   (ver README) porque la carrocería beige es lo único de tono cálido que hay
-   en ella; lo demás es gris o negro.
+/* Both paint layers are cut with the same mask: a PNG of the same size whose
+   alpha channel is 1 on the bodywork and 0 on glass, tyres, wheels, chrome,
+   lights, plate and badge. It was generated from the photo itself (see
+   README) because the beige bodywork is the only warm tone in it; the rest
+   is grey or black.
 
-   Antes se usaba la foto misma como máscara de luminancia, y por eso el color
-   se comía el coche entero: la luminancia solo distingue claro de oscuro, así
-   que la parrilla cromada y los faros —que son claros— se pintaban igual que
-   la chapa, y los neumáticos quedaban de un rojo apagado en vez de negros. */
+   The photo itself used to be the luminance mask, which is why the colour
+   swallowed the whole car: luminance only tells light from dark, so the
+   chrome grille and the headlights (which are light) were painted like the
+   bodywork, and the tyres came out a dull red instead of black. */
 .hero__vehicle-paint,
 .hero__vehicle-tint {
     position: absolute;
@@ -1866,13 +1865,13 @@ html:has(body.home) {
     mask-repeat: no-repeat;
 }
 
-/* Copia de la foto encima de sí misma, recortada a la chapa y filtrada: es lo
-   que cambia el claro/oscuro. Con el filtro en `none` dibuja exactamente los
-   mismos píxeles que hay debajo, así que el estado inicial no se ve alterado
-   ni siquiera en el borde suave de la máscara.
+/* A copy of the photo on top of itself, cut to the bodywork and filtered: it
+   is what changes light and dark. With the filter at `none` it draws exactly
+   the same pixels as the ones below, so the initial state is not altered,
+   not even at the mask's soft edge.
 
-   El filtro va aquí y no sobre la foto entera, que es lo que hacía que el
-   blanco perla y el negro onyx apagaran también los pilotos traseros. */
+   The filter sits here and not on the whole photo, which is what made pearl
+   white and onyx black also dim the tail lights. */
 .hero__vehicle-paint {
     background-image: url("imgs/assets/suv.webp");
     background-size: 100% 100%;
@@ -1881,9 +1880,9 @@ html:has(body.home) {
     transition: filter 0.45s var(--ease-out);
 }
 
-/* El color plano en modo `color` toma el tono y la saturación del swatch y
-   respeta la luminancia que dejó la capa de abajo, que es lo que conserva
-   reflejos, sombras y las juntas entre piezas. */
+/* The flat colour in `color` mode takes the swatch's hue and saturation and
+   keeps the luminance the layer below left, which is what preserves
+   reflections, shadows and the seams between panels. */
 .hero__vehicle-tint {
     background: var(--vehicle-tint, transparent);
     mix-blend-mode: color;
@@ -2093,16 +2092,6 @@ html:has(body.home) {
     gap: 8px;
 }
 
-.trade__eyebrow {
-    margin: 0;
-    font-family: var(--font-label);
-    font-variant-numeric: tabular-nums;
-    font-size: 0.72rem;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: rgba(255, 255, 255, 0.66);
-}
-
 .trade__copy h3 {
     margin: 0;
     font-family: var(--font-display);
@@ -2111,7 +2100,7 @@ html:has(body.home) {
     color: #fff;
 }
 
-.trade__copy p:not(.trade__eyebrow) {
+.trade__copy p {
     margin: 0;
     max-width: 46ch;
     color: rgba(255, 255, 255, 0.78);
@@ -2707,26 +2696,25 @@ html:has(body.home) {
     color: var(--ink);
 }
 
-/* ===== Home: las pruebas =====
-   Una foto sola, pegada a lo que demuestra. Agrupadas volvían a leerse como
-   una galería: un cajón de cosas sueltas que no demostraba ninguna. Por eso
-   esto no tiene ni título ni marco propio -- no es un bloque, es parte de la
-   sección donde cae.
+/* ===== Home: the proof photos =====
+   One photo alone, next to what it proves. Grouped, they read as a gallery
+   again: a drawer of loose things that proved nothing. That is why this has
+   no title or frame of its own: it is not a block, it is part of the
+   section it lands in.
 
-   Y sin pie, salvo una. Cuatro de los cinco repetían lo que ya dice el texto
-   de al lado: la tarjeta de Servicios describe el planchado, los acabados
-   describen los materiales, la ficha de Colorimetría describe el
-   espectrofotómetro y la dirección dice dónde está el taller. Con el pie
-   fuera, la foto se queda con el ancho entero en vez del 56% que le dejaba
-   la columna del texto -- y desaparecen los 400-600px de columna muerta que
-   había al lado de cada una. */
+   And no caption, except on one. Four of the five repeated what the text
+   beside them already says: the Services card describes panel beating, the
+   finishes describe the materials, the Colorimetry fact describes the
+   spectrophotometer and the address says where the workshop is. With the
+   caption gone, the photo keeps the full width instead of the 56% the text
+   column left it, and the 400-600px of dead column beside each one go away. */
 .proof {
     max-width: var(--shell);
     margin: 56px auto 0;
 }
 
-/* Dos seguidas necesitan separarse más entre sí que del texto que las rodea,
-   o vuelven a leerse como pareja en vez de como dos afirmaciones. */
+/* Two in a row need more space between them than from the text around them,
+   or they read as a pair again instead of as two claims. */
 .proof + .proof {
     margin-top: 88px;
 }
@@ -2735,16 +2723,16 @@ html:has(body.home) {
     display: block;
     width: 100%;
     height: auto;
-    /* El hueco reservado con el tono de los fondos alternos: al cargar no da
-       un fogonazo blanco. */
+    /* The reserved space in the tone of the alternating backgrounds: no
+       white flash on load. */
     background: var(--surface-tint);
 }
 
-/* A partir del ancho de dos columnas la foto es una banda: a lo ancho del
-   shell, una de 4:3 mediría 885px de alto y taparía la pantalla entera. El
-   2:1 la deja alta de verdad sin convertirla en un muro, y es el mismo alto
-   para todas, así que la página coge un pulso horizontal en vez de subir y
-   bajar con la proporción de cada foto. */
+/* From two-column width up, the photo is a band: at the shell's width a 4:3
+   one would be 885px tall and cover the whole screen. 2:1 keeps it genuinely
+   tall without making it a wall, and it is the same height for all of them,
+   so the page gets a horizontal beat instead of rising and falling with each
+   photo's ratio. */
 @media (min-width: 900px) {
     .proof img {
         aspect-ratio: 2 / 1;
@@ -2753,8 +2741,8 @@ html:has(body.home) {
     }
 }
 
-/* Dónde cae el recorte: el asunto de cada foto está a una altura distinta y
-   el centro geométrico no sirve para ninguna de las tres. */
+/* Where the crop lands: each photo's subject sits at a different height and
+   the geometric centre works for none of the three. */
 .proof img[src*="planchado"] { object-position: center 42%; }
 .proof img[src*="matizado"] { object-position: center 45%; }
 .proof img[src*="instalaciones"] { object-position: center 54%; }
@@ -2772,16 +2760,16 @@ html:has(body.home) {
     color: var(--ink);
 }
 
-/* La vertical también es banda, y su pie va debajo y no al lado. Puesta de
-   canto ocupaba 468px de los 1180 y dejaba 594px de columna muerta en el
-   cuadrante de arriba a la derecha: en una pantalla ancha era el peor momento
-   de la página. Un vertical no tiene arreglo a este ancho -- agrandarlo sólo
-   lo hace más alto -- así que entra en el sistema de bandas como las demás.
+/* The portrait one is a band too, and its caption goes below, not beside.
+   Standing upright it took 468px of the 1180 and left 594px of dead column in
+   the top-right quadrant: on a wide screen it was the page's worst moment. A
+   portrait cannot be fixed at this width (making it bigger only makes it
+   taller), so it joins the band system like the others.
 
-   16:9 y no 2:1 porque es la foto que más peso carga y la única con pie: un
-   poco más de alto le deja la pieza entera y la mano que la sostiene. El
-   recorte se centra al 45%, que es donde está la pieza contra la carrocería;
-   lo que se pierde es el guante de abajo. */
+   16:9 and not 2:1 because it is the photo carrying the most weight and the
+   only one with a caption: a little more height keeps the whole panel and the
+   hand holding it. The crop is centred at 45%, where the panel sits against
+   the bodywork; what gets lost is the glove below. */
 @media (min-width: 900px) {
     .proof--lead img {
         aspect-ratio: 16 / 9;
@@ -2789,15 +2777,15 @@ html:has(body.home) {
     }
 
     .home .proof--lead figcaption {
-        /* 54 y no 62: el `ch` mide el ancho del cero, que en Schibsted
-           Grotesk va un 23% por encima de la letra media, así que 62ch
-           ponía 76 caracteres en la línea. */
+        /* 54 and not 62: `ch` measures the width of the zero, which in
+           Schibsted Grotesk runs 23% above the average letter, so 62ch put
+           76 characters on the line. */
         max-width: 54ch;
         font-size: 1.06rem;
     }
 }
 
-/* Junto al mapa, el aire de arriba ya lo pone la lista de datos. */
+/* Next to the map, the list of details already provides the space above. */
 .proof--tight {
     margin-top: 40px;
     margin-bottom: 32px;
@@ -2875,7 +2863,7 @@ html:has(body.home) {
     line-height: var(--lh-snug);
     color: var(--ink);
     /* the address and the mail have no spaces to break at, and the cells are
-       narrow — without this they run out over the rule on the right */
+       narrow; without this they run out over the rule on the right */
     overflow-wrap: anywhere;
 }
 
@@ -3102,7 +3090,7 @@ a.contact__value:hover {
    QUOTE WIZARD polish (pgs/repair.html)
    Scoped to `body.wizard`, so every rule here outranks the base wizard
    styles above without editing them. The step markup, class names and ids
-   the JS depends on are untouched — this is presentation only.
+   the JS depends on are untouched: this is presentation only.
    ========================================================================== */
 
 /* The wizard card sits on the section tint, so it reads as one sheet on the
@@ -3146,7 +3134,7 @@ body.wizard {
 /* Two steps need more room than a form column: the three finish cards, and
    the 3D stage next to its parts list. Rather than bleeding those out of
    the card, the card itself widens for them and snaps back afterwards.
-   Without :has() support the card simply stays at its base width — the
+   Without :has() support the card simply stays at its base width; the
    grids inside already collapse gracefully. */
 .wizard .repair:has(.step[data-step="2"].active) {
     max-width: 880px;
@@ -3674,12 +3662,12 @@ body.wizard {
 }
 
 /* ==========================================================================
-   SEGUIMIENTO DE SOLICITUDES
-   El código que se entrega al enviar el formulario, y el formulario de
-   consulta que va debajo de la tarjeta del asistente.
+   REQUEST TRACKING
+   The code handed out when the form is sent, and the lookup form that sits
+   below the wizard card.
    ========================================================================== */
 
-/* ===== Aviso de error de un formulario ===== */
+/* ===== Form error notice ===== */
 .form-error {
     margin: 14px 0 0;
     padding: 11px 14px;
@@ -3696,7 +3684,7 @@ body.wizard {
     display: none;
 }
 
-/* ===== Código de seguimiento (pantalla de éxito) ===== */
+/* ===== Tracking code (success screen) ===== */
 .tracking-code {
     max-width: 27rem;
     margin: 0 auto 26px;
@@ -3727,8 +3715,8 @@ body.wizard {
     margin: 8px 0 10px;
 }
 
-/* Separado con letter-spacing en vez de espacios de verdad, para que el
-   código se pueda leer en voz alta pero copiarse tal cual. */
+/* Spaced with letter-spacing instead of real spaces, so the code can be read
+   aloud but copied as is. */
 .tracking-code__value {
     font-family: var(--font-label);
     font-variant-numeric: tabular-nums;
@@ -3777,11 +3765,11 @@ body.wizard {
     text-underline-offset: 3px;
 }
 
-/* ===== Consulta por código ===== */
+/* ===== Lookup by code ===== */
 
-/* Ancho propio: la tarjeta del asistente se ensancha en los pasos 2 y 3
-   (ver .wizard .repair:has(…)), y esta tarjeta no tiene por qué moverse
-   cada vez que el cliente avanza de paso. */
+/* Its own width: the wizard card widens in steps 2 and 3 (see
+   .wizard .repair:has(…)), and this card has no reason to move every time
+   the customer moves on a step. */
 .lookup {
     max-width: 680px;
     margin: 28px auto 0;
@@ -3813,8 +3801,8 @@ body.wizard {
     max-width: 46ch;
 }
 
-/* El campo y el botón comparten fila en cuanto hay sitio; debajo de eso el
-   botón pasa a ancho completo en vez de quedar apretado al lado del campo. */
+/* Field and button share a row as soon as there is room; below that the
+   button goes full width instead of squeezing beside the field. */
 .lookup__form {
     display: flex;
     flex-wrap: wrap;
@@ -3912,9 +3900,9 @@ body.wizard {
     letter-spacing: 0.1em;
 }
 
-/* El color va por el estado en crudo que devuelve la API, no por su
-   etiqueta: azul mientras la solicitud avanza, verde cuando el trabajo está
-   hecho, gris apagado si se canceló. */
+/* The colour follows the raw status the API returns, not its label: blue
+   while the request moves along, green when the work is done, muted grey if
+   it was cancelled. */
 .status-pill {
     display: inline-flex;
     align-items: center;
@@ -3955,19 +3943,19 @@ body.wizard {
 }
 
 /* =============================================================================
-   VENTA DE MATIZADO (pgs/paintings.html)
+   MATIZADO SALES (pgs/paintings.html)
 
-   Reaprovecha la carcasa del asistente de cotización —la tarjeta, la barra de
-   pasos, el pie, los campos— y añade solo lo que esta página tiene y la otra
-   no: las tres formas de identificar un color, la ficha del color encontrado,
-   los seis envases y el resumen previo a confirmar.
+   Reuses the quote wizard's shell (the card, the step bar, the footer, the
+   fields) and adds only what this page has and the other does not: the ways
+   of identifying a colour, the card for the colour found, the six containers
+   and the summary before confirming.
 
-   Todo va bajo .wizard--paints para no tocar nada de repair.html.
+   Everything sits under .wizard--paints so nothing in repair.html is touched.
    ========================================================================== */
 
-/* El paso de los envases pide seis tarjetas en fila; el resumen, algo más de
-   ancho que un formulario. El resto se queda en la anchura base del asistente
-   (ver `.wizard .repair` arriba). */
+/* The containers step wants six cards in a row; the summary, a little more
+   width than a form. The rest keeps the wizard's base width (see
+   `.wizard .repair` above). */
 .wizard--paints .repair:has(.step[data-step="2"].active) {
     max-width: 1000px;
 }
@@ -3976,9 +3964,9 @@ body.wizard {
     max-width: 780px;
 }
 
-/* El paso que no aplica: ni hecho ni pendiente. Se queda escrito en la barra,
-   tachado, porque desaparecer haría que la barra cambiara de forma al elegir
-   una opción, y eso se lee como un fallo. */
+/* The step that does not apply: neither done nor pending. It stays written in
+   the bar, struck through, because vanishing would make the bar change shape
+   when an option is picked, and that reads as a fault. */
 .wizard--paints .progress-dot.is-skipped {
     background: var(--surface-tint);
     border-style: dashed;
@@ -3995,7 +3983,7 @@ body.wizard {
     color: var(--text-faint);
 }
 
-/* ===== Paso 1: los tres caminos ===== */
+/* ===== Step 1: the routes ===== */
 .method-tabs {
     margin: 0 0 22px;
 }
@@ -4012,8 +4000,8 @@ body.wizard {
     margin: -4px 0 16px;
 }
 
-/* La línea bajo cada camino: qué hacer cuando ese camino no sirve. Es la que
-   convierte un callejón sin salida en una puerta a los otros dos. */
+/* The line under each route: what to do when that route does not work. It is
+   what turns a dead end into a door to the others. */
 .method-note {
     margin: 14px 0 0;
     padding-left: 14px;
@@ -4023,8 +4011,8 @@ body.wizard {
     color: var(--text-dim);
 }
 
-/* Campo y botón pegados, con el botón dentro del mismo borde: es un solo
-   gesto —escribir el código y buscarlo— y se ve como uno. */
+/* Field and button joined, with the button inside the same border: it is one
+   gesture (type the code and search for it) and it looks like one. */
 .code-search {
     display: flex;
     align-items: stretch;
@@ -4085,8 +4073,8 @@ body.wizard {
     padding: 12px 18px;
 }
 
-/* Los tres pasos de la visita al taller. Numerados porque son un orden, no
-   una lista de ventajas. */
+/* The three steps of the workshop visit. Numbered because they are an order,
+   not a list of benefits. */
 .shop-steps {
     display: grid;
     gap: 14px;
@@ -4125,7 +4113,7 @@ body.wizard {
     color: var(--text-dim);
 }
 
-/* ===== La ficha del color encontrado ===== */
+/* ===== The card for the colour found ===== */
 .colour-card {
     display: grid;
     grid-template-columns: 96px 1fr;
@@ -4142,8 +4130,8 @@ body.wizard {
     display: none;
 }
 
-/* La muestra. El borde interior en dos tonos evita que un blanco de fábrica
-   se pierda contra la tarjeta y que un negro se coma su propio recuadro. */
+/* The swatch. The two-tone inner border keeps a factory white from getting
+   lost against the card and a black from swallowing its own frame. */
 .colour-card__swatch {
     min-height: 96px;
     border: 1px solid var(--border);
@@ -4166,9 +4154,9 @@ body.wizard {
     text-transform: uppercase;
 }
 
-/* Lo cerca que quedó una lectura digital. Exacta y muy cercana se aprueban
-   solas; de ahí en adelante el color se ajusta a mano, y el color del sello
-   lo dice antes de que nadie lea el ΔE. */
+/* How close a digital reading landed. Exact and very close pass on their
+   own; from there on the colour is adjusted by hand, and the stamp's colour
+   says so before anyone reads the ΔE. */
 .colour-card__status.is-exact,
 .colour-card__status.is-close {
     background: rgba(31, 138, 76, 0.1);
@@ -4226,9 +4214,9 @@ body.wizard {
     color: var(--text-faint);
 }
 
-/* El nombre que le da Sherwin. Va debajo del del fabricante y más callado:
-   el de arriba es el que dice la etiqueta del coche —y viene en el idioma de
-   donde se fabricó—, este es el que se entiende en el mostrador. */
+/* Sherwin's name for it. It goes under the manufacturer's, quieter: the one
+   above is what the car's label says (and comes in the language of where it
+   was built), this is the one understood at the counter. */
 .colour-card__alias {
     display: block;
     margin-top: 2px;
@@ -4236,10 +4224,10 @@ body.wizard {
     color: var(--text-faint);
 }
 
-/* Elegir el acabado. Sale cuando el catálogo del fabricante no lo dice —uno de
-   cada ocho colores— o cuando lo dedujimos del nombre. No es un adorno: el
-   acabado multiplica el precio, así que es más honesto preguntarlo que
-   suponerlo y cobrar de menos. */
+/* Picking the finish. It shows when the manufacturer catalogue does not say
+   (one colour in eight) or when we inferred it from the name. It is not
+   decoration: the finish multiplies the price, so asking is more honest than
+   guessing and undercharging. */
 .colour-card__finish {
     margin-top: 14px;
     padding-top: 14px;
@@ -4259,9 +4247,8 @@ body.wizard {
     gap: 6px;
 }
 
-/* Rectángulos como las pastillas de tono del buscador, y no píldoras: aquí
-   se filtra y se elige, y las píldoras son de estado. Ver la nota junto a
-   .staff-chip. */
+/* Rectangles like the finder's hue chips, not pills: here one filters and
+   picks, and pills are for status. See the note next to .staff-chip. */
 .finish-chip {
     padding: 5px 10px;
     background: var(--surface);
@@ -4284,16 +4271,16 @@ body.wizard {
     color: #fff;
 }
 
-/* Los colores ya no están en la página: hay que ir a buscarlos. Se apaga la
-   rejilla mientras llegan en vez de vaciarla, porque vaciarla haría saltar el
-   alto de la página en cada cambio de modelo o de año. */
+/* The colours are no longer in the page: they have to be fetched. The grid
+   dims while they arrive instead of emptying, because emptying would make the
+   page height jump on every model or year change. */
 .swatch-grid.is-loading {
     opacity: 0.45;
     pointer-events: none;
 }
 
-/* El código que no está en el catálogo. No es un error del cliente, así que
-   no se pinta de rojo: es una nota que además ofrece los otros dos caminos. */
+/* The code that is not in the catalogue. It is not the customer's mistake,
+   so it is not painted red: it is a note that also offers the other routes. */
 .colour-miss {
     margin: 18px 0 0;
     padding: 14px 16px;
@@ -4480,9 +4467,9 @@ body.wizard {
 }
 
 .swatch-option__code {
-    /* La línea lleva ahora el código de fábrica y el de Sherwin —«KBX · PBX ·
-       92514»— y la baldosa mide 118px. Se parte por los separadores como se
-       parte el nombre, en vez de desbordar la caja. */
+    /* The line now carries the factory code and Sherwin's («KBX / PBX /
+       92514») and the tile is 118px wide. It breaks at the separators the way
+       the name does, instead of overflowing the box. */
     max-width: 100%;
     font-family: var(--font-label);
     font-variant-numeric: tabular-nums;
@@ -4537,7 +4524,7 @@ body.wizard {
     }
 }
 
-/* ===== Paso 2: los seis envases ===== */
+/* ===== Step 2: the six containers ===== */
 .size-cards {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
@@ -4568,15 +4555,15 @@ body.wizard {
     box-shadow: inset 0 0 0 1px var(--ink);
 }
 
-/* El envase, dibujado. Seis botes del mismo dibujo a distintos tamaños dicen
-   «este es el doble de aquel» más rápido que seis fracciones, y no hace falta
-   ninguna foto. El lado sale de la raíz cúbica del volumen (ver
-   renderSizeCards en src/paintings.js), así que la comparación es la de dos
-   recipientes de verdad y no la de dos números.
+/* The container, drawn. Six cans of the same drawing at different sizes say
+   «this one is twice that one» faster than six fractions, and no photo is
+   needed. The side comes from the cube root of the volume (see
+   renderSizeCards in src/paintings.js), so the comparison is that of two
+   real containers and not of two numbers.
 
-   La plataforma es lo que mantiene alineadas las seis tarjetas: los botes se
-   apoyan en su borde inferior y las etiquetas empiezan todas a la misma
-   altura, aunque el bote de un galón mida el doble que el de 1/32. */
+   The platform is what keeps the six cards aligned: the cans stand on its
+   bottom edge and the labels all start at the same height, even though the
+   gallon can is twice the size of the 1/32 one. */
 .size-card__stage {
     display: flex;
     align-items: flex-end;
@@ -4585,46 +4572,46 @@ body.wizard {
     margin-bottom: 10px;
 }
 
-/* El bote va pintado del color elegido, porque es lo que lleva dentro: el
-   cliente ve su color en los seis tamaños y no tiene que acordarse de cuál
-   eligió dos pasos atrás.
+/* The can is painted the chosen colour, because that is what it holds: the
+   customer sees their colour in all six sizes and does not have to remember
+   which one they picked two steps back.
 
-   Todo el relieve son capas translúcidas sobre --jar, nunca tonos calculados.
-   Un negro aclarado y un blanco oscurecido hay que calcularlos por separado y
-   siempre se rompe alguno; el blanco y el negro con alfa caen igual de bien
-   sobre cualquier color, que aquí son 28.562. Y se quedan por debajo de 0,18
-   a propósito: el bote tiene que parecer un bote, pero el color que enseña
-   sigue siendo el color, no una versión suya más bonita. */
+   All the relief is translucent layers over --jar, never computed tones. A
+   lightened black and a darkened white have to be computed separately and
+   one always breaks; white and black with alpha land equally well on any
+   colour, and here there are 28,562. And they stay below 0.18 on purpose:
+   the can has to look like a can, but the colour it shows is still the
+   colour, not a prettier version of it. */
 .size-card__jar {
     display: block;
     width: calc(16px + var(--fill) * 22px);
     height: calc(18px + var(--fill) * 40px);
     background:
-        /* la luz entra por la izquierda y el bote es redondo */
+        /* light comes from the left and the can is round */
         linear-gradient(90deg,
             rgba(255, 255, 255, 0.17) 0%,
             rgba(255, 255, 255, 0.05) 34%,
             rgba(0, 0, 0, 0.03) 64%,
             rgba(0, 0, 0, 0.11) 100%),
-        /* y el fondo del bote queda en sombra */
+        /* and the bottom of the can sits in shadow */
         linear-gradient(180deg, rgba(255, 255, 255, 0.09) 0%, rgba(0, 0, 0, 0.11) 100%),
         var(--jar, var(--surface-tint));
-    /* El borde se pinta encima del fondo, así que un negro translúcido da el
-       canto y la tapa del mismo color, un punto más oscuros, sin tener que
-       saber cuál es el color. */
+    /* The border is painted over the background, so a translucent black gives
+       the rim and the lid the same colour, a touch darker, without having to
+       know what the colour is. */
     border: 1px solid rgba(0, 0, 0, 0.24);
     border-top-width: 3px;
     border-top-color: rgba(0, 0, 0, 0.34);
-    /* Un hilo claro bajo la tapa. Sobre un color claro la tapa ya se separa
-       sola por el borde oscuro; sobre un negro no, y sin esto el bote de negro
-       es un rectángulo sin tapa. */
+    /* A light thread under the lid. On a light colour the lid already
+       separates by its dark border; on a black it does not, and without this
+       the black can is a rectangle with no lid. */
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.34);
     transition: background 0.2s var(--ease-out), border-color 0.2s var(--ease-out),
         box-shadow 0.2s var(--ease-out);
 }
 
-/* Sin color que enseñar se raya, igual que la muestra de la ficha: un bote
-   pintado de un color inventado es justo lo que el cliente se creería. */
+/* With no colour to show it is striped, like the card's swatch: a can painted
+   an invented colour is exactly what the customer would believe. */
 .size-card__jar.swatch--none {
     box-shadow: none;
 }
@@ -4634,8 +4621,8 @@ body.wizard {
     border-top-color: rgba(0, 0, 0, 0.52);
 }
 
-/* El elegido ya se marca en la tarjeta —borde y anillo—, así que el bote solo
-   se perfila: si además cambiara de color, el color dejaría de ser el dato. */
+/* The chosen one is already marked on the card (border and ring), so the can
+   is only outlined: if it also changed colour, the colour would stop being the data. */
 .size-card.is-selected .size-card__jar {
     border-color: rgba(0, 0, 0, 0.55);
     border-top-color: rgba(0, 0, 0, 0.66);
@@ -4669,7 +4656,7 @@ body.wizard {
     color: var(--ink);
 }
 
-/* La barra de abajo: cuántos envases y cuánto suma. Aparece al elegir uno. */
+/* The bottom bar: how many containers and what they add up to. It appears once one is picked. */
 .order-bar {
     display: flex;
     flex-wrap: wrap;
@@ -4763,14 +4750,14 @@ body.wizard {
     display: none;
 }
 
-/* ===== Paso 3: los dos bloques de datos ===== */
+/* ===== Step 3: the two data blocks ===== */
 .company-form {
     display: flex;
     flex-direction: column;
     gap: 16px;
 }
 
-/* ===== Paso 4: el resumen ===== */
+/* ===== Step 4: the summary ===== */
 .summary {
     display: grid;
     gap: 14px;
@@ -4798,8 +4785,8 @@ body.wizard {
     font-weight: 600;
 }
 
-/* El atajo al paso donde se cambia. Discreto, pero presente en cada bloque:
-   es la pantalla en la que uno descubre que se equivocó de envase. */
+/* The shortcut to the step where it is changed. Discreet, but present on each
+   block: this is the screen where one finds they picked the wrong container. */
 .summary__edit {
     padding: 4px 2px;
     border: none;
@@ -4900,14 +4887,13 @@ body.wizard {
 }
 
 /* =============================================================================
-   Panel del taller (pgs/taller.html)
+   Workshop panel (pgs/taller.html)
 
-   Es una herramienta interna, no una página del sitio: no lleva la cabecera ni
-   el menú público, así que trae su propio envoltorio. La diferencia con el
-   resto del sitio es deliberada —una barra oscura, tipografía más chica, todo
-   más apretado— porque aquí no se está convenciendo a nadie: se está mirando
-   una cola de trabajo durante toda la jornada, y lo que sirve es densidad y
-   contraste, no aire.
+   It is an internal tool, not a page of the site: it has no public header or
+   menu, so it brings its own wrapper. The difference from the rest of the
+   site is deliberate (a dark bar, smaller type, everything tighter) because
+   nobody is being persuaded here: people watch a work queue all day long, and
+   what helps is density and contrast, not air.
    ========================================================================== */
 
 /* -----------------------------------------------------------------------------
@@ -4924,11 +4910,10 @@ body.staff {
     color: var(--ink);
 }
 
-/* .staff-panel es flex, y el `display` de una clase le gana al atributo
-   hidden: sin esto el panel se vería por debajo del formulario de acceso, con
-   la tabla vacía y todo. Va acotado a esta página en vez de arreglar [hidden]
-   para todo el sitio, que es un cambio mucho más grande de lo que pide el
-   síntoma. */
+/* .staff-panel is flex, and a class's `display` beats the hidden attribute:
+   without this the panel would show beneath the login form, empty table and
+   all. It is scoped to this page instead of fixing [hidden] for the whole
+   site, which is a much bigger change than the symptom calls for. */
 .staff [hidden] {
     display: none !important;
 }
@@ -5007,35 +4992,35 @@ body.staff {
     display: flex;
     flex-direction: column;
     gap: 18px;
-    /* Como el paso ancho del asistente (ver `.wizard .repair`), la columna se
-       ensancha sola cuando hace falta y vuelve con una transición. */
+    /* Like the wizard's wide step (see `.wizard .repair`), the column widens
+       on its own when needed and comes back with a transition. */
     transition: max-width 0.35s var(--ease-out);
 }
 
-/* Con la tabla a la vista el ancho normal queda corto: son nueve datos por
-   fila más el estado y quién la ocupa, y encogerlos en la caja del sitio
-   obligaba a desplazar en horizontal y recortaba la píldora de «Ocupado» al
-   estirarse. Así la columna se estira hasta donde dé el viewport y la tabla
-   (width:100%) reparte ese espacio de más entre sus columnas, que es lo que le
-   da holgura a la de la derecha. En el acceso —sin tabla— se queda estrecha. */
+/* With the table in view the normal width falls short: nine fields per row
+   plus the status and who holds it, and squeezing them into the site's box
+   forced horizontal scrolling and clipped the «Ocupado» pill when it
+   stretched. So the column stretches as far as the viewport allows and the
+   table (width:100%) shares that extra room among its columns, which is what
+   gives the right-hand one slack. On the login (no table) it stays narrow. */
 .staff-page:has(#staffPanel:not([hidden])) {
     max-width: min(1340px, calc(100vw - 40px));
 }
 
-/* La ficha se suelta del todo: la foto contra el borde izquierdo y los dos
-   botones repartiéndose la ventana entera. Es una pantalla de una sola
-   decisión, y encerrarla en la caja del sitio la dejaba flotando en el medio
-   con la mitad de la pantalla vacía a los lados. */
+/* The profile breaks loose entirely: the photo against the left edge and the
+   buttons sharing the whole window. It is a single-decision screen, and
+   boxing it in the site's frame left it floating in the middle with half the
+   screen empty on either side. */
 .staff-page:has(#staffProfile:not([hidden])) {
-    /* `none` y no `100%`: la columna tiene una transición de max-width, y entre
-       una medida y un porcentaje el navegador interpola un calc() que se queda
-       a medio camino. Con la palabra clave no hay nada que interpolar, y el
-       salto de ancho cae en el mismo instante en que se cambia de pantalla. */
+    /* `none` and not `100%`: the column has a max-width transition, and
+       between a length and a percentage the browser interpolates a calc()
+       that stops halfway. With the keyword there is nothing to interpolate,
+       and the width jump lands at the same instant the screen changes. */
     max-width: none;
 }
 
-/* El panel entero es un hijo flex de .staff-page, así que reparte su propio
-   espacio: título, herramientas, tarjeta y nota. */
+/* The whole panel is a flex child of .staff-page, so it shares out its own
+   space: title, tools, card and note. */
 .staff-panel {
     display: flex;
     flex-direction: column;
@@ -5052,9 +5037,9 @@ body.staff {
     color: var(--ink);
 }
 
-/* El recuento va pegado al título y no en la tarjeta: es lo primero que se
-   mira al volver a la pantalla —cuántas hay, y cuántas de todas— y desde
-   arriba no compite con los datos. */
+/* The count sits by the title and not in the card: it is the first thing
+   looked at on returning to the screen (how many there are, and how many of
+   the total) and from up there it does not compete with the data. */
 .staff-page__count {
     margin: 5px 0 0;
     font-size: 0.85rem;
@@ -5067,7 +5052,7 @@ body.staff {
 }
 
 /* -----------------------------------------------------------------------------
-   Buscador y filtros
+   Search and filters
    -------------------------------------------------------------------------- */
 
 .staff-tools {
@@ -5083,8 +5068,8 @@ body.staff {
     max-width: 360px;
 }
 
-/* La lupa es fondo del propio campo y no un elemento aparte: así no hay nada
-   encima que pueda robarle el clic al input. */
+/* The magnifier is the field's own background and not a separate element:
+   that way nothing sits on top that could steal the click from the input. */
 .staff-search__input {
     width: 100%;
     box-sizing: border-box;
@@ -5113,9 +5098,9 @@ body.staff {
     gap: 6px;
 }
 
-/* Los filtros son rectángulos y los estados son píldoras. La forma distinta
-   es a propósito: en una misma fila conviven un filtro «Listo» y el estado
-   «Listo» de una solicitud, y no deben poder confundirse. */
+/* Filters are rectangles and statuses are pills. The different shape is on
+   purpose: a «Listo» filter and a request's «Listo» status live on the same
+   row, and they must not be confused. */
 .staff-chip {
     padding: 7px 13px;
     border: 1px solid var(--border);
@@ -5142,11 +5127,11 @@ body.staff {
     color: #fff;
 }
 
-/* «Mis vehículos» no recorta por etapa sino por quién tiene el vehículo, así
-   que se combina con cualquiera de los estados en vez de reemplazarlo. Va al
-   principio de la fila, separado por una raya, y encendido va con borde y no
-   relleno como los estados: en el mismo renglón conviven dos filtros que no
-   hacen lo mismo, y tienen que verse distintos. */
+/* «Mis vehículos» trims not by stage but by who holds the vehicle, so it
+   combines with any of the statuses instead of replacing it. It goes first in
+   the row, set off by a divider, and when on it gets a border rather than a
+   fill like the statuses: two filters that do different things share the
+   line, and they have to look different. */
 .staff-chip--mine {
     position: relative;
     display: inline-flex;
@@ -5182,7 +5167,7 @@ body.staff {
 }
 
 /* -----------------------------------------------------------------------------
-   Tarjeta y tabla
+   Card and table
    -------------------------------------------------------------------------- */
 
 .staff-card {
@@ -5193,9 +5178,9 @@ body.staff {
     box-shadow: none;
 }
 
-/* En pantalla angosta la tabla se desplaza dentro de su tarjeta en vez de
-   reordenarse: son nueve columnas que se leen en fila, y una regla de scroll
-   sale más barata que veinte de reacomodo. */
+/* On a narrow screen the table scrolls inside its card instead of
+   rearranging: nine columns that read as a row, and one scroll rule costs
+   less than twenty rearranging ones. */
 .staff-table__scroll {
     overflow-x: auto;
 }
@@ -5238,9 +5223,9 @@ body.staff {
     background: var(--surface-tint);
 }
 
-/* Solo lo que se lee de corrido —código, fecha, teléfono— se niega a partirse.
-   Nombres y vehículos sí pueden ocupar dos renglones: la altura de la fila la
-   fija de todos modos la píldora de estado, así que no cuesta nada. */
+/* Only what reads as one run (code, date, phone) refuses to break. Names and
+   vehicles may take two lines: the row height is set by the status pill
+   anyway, so it costs nothing. */
 .staff-table__nowrap {
     white-space: nowrap;
 }
@@ -5254,8 +5239,8 @@ body.staff {
     white-space: nowrap;
 }
 
-/* La placa va en su propio recuadro: es el dato con el que se identifica el
-   auto en el patio, y así se encuentra recorriendo la columna con la vista. */
+/* The plate gets its own box: it is what identifies the car in the yard, and
+   this way it is found by running an eye down the column. */
 .staff-table__plate {
     display: inline-block;
     padding: 3px 8px;
@@ -5280,17 +5265,18 @@ body.staff {
 }
 
 /* -----------------------------------------------------------------------------
-   Estado: píldora con su propio desplegable
+   Status: a pill with its own dropdown
 
-   Es un menú hecho a mano y no un <select>, porque el nativo no deja pintar
-   sus opciones: aquí cada estado lleva su punto de color, y ver la lista
-   coloreada al abrirla es la mitad de la utilidad.
+   A hand-made menu and not a <select>, because the native one does not let
+   its options be painted: here each status carries its colour dot, and
+   seeing the coloured list on opening is half the point.
 
-   El menú se posiciona `fixed` y no `absolute`. La tabla vive dentro de un
-   contenedor con overflow para poder desplazarse en horizontal, y un elemento
-   absoluto se recortaría contra ese borde: el desplegable de las últimas filas
-   quedaría cortado. Con `fixed` sale del recorte, a cambio de calcular la
-   posición al abrirlo y de cerrarse cuando algo se desplaza (src/staff.js).
+   The menu is positioned `fixed`, not `absolute`. The table lives inside a
+   container with overflow so it can scroll horizontally, and an absolute
+   element would be clipped against that edge: the dropdown on the last rows
+   would be cut off. With `fixed` it escapes the clipping, at the cost of
+   computing the position on opening and closing when anything scrolls
+   (src/staff.js).
    -------------------------------------------------------------------------- */
 
 .staff-status {
@@ -5298,8 +5284,8 @@ body.staff {
     display: inline-block;
 }
 
-/* Mientras el PATCH está en vuelo la píldora se apaga y no acepta otro clic:
-   el cambio todavía no está en la base y no debe leerse como si lo estuviera. */
+/* While the PATCH is in flight the pill dims and takes no other click: the
+   change is not in the database yet and must not read as if it were. */
 .staff-status[data-saving="1"] {
     opacity: 0.5;
     pointer-events: none;
@@ -5335,8 +5321,8 @@ body.staff {
     background: var(--pill-dot, currentColor);
 }
 
-/* El triángulo se dibuja con bordes para que herede el color del estado, que
-   es justo lo que un caret puesto como imagen de fondo no puede hacer. */
+/* The triangle is drawn with borders so it inherits the status colour, which
+   is exactly what a caret set as a background image cannot do. */
 .staff-status__caret {
     flex: none;
     width: 0;
@@ -5381,20 +5367,20 @@ body.staff {
     background: var(--surface-tint);
 }
 
-/* El estado que ya tiene la solicitud aparece con su propio color, así que al
-   abrir el menú se ve de inmediato dónde está parada. */
+/* The status the request already has shows in its own colour, so on opening
+   the menu it is immediately clear where it stands. */
 .staff-status__option[aria-selected="true"] {
     background: var(--pill-bg);
     color: var(--pill-fg);
 }
 
-/* Los once estados del CHECK de la tabla (server/schema.sql), cada uno con su
-   tono. Con la tabla entera en pantalla, el color hace de índice: se ve dónde
-   está la carga sin leer una sola palabra, y por eso las siete etapas del
-   taller llevan siete matices distintos y no siete veces el mismo azul.
+/* The eleven statuses of the table's CHECK (server/schema.sql), each with
+   its tone. With the whole table on screen, colour works as an index: the
+   load is visible without reading a word, which is why the seven workshop
+   stages carry seven different hues and not the same blue seven times.
 
-   Va sobre [data-status] a secas para que sirva igual a la píldora y a cada
-   opción del menú, que es lo que les da su punto de color. */
+   It sits on bare [data-status] so it serves the pill and each menu option
+   alike, which is what gives them their colour dot. */
 .staff [data-status="recibido"]           { --pill-bg: #eceef2; --pill-fg: #3f4757; --pill-dot: #7d8a97; }
 .staff [data-status="planchado"]          { --pill-bg: #f8efd9; --pill-fg: #6f520b; --pill-dot: #d19b1e; }
 .staff [data-status="desmontaje_montaje"] { --pill-bg: #eeebf8; --pill-fg: #4d3f88; --pill-dot: #8a76c8; }
@@ -5407,9 +5393,9 @@ body.staff {
 .staff [data-status="entregado"]          { --pill-bg: #eceee8; --pill-fg: #50574a; --pill-dot: #8d9682; }
 .staff [data-status="cancelado"]          { --pill-bg: #f9e7e6; --pill-fg: #9f231c; --pill-dot: #d94a41; }
 
-/* La píldora de estado de un vehículo que tiene otro: inerte y sin el caret que
-   invita a desplegarla. El servidor rechaza el cambio igual (403); esto solo
-   evita el clic que no iba a ninguna parte. */
+/* The status pill of a vehicle someone else holds: inert and without the
+   caret that invites opening it. The server refuses the change anyway (403);
+   this only avoids the click that led nowhere. */
 .staff-status__pill--locked {
     cursor: default;
     opacity: 0.55;
@@ -5420,25 +5406,25 @@ body.staff {
 }
 
 /* -----------------------------------------------------------------------------
-   Columna «Ocupado»
+   The «Ocupado» column
 
-   Quién tiene el vehículo entre manos. Disponible es un botón para tomarlo;
-   ocupado por uno mismo, una píldora que al pulsarla lo suelta; ocupado por
-   otro, solo el nombre. La regla —una vez ocupado, solo quien lo tiene lo
-   suelta o le cambia el estado— la aplica el servidor; esto es su reflejo.
+   Who has the vehicle in hand. Available is a button to take it; held by
+   oneself, a pill that releases it when pressed; held by someone else, just
+   the name. The rule (once taken, only its holder releases it or changes its
+   status) is enforced by the server; this is its reflection.
    -------------------------------------------------------------------------- */
 
 .staff-occupied {
     white-space: nowrap;
-    /* Reserva sitio para la píldora ya estirada (nombre + «Liberar»). La píldora
-       en reposo sigue ajustada al nombre; lo que reserva es la columna, para que
-       al pasar por encima el «Liberar» quepa dentro de la propia columna —sin
-       ensanchar la tabla ni recortarse— y, cuando la tabla no entra y hay que
-       desplazarla, haya hacia dónde. */
+    /* Reserves room for the stretched pill (name + «Liberar»). The resting
+       pill still fits the name; what reserves is the column, so that on hover
+       «Liberar» fits inside the column itself (without widening the table or
+       getting clipped) and, when the table does not fit and has to scroll,
+       there is somewhere to go. */
     min-width: 15rem;
 }
 
-/* Disponible: un botón discreto que invita a tomarlo. */
+/* Available: a quiet button that invites taking it. */
 .staff-occupied__claim {
     display: inline-flex;
     align-items: center;
@@ -5461,7 +5447,7 @@ body.staff {
     background: var(--surface-tint);
 }
 
-/* Ocupado por uno mismo: píldora sólida con el nombre; al pulsarla, se suelta. */
+/* Held by oneself: a solid pill with the name; pressing it releases it. */
 .staff-occupied__mine {
     display: inline-flex;
     align-items: center;
@@ -5482,11 +5468,11 @@ body.staff {
     background: #d0eadb;
 }
 
-/* «Liberar» sale al pasar por encima o al enfocar, y la píldora se estira para
-   darle sitio en vez de reservarlo siempre: en reposo mide 0 de ancho —sin él,
-   el nombre quedaba con un hueco vacío a la derecha— y crece con la transición
-   de max-width. El margen se anima aparte para que tampoco separe cuando está
-   plegado. */
+/* «Liberar» appears on hover or focus, and the pill stretches to make room
+   for it instead of always reserving it: at rest it is 0 wide (without that,
+   the name was left with an empty gap on its right) and it grows with the
+   max-width transition. The margin animates separately so it does not add a
+   gap while folded either. */
 .staff-occupied__free {
     max-width: 0;
     margin-left: 0;
@@ -5500,8 +5486,8 @@ body.staff {
     transition: max-width 0.18s var(--ease-out), margin-left 0.18s var(--ease-out), opacity 0.14s var(--ease-out);
 }
 
-/* La clase la pone staff.js al entrar en la celda (no :hover), para que el
-   «Liberar» no se cierre mientras la tabla se desplaza a enseñarlo. */
+/* staff.js sets the class on entering the cell (not :hover), so «Liberar»
+   does not close while the table scrolls to show it. */
 .staff-occupied.is-peeking .staff-occupied__free {
     max-width: 6rem;
     margin-left: 8px;
@@ -5514,7 +5500,7 @@ body.staff {
     outline-offset: 2px;
 }
 
-/* Ocupado por otro: solo el nombre, apagado, sin que parezca pulsable. */
+/* Held by someone else: just the name, muted, not looking pressable. */
 .staff-occupied__other {
     color: var(--text-dim);
     font-size: 0.82rem;
@@ -5522,8 +5508,8 @@ body.staff {
 }
 
 /* Two people at most per vehicle, so the cell is a list and not a single
-   control: one's own pill, the other person's name and — while there is room
-   left — the button to join. Stacked, so that one long name cannot push the
+   control: one's own pill, the other person's name and (while there is room
+   left) the button to join. Stacked, so that one long name cannot push the
    other out of the column. */
 .staff-occupied__holders {
     display: flex;
@@ -5695,14 +5681,14 @@ body.staff {
     outline-offset: 2px;
 }
 
-/* The viewer carries no camera buttons here — it turns by itself — so the gap
+/* The viewer carries no camera buttons here (it turns by itself), so the gap
    they left under the canvas is not needed. */
 .parts-view .car-view-3d {
     margin: 0;
 }
 
 /* -----------------------------------------------------------------------------
-   Estados de la página
+   Page states
    -------------------------------------------------------------------------- */
 
 .staff-empty {
@@ -5718,20 +5704,20 @@ body.staff {
     color: var(--text-faint);
 }
 
-/* La tarjeta de acceso no compite con nada: es lo único en pantalla, así que
-   se queda en el centro y estrecha. */
+/* The login card competes with nothing: it is the only thing on screen, so it
+   stays centred and narrow. */
 .staff-login {
     max-width: 380px;
     margin: 6vh auto 0;
 }
 
 /* -----------------------------------------------------------------------------
-   Ficha del trabajador
+   The worker's profile
 
-   El paso entre el acceso y la tabla: la foto, el nombre, la libreta de
-   recordatorios y las dos formas de seguir —con la sesión iniciada o solo a
-   mirar—. Como el acceso, se queda estrecha y centrada: aquí no hay tabla que
-   pida ancho.
+   The step between the login and the table: the photo, the name, the notepad
+   of reminders and the ways to go on (with the session started or just to
+   look). Like the login, it stays narrow and centred: there is no table here
+   asking for width.
    -------------------------------------------------------------------------- */
 
 .staff-profile {
@@ -5741,21 +5727,21 @@ body.staff {
 
 .staff-profile__top {
     display: flex;
-    /* Arriba y no estirada: con el tope de alto, la foto suele ser más corta
-       que la columna de al lado, y colgarla hasta abajo la separaría del
-       nombre, que es con lo que va. */
+    /* Top-aligned, not stretched: with the height cap the photo is usually
+       shorter than the column beside it, and hanging it to the bottom would
+       separate it from the name, which is what it belongs with. */
     align-items: flex-start;
     gap: 34px;
 }
 
-/* El recuadro de la foto, mientras no haya foto. Va punteado a propósito: se
-   lee como un hueco por llenar y no como un avatar vacío. */
+/* The photo frame, while there is no photo. Dotted on purpose: it reads as a
+   gap to fill and not as an empty avatar. */
 .staff-profile__photo {
     flex: 0 0 auto;
-    /* Tan alta como la columna de al lado —nombre, código y tarjeta de notas—,
-       hasta un tope, y con la proporción de un retrato. Las dos medidas las
-       escribe src/staff.js midiendo esa columna: aquí solo queda de qué tamaño
-       se ve si el script no llega a correr, y entonces manda la proporción. */
+    /* As tall as the column beside it (name, code and notes card), up to a
+       cap, and with a portrait's proportion. Both sizes are written by
+       src/staff.js measuring that column: all that is left here is the size
+       it shows at if the script never runs, and then the ratio rules. */
     width: clamp(180px, 18vw, 300px);
     aspect-ratio: 4 / 5;
     display: flex;
@@ -5780,7 +5766,7 @@ body.staff {
     text-transform: uppercase;
 }
 
-/* min-width:0 para que el nombre largo no estire la fila y empuje la foto. */
+/* min-width:0 so a long name does not stretch the row and push the photo. */
 .staff-profile__main {
     flex: 1 1 auto;
     min-width: 0;
@@ -5811,16 +5797,16 @@ body.staff {
     color: var(--ink);
 }
 
-/* Las notas son texto suelto: ni listas ni campos, lo que al trabajador le
-   sirva recordar. Crece con lo escrito y se puede estirar a mano, como el
-   resto de los textos largos del sitio (ver `.field textarea`). */
+/* The notes are free text: no lists or fields, whatever the worker finds
+   useful to remember. It grows with what is written and can be stretched by
+   hand, like the site's other long text fields (see `.field textarea`). */
 .staff-profile__notes-input {
     width: 100%;
-    /* `field-sizing: content` estira el campo por los dos lados, no solo a lo
-       alto: una palabra larga sin espacios —de esas que salen al apoyarse en
-       el teclado— lo sacaba de la tarjeta y ensanchaba la página entera. Con
-       el tope de ancho el campo se queda dentro, y `anywhere` parte la palabra
-       donde toque en vez de empujar. */
+    /* `field-sizing: content` stretches the field both ways, not only in
+       height: a long word with no spaces (the kind that comes from leaning on
+       the keyboard) pushed it out of the card and widened the whole page. With
+       the width cap the field stays inside, and `anywhere` breaks the word
+       wherever needed instead of pushing. */
     max-inline-size: 100%;
     overflow-wrap: anywhere;
     background: var(--surface);
@@ -5833,11 +5819,11 @@ body.staff {
     line-height: var(--lh-body);
     field-sizing: content;
     min-block-size: 6lh;
-    /* Crece con lo escrito hasta aquí, y de ahí en adelante se desplaza por
-       dentro. El tope no es un capricho de la caja: la foto de al lado va tan
-       alta como esta columna, y sin techo una lista larga de recordatorios la
-       convertía en un cartel. El `dvh` es para la pantalla baja, donde 320px
-       ya serían media ventana. */
+    /* It grows with what is written up to here, and from there on it scrolls
+       inside. The cap is not the box's whim: the photo beside it is as tall
+       as this column, and without a ceiling a long list of reminders turned
+       it into a poster. The `dvh` is for short screens, where 320px would
+       already be half the window. */
     max-block-size: min(320px, 50dvh);
     resize: vertical;
     transition: border-color 0.2s var(--ease-out), background 0.2s var(--ease-out);
@@ -5859,9 +5845,9 @@ body.staff {
     color: var(--text-faint);
 }
 
-/* Las maneras de seguir, del mismo tamaño y en la misma fila: ninguna es un
-   rincón de la otra. Son dos para un trabajador y tres para el jefe, así que la
-   fila se reparte sola en vez de llevar el número escrito. */
+/* The ways to go on, the same size and on the same row: neither is a corner
+   of the other. Two for a worker and three for the boss, so the row shares
+   itself out instead of having the number written in. */
 .staff-profile__actions {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -6239,8 +6225,8 @@ body.staff {
     }
 }
 
-/* Aviso del modo consulta, encima de la tabla: sin él, una tabla con todo
-   inerte se lee como una tabla rota. */
+/* Look-only notice above the table: without it, a table with everything
+   inert reads as a broken table. */
 .staff-readonly {
     display: flex;
     align-items: center;
@@ -6295,7 +6281,7 @@ body.staff {
    The boss's monitor
 
    One card per worker with the vehicles they have taken. It is read from across
-   the room and at a glance — who is on something and who is not — so the name
+   the room and at a glance (who is on something and who is not) so the name
    carries weight, and the card of somebody holding nothing dims instead of
    disappearing: a missing name would be information lost.
    -------------------------------------------------------------------------- */
@@ -6355,8 +6341,8 @@ body.staff {
 }
 
 /* Who on the left, what they are holding on the right. The left column has a
-   fixed width so the names line up down the page — the whole point of one
-   column — and `minmax(0, 1fr)` on the right lets a long model name shrink
+   fixed width so the names line up down the page (the whole point of one
+   column) and `minmax(0, 1fr)` on the right lets a long model name shrink
    instead of pushing the card wider than the page. */
 .staff-monitor__card {
     display: grid;
@@ -6533,19 +6519,20 @@ body.staff {
     justify-content: center;
     width: 32px;
     height: 32px;
-    /* The glyph is three dots sitting on the baseline, so centring the box
-       leaves them low. The padding lifts them onto the circle's middle. */
-    padding: 0 0 6px;
+    padding: 0;
     border: 1px solid var(--border);
     border-radius: 50%;
     background: var(--surface-tint);
     color: var(--text-dim);
-    font: inherit;
-    font-size: 1.2rem;
-    line-height: 1;
     cursor: pointer;
     transition: background 0.15s var(--ease-out), border-color 0.15s var(--ease-out),
         color 0.15s var(--ease-out);
+}
+
+.staff-monitor__more svg {
+    width: 16px;
+    height: 16px;
+    fill: currentColor;
 }
 
 .staff-monitor__more:hover {
@@ -6801,7 +6788,7 @@ body.staff {
 /* The walk-in form's quote, under the parts it prices: one row per finish,
    discount already taken off, the picked one inked like the finish buttons
    above. Built for reading a number out at the counter, so no subtotal, no
-   hint and no small print — the customer's wizard has those. */
+   hint and no small print; the customer's wizard has those. */
 .intake-quote {
     display: flex;
     flex-direction: column;
@@ -6881,6 +6868,8 @@ body.staff {
 }
 
 .staff-intake__card-title span {
+    display: block;
+    margin-top: 4px;
     font-weight: 500;
     letter-spacing: 0;
     text-transform: none;
@@ -6930,7 +6919,7 @@ body.staff {
 
 /* The 3D part picker inside the walk-in form. The viewer and its layout are
    the wizard's (.car-view-3d, further up); these are the few things the panel
-   sees differently — surfaces that sit on the panel's card rather than the
+   sees differently: surfaces that sit on the panel's card rather than the
    site's, and camera tabs that match the panel's chips. */
 .staff-intake__parts {
     margin-top: 20px;
@@ -6946,6 +6935,8 @@ body.staff {
 }
 
 .staff-intake__parts-title span {
+    display: block;
+    margin-top: 2px;
     font-weight: 400;
     color: var(--text-faint);
 }
@@ -7046,13 +7037,13 @@ body.staff {
 }
 
 
-/* La foto encima del nombre en cuanto la fila de dos columnas deja de caber
-   sin apretar el texto. */
+/* The photo goes above the name as soon as the two-column row no longer fits
+   without squeezing the text. */
 @media (max-width: 700px) {
     .staff-profile__top {
         flex-direction: column;
-        /* En columna, estirar sería a lo ancho: la foto ocuparía la pantalla
-           entera. Vuelve a un ancho suyo. */
+        /* In a column, stretching would be sideways: the photo would take the
+           whole screen. It goes back to a width of its own. */
         align-items: flex-start;
         gap: 22px;
     }
@@ -7083,8 +7074,8 @@ body.staff {
 }
 
 @media (max-width: 560px) {
-    /* Nothing in this row shrinks — the lockup has a fixed height, the clock
-       and the button are single words that do not break — so below about
+    /* Nothing in this row shrinks (the lockup has a fixed height, the clock
+       and the button are single words that do not break), so below about
        510px the bar ran wider than the screen. That widened the page itself,
        and with it the containing block of every fixed layer on it: the status
        menu and the parts viewer were laid out at the width of the OVERFLOW,

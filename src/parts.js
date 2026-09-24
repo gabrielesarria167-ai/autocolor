@@ -1,5 +1,5 @@
 /* =========================================================================
-   parts.js — the name each body panel goes by, and what painting it costs
+   parts.js: the name each body panel goes by, and what painting it costs
 
    The keys are the GLB node names, exactly as they come out of the four
    models (see VEHICLE_MODELS in src/carVisual.js). One flat map serves all
@@ -11,7 +11,7 @@
    because three places name these panels: the customer's wizard
    (src/repair.js), the walk-in form in the workshop panel (src/staff.js) and
    the two emails (server/mail.js). One copy each would drift, and the one
-   that drifted would be the one nobody reads — the email, which is the piece
+   that drifted would be the one nobody reads: the email, which is the piece
    the customer keeps.
 
    Reaching all three means this file has to load two ways, so it exports

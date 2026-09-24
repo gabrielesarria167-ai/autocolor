@@ -1,32 +1,32 @@
 /* =========================================================================
-   statuses.js — el vocabulario de estados de una solicitud
+   statuses.js: the status vocabulary of a request
 
-   Es la única lista del lado del cliente. La consulta por código
-   (src/lookup.js) y el panel del taller (src/staff.js) la leen de aquí en vez
-   de llevar cada uno su copia, que es como estaba y como se desincroniza.
+   This is the only list on the client side. The code lookup (src/lookup.js)
+   and the workshop panel (src/staff.js) read it from here instead of each
+   carrying its own copy, which is how it used to be and how it drifts.
 
-   Sigue el patrón que ya usan carModels.js y cities.js: un global en `window`,
-   cargado antes que el script que lo necesita. El proyecto no usa módulos, así
-   que no hay otro sitio donde compartir esto sin inventar uno nuevo.
+   It follows the pattern carModels.js and cities.js already use: a global on
+   `window`, loaded before the script that needs it. The project uses no
+   modules, so there is nowhere else to share this without inventing one.
 
    ---------------------------------------------------------------------------
-   OJO: hay otras dos copias que no pueden leer este archivo, y las tres tienen
-   que decir lo mismo:
+   CAREFUL: two other copies cannot read this file, and all three have to say
+   the same thing:
 
-     - server/server.js  (STATUSES)  valida lo que entra por PATCH
-     - server/schema.sql (el CHECK de la columna `status`) es la última palabra
+     - server/server.js  (STATUSES)  validates what comes in through PATCH
+     - server/schema.sql (the CHECK on the `status` column) has the last word
 
-   Agregar un estado son cuatro sitios: los dos de arriba, este archivo, y la
-   migración que amplíe el CHECK sobre la base que ya existe.
+   Adding a status touches four places: the two above, this file, and the
+   migration that widens the CHECK on the existing database.
    ========================================================================= */
 
 (function () {
     "use strict";
 
-    // Entre «recibido» y «listo» ya no hay un solo estado de «en taller», sino
-    // las siete etapas por las que pasa el trabajo dentro del local. El orden
-    // es el que dio el taller al pedirlas, para que el desplegable se lea como
-    // se nombran allí.
+    // Between «recibido» and «listo» there is no longer a single "in the
+    // workshop" status but the seven stages the job goes through inside the
+    // shop. The order is the one the workshop gave when asking for them, so
+    // the dropdown reads the way they name them there.
     var ORDER = [
         "recibido",
         "planchado",
@@ -41,10 +41,10 @@
         "cancelado"
     ];
 
-    // Lo que ve el cliente al consultar su código, y lo que lleva la píldora
-    // del panel. Los cuatro estados de siempre van en femenino porque el sujeto
-    // es «la solicitud»; las siete etapas del taller llevan su propio nombre,
-    // que es un sustantivo y no concuerda con nada.
+    // What the customer sees when looking up their code, and what the panel's
+    // pill carries. The four original statuses are feminine because the
+    // subject is «la solicitud»; the seven workshop stages keep their own
+    // name, a noun that agrees with nothing.
     var LABELS = {
         recibido: "Recibida",
         planchado: "Planchado",
@@ -59,9 +59,9 @@
         cancelado: "Cancelada"
     };
 
-    // Los filtros del panel van más cortos: en una fila de doce botones,
-    // «Lista para recoger» ocuparía el ancho de tres. Las siete etapas usan la
-    // sigla con la que las nombra el taller, que es además la que cabe.
+    // The panel filters are shorter: in a row of twelve buttons, «Lista para
+    // recoger» would take the width of three. The seven stages use the
+    // abbreviation the workshop calls them by, which is also the one that fits.
     var FILTER_LABELS = {
         recibido: "Recibidas",
         planchado: "PL",
@@ -76,11 +76,11 @@
         cancelado: "Canceladas"
     };
 
-    // Los pedidos de matizado (tabla `paint_orders`) tienen su propia lista,
-    // más corta: una lata se recibe, se prepara, está lista y se entrega, sin
-    // pasar por el planchado ni por el horno. Sus otras copias son
-    // PAINT_STATUSES en server/server.js y el CHECK de `paint_orders.status`.
-    // Van en masculino porque el sujeto es «el pedido».
+    // Paint orders (table `paint_orders`) have their own, shorter list: a can
+    // is received, prepared, ready and handed over, without going through
+    // panel beating or the oven. Its other copies are PAINT_STATUSES in
+    // server/server.js and the CHECK on `paint_orders.status`. They are
+    // masculine because the subject is «el pedido».
     var PAINT_ORDER = ["recibido", "preparacion", "listo", "entregado", "cancelado"];
 
     var PAINT_LABELS = {
@@ -107,9 +107,9 @@
         PAINT_LABELS: PAINT_LABELS,
         PAINT_FILTER_LABELS: PAINT_FILTER_LABELS,
 
-        // Un estado que no esté en la lista se muestra en crudo antes que
-        // dejar el hueco en blanco: si la base gana un estado y el cliente
-        // todavía no, es mejor ver «en_pintura» que nada.
+        // A status missing from the list shows raw rather than leaving a
+        // blank: if the database gains a status before the client does,
+        // «en_pintura» beats nothing.
         label: function (status) {
             return LABELS[status] || status;
         }

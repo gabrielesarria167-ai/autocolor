@@ -1,32 +1,32 @@
 'use strict';
 
 /* =============================================================================
-   Aplica server/schema.sql a la base a la que apunte server/db.js — la de esta
-   máquina, o la de un servicio alojado si hay DATABASE_URL.
+   Applies server/schema.sql to whichever database server/db.js points at:
+   this machine's, or a hosted service's if DATABASE_URL is set.
 
-       npm run db:migrate                                # la base local
-       DATABASE_URL='postgresql://…' npm run db:migrate  # la de producción
+       npm run db:migrate                                # the local database
+       DATABASE_URL='postgresql://…' npm run db:migrate  # production
 
-   Es el hermano portátil de `npm run db:schema` (server/pgserver.sh), que llama
-   a psql con el puerto 5434 escrito y con los binarios de Postgres.app: sirve
-   en esta máquina y en ninguna otra. Este no necesita psql instalado, porque
-   habla por el mismo pool que la aplicación.
+   It is the portable sibling of `npm run db:schema` (server/pgserver.sh),
+   which calls psql with port 5434 written in and with the Postgres.app
+   binaries: it works on this machine and no other. This one does not need
+   psql installed, because it talks through the same pool as the application.
 
-   El archivo entero va en una sola consulta y sin parámetros. Eso hace que
-   node-postgres use el protocolo simple, y de ahí salen las dos cosas que
-   importan: Postgres acepta varias sentencias seguidas —no hay que partir el
-   archivo por ';', que rompería los cuerpos plpgsql entre $$ del final— y las
-   ejecuta dentro de una única transacción implícita, así que una sentencia que
-   falle no deja media migración aplicada.
+   The whole file goes in a single query with no parameters. That makes
+   node-postgres use the simple protocol, which brings the two things that
+   matter: Postgres accepts several statements in a row (no need to split the
+   file on ';', which would break the plpgsql bodies between $$ at the end)
+   and runs them inside a single implicit transaction, so a statement that
+   fails does not leave half a migration applied.
 
-   schema.sql es idempotente (CREATE ... IF NOT EXISTS, ADD COLUMN IF NOT
-   EXISTS, CREATE OR REPLACE), así que volver a aplicarlo no pierde datos.
+   schema.sql is idempotent (CREATE ... IF NOT EXISTS, ADD COLUMN IF NOT
+   EXISTS, CREATE OR REPLACE), so applying it again loses no data.
    ========================================================================== */
 
-// Igual que en server.js: el .env de la raíz antes de leer nada del entorno.
-// Como env.js respeta lo que ya venga puesto, una DATABASE_URL delante del
-// comando le gana al archivo — que es lo que hace seguro apuntar a producción
-// desde una máquina que tiene su propia base local configurada.
+// As in server.js: the root .env before reading anything from the
+// environment. Since env.js respects whatever is already set, a DATABASE_URL
+// in front of the command beats the file, which is what makes pointing at
+// production safe from a machine that has its own local database configured.
 require('./env');
 
 const fs = require('node:fs');
@@ -45,20 +45,20 @@ async function main() {
 main()
     .then(() => pool.end())
     .catch(async (err) => {
-        // Cuando la base no responde, Node agrupa un intento por dirección (::1
-        // y 127.0.0.1) en un AggregateError cuyo propio .message viene vacío, y
-        // sin este respaldo el aviso terminaba en «: » y parecía que el SQL
-        // falló. Mismo trato que en server.js al arrancar.
+        // When the database does not answer, Node groups one attempt per
+        // address (::1 and 127.0.0.1) into an AggregateError whose own .message
+        // is empty, and without this fallback the notice ended in «: » and it
+        // looked like the SQL had failed. Same treatment as server.js at startup.
         const detail = err.message
             || (err.errors || []).map((e) => e.message).join('; ')
             || err.code
             || String(err);
         console.error(`\nNo se pudo aplicar el esquema: ${detail}`);
-        // Postgres dice en qué carácter del archivo tropezó; sin esto hay que
-        // adivinar cuál de las ciento ochenta líneas fue.
+        // Postgres says at which character of the file it stumbled; without
+        // this one has to guess which of the hundred and eighty lines it was.
         if (err.position) console.error(`  (carácter ${err.position} de schema.sql)`);
-        // ECONNREFUSED no es un problema del esquema: es que la base no está
-        // levantada. Si es la local, hay un comando para encenderla.
+        // ECONNREFUSED is not a schema problem: the database is not up. If it
+        // is the local one, there is a command to start it.
         const refused = err.code === 'ECONNREFUSED'
             || (err.errors || []).some((e) => e.code === 'ECONNREFUSED');
         if (refused && !DATABASE_URL) {

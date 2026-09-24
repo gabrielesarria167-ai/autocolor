@@ -1,11 +1,9 @@
-/* Autocolor — home page behaviour.
+/* Autocolor home page behaviour.
    Menu panel, colour preview swatches, footer year.
    Everything degrades gracefully: with the script blocked the page is still
    complete and readable. */
 (function () {
     "use strict";
-
-    var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     /* ===== Mobile menu ===== */
     var toggle = document.getElementById("menuToggle");
@@ -51,7 +49,7 @@
          data-tint          the hue, blended in `color` mode
          data-tint-opacity  how much of that hue lands
 
-       Chromatic finishes need both — the tint alone over light beige comes out
+       Chromatic finishes need both: the tint alone over light beige comes out
        pink rather than red, so the filter darkens the panel first. The neutral
        finishes need only the filter: a grey in `color` mode has no hue to give.
 
@@ -96,93 +94,6 @@
                 apply(next);
             });
         });
-    }
-
-    /* ===== Cifras de la empresa: cuenta atrás exponencial =====
-       Cada figura arranca en cero y se acerca a su valor con decaimiento
-       exponencial: la distancia que falta se reduce una fracción fija en cada
-       instante, así que sube de golpe y se posa. La curva se normaliza para
-       que aterrice justo en el valor al terminar, no cerca. */
-    var figures = document.querySelectorAll(".stats strong");
-
-    if (figures.length && "IntersectionObserver" in window && !reduceMotion) {
-        var DECAY = 3;          // cuanto más alto, más brusca la frenada
-        // Mientras la cuenta corre, la cifra que se lee es más baja que la de
-        // verdad, y la última de la lista pasaba más de tres segundos diciendo
-        // "0 años de garantía". Con el decaimiento exponencial la cifra real
-        // ya está puesta en la primera tercera parte del recorrido, así que
-        // acortarlo no le quita el gesto y sí quita el dato falso.
-        var DURATION = 1200;    // ms
-        var STAGGER = 90;       // ms entre una cifra y la siguiente
-        var SETTLE = 1 - Math.exp(-DECAY);
-
-        var countables = [];
-
-        figures.forEach(function (figure) {
-            // "+200" -> "+" / 200 / "", "5 años" -> "" / 5 / " años".
-            var parts = /^(\D*)(\d+)([\s\S]*)$/.exec(figure.textContent.trim());
-            if (!parts) return;
-            countables.push({
-                node: figure,
-                prefix: parts[1],
-                target: Number(parts[2]),
-                suffix: parts[3],
-                done: false
-            });
-        });
-
-        if (countables.length) {
-            var render = function (item, value) {
-                item.node.textContent = item.prefix + value + item.suffix;
-            };
-
-            var run = function (item, delay) {
-                var start = 0;
-
-                // El cero no se pinta hasta que corre el primer fotograma de
-                // verdad: si la pestaña está en segundo plano no hay fotogramas,
-                // y así la cifra real se queda puesta en vez de quedarse en cero.
-                var frame = function (now) {
-                    if (!start) start = now;
-                    var elapsed = now - start - delay;
-
-                    if (elapsed < 0) {
-                        render(item, 0);
-                        requestAnimationFrame(frame);
-                        return;
-                    }
-
-                    if (elapsed >= DURATION) {
-                        render(item, item.target);
-                        return;
-                    }
-
-                    var t = elapsed / DURATION;
-                    var eased = (1 - Math.exp(-DECAY * t)) / SETTLE;
-                    render(item, Math.round(item.target * eased));
-                    requestAnimationFrame(frame);
-                };
-
-                requestAnimationFrame(frame);
-            };
-
-            var counter = new IntersectionObserver(function (entries) {
-                entries.forEach(function (entry) {
-                    if (!entry.isIntersecting) return;
-                    counter.unobserve(entry.target);
-
-                    countables.forEach(function (item, index) {
-                        if (item.node !== entry.target || item.done) return;
-                        item.done = true;
-                        run(item, index * STAGGER);
-                    });
-                });
-            }, { threshold: 0.6 });
-
-            countables.forEach(function (item) {
-                counter.observe(item.node);
-            });
-        }
     }
 
     /* ===== Footer year ===== */

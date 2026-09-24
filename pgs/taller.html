@@ -42,17 +42,18 @@
       }
     }
     </script>
-    <title>Autocolor — Taller</title>
+    <title>Taller | Autocolor</title>
 </head>
 
-<!-- Página interna: sin la cabecera ni el menú del sitio público. Se entra por
-     la dirección directa, y lo que la protege es la contraseña que pide la API
-     (server/auth.js), no el hecho de que no esté enlazada.
+<!-- Internal page: no header or menu from the public site. It is reached by
+     its direct address, and what protects it is the password the API asks for
+     (server/auth.js), not the fact that nothing links to it.
 
-     Esta página SÍ se sirve en el sitio público: el despliegue es Render (ver
-     render.yaml) y ahí la sirve el servidor de server/server.js, que no la
-     excluye —ni podría, porque es la que hay que abrir para entrar—. Sin la contraseña esta página no enseña nada: los datos los
-     da la API, no el HTML. -->
+     This page IS served on the public site: the deploy is Render (see
+     render.yaml) and there the server in server/server.js serves it without
+     excluding it (nor could it, since this is the page to open to log in).
+     Without the password this page shows nothing: the data comes from the
+     API, not the HTML. -->
 
 <body class="staff">
 
@@ -91,17 +92,17 @@
             </form>
         </section>
 
-        <!-- La ficha del trabajador: el paso intermedio entre el acceso y la
-             tabla. Aquí se decide cómo se entra —con la sesión iniciada, que
-             es lo que deja tomar vehículos y moverles el estado, o solo a
-             mirar—, y de paso queda a mano la libreta de recordatorios. -->
+        <!-- The worker's profile: the step between the login and the table.
+             Here they decide how to go in (with the session started, which is
+             what lets them take vehicles and move their status, or just to
+             look), and the notepad of reminders is at hand too. -->
         <section class="staff-profile" id="staffProfile" aria-labelledby="staffProfileName" hidden>
 
             <div class="staff-profile__top">
 
-                <!-- TO-DO: la foto del trabajador. Todavía no hay de dónde
-                     sacarla —nadie la sube y el servidor no la guarda—, así
-                     que por ahora queda el recuadro con la silueta. -->
+                <!-- TO-DO: the worker's photo. There is nowhere to get it from
+                     yet (nobody uploads it and the server does not store it),
+                     so for now the frame with the silhouette stays. -->
                 <div class="staff-profile__photo" id="staffProfilePhoto" role="img"
                     aria-label="Foto del trabajador (pendiente)">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
@@ -139,7 +140,7 @@
                     <div class="staff-profile__notes">
                         <label class="staff-profile__notes-title" for="staffNotes">Notas personales</label>
                         <textarea class="staff-profile__notes-input" id="staffNotes" rows="7"
-                            placeholder="Escribe aquí tus recordatorios…"
+                            placeholder="Escribe aquí tus recordatorios"
                             aria-describedby="staffNotesHint"></textarea>
                         <p class="staff-profile__notes-hint" id="staffNotesHint"></p>
                     </div>
@@ -236,8 +237,8 @@
                         </div>
                         <div class="field">
                             <label for="intakePhone">Teléfono</label>
-                            <!-- El +51 lo pone el navegador al enviar, como en
-                                 el asistente: el servidor lo exige. -->
+                            <!-- The browser adds the +51 when sending, as in
+                                 the wizard: the server requires it. -->
                             <div class="phone-input">
                                 <span class="phone-input__prefix">+51</span>
                                 <input type="tel" id="intakePhone" inputmode="numeric"
@@ -262,7 +263,7 @@
 
                 <div class="staff-intake__card">
                     <p class="staff-intake__card-title">
-                        El vehículo <span>— el cliente y el carro están en el mostrador</span>
+                        El vehículo <span>El cliente y el carro están en el mostrador.</span>
                     </p>
 
                     <div class="field-row field-row--wide">
@@ -287,7 +288,7 @@
                          second card (see firstIntakeProblem in src/staff.js). -->
                     <div class="staff-intake__parts" id="intakeParts" hidden>
                         <p class="staff-intake__parts-title">
-                            Piezas a pintar <span>— toca el vehículo</span>
+                            Piezas a pintar <span>Toca el vehículo para marcarlas.</span>
                         </p>
 
                         <div class="car-view-3d" id="intake3d">
@@ -355,8 +356,8 @@
                 </div>
             </form>
 
-            <!-- Lo que se lee en voz alta al cliente que está delante, así que
-                 el código va grande y solo. -->
+            <!-- What is read aloud to the customer standing there, so the code
+                 goes big and on its own. -->
             <div class="staff-intake__done" id="intakeDone" hidden>
                 <p class="staff-intake__done-title">Vehículo registrado</p>
                 <p class="staff-intake__done-name" id="intakeDoneName"></p>
@@ -372,7 +373,7 @@
 
         <!-- The boss's monitor: one card per worker with the vehicles they are
              holding right now. It comes from the same «Ocupado» column as
-             always, read the other way round — by person instead of by vehicle —
+             always, read the other way round (by person instead of by vehicle)
              and not from any record of shifts: the workshop keeps none.
 
              The data comes from GET /api/staff/workers, which answers the boss
@@ -439,10 +440,10 @@
                 <p class="staff-page__count" id="staffCount"></p>
             </header>
 
-            <!-- Modo consulta: se llegó por «Ver solicitudes», así que la
-                 tabla se ve entera pero no se puede tocar nada. El botón
-                 inicia la sesión sin volver a pedir la contraseña —ya se
-                 entró—, y la tabla se rehace con sus controles. -->
+            <!-- Look-only mode: they came in through «Ver solicitudes», so the
+                 table shows in full but nothing can be touched. The button
+                 starts the session without asking for the password again
+                 (they already logged in), and the table is rebuilt with its controls. -->
             <p class="staff-readonly" id="staffReadOnly" hidden>
                 <span id="staffReadOnlyText">Estás viendo las solicitudes sin iniciar sesión: no puedes tomar vehículos ni cambiarles el estado.</span>
                 <button type="button" class="staff-readonly__enter" id="staffReadOnlyEnter">Iniciar sesión</button>
@@ -452,12 +453,12 @@
                 <div class="staff-search">
                     <label class="sr-only" for="staffSearch">Buscar solicitudes</label>
                     <input type="search" class="staff-search__input" id="staffSearch"
-                        placeholder="Buscar por placa, cliente o código…" autocomplete="off">
+                        placeholder="Buscar por placa, cliente o código" autocomplete="off">
                 </div>
 
-                <!-- Los filtros se generan en src/staff.js a partir de la misma
-                     lista de estados que pinta las píldoras, para que no haya
-                     dos sitios donde agregar un estado nuevo. -->
+                <!-- The filters are built in src/staff.js from the same list
+                     of statuses that paints the pills, so there are not two
+                     places to add a new status. -->
                 <div class="staff-filters" id="staffFilters" role="group" aria-label="Filtrar por estado"></div>
                 <!-- The matizado table's own five, built in src/staff.js from
                      PAINT_ORDER in src/statuses.js. -->
@@ -497,10 +498,10 @@
                 <p class="staff-empty" id="staffEmpty" hidden>No se encontraron solicitudes con esos criterios.</p>
             </div>
 
-            <!-- Los pedidos de matizado. Nadie los «ocupa» —es una lata que se
-                 prepara en el mostrador—, así que no hay columna «Ocupado»:
-                 el estado lo mueve cualquiera que tenga la sesión iniciada.
-                 El código es del jefe, como en la tabla de vehículos. -->
+            <!-- The matizado orders. Nobody «holds» them (it is a can
+                 prepared at the counter), so there is no «Ocupado» column:
+                 anyone with the session started moves the status.
+                 The code is the boss's, as in the vehicles table. -->
             <div class="staff-card" id="staffPaintCard" role="tabpanel" aria-labelledby="staffTabPaint" hidden>
                 <div class="staff-table__scroll">
                     <table class="staff-table staff-table--paint">

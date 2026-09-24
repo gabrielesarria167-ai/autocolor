@@ -1,9 +1,10 @@
 'use strict';
 
 /* =============================================================================
-   Acceso a la base `autocolor`: guardar una solicitud del asistente, buscar
-   una por su código, y las que usa el panel del taller — listarlas, cambiarle
-   el estado a una, ocuparla o soltarla, y ver cuáles tiene alguien tomadas.
+   Access to the `autocolor` database: storing a request from the wizard,
+   finding one by its code, and the ones the workshop panel uses: listing
+   them, changing one's status, taking or releasing it, and seeing which ones
+   somebody holds.
 
    Also the boss's note on each worker (worker_notes), which is the one thing
    here that is not about a request.
@@ -12,14 +13,15 @@
 const crypto = require('node:crypto');
 const { Pool } = require('pg');
 
-// Un servicio alojado entrega la base como una sola URL. Cuando DATABASE_URL
-// está puesta manda entera —host, puerto, base, usuario, contraseña y TLS
-// salen de ahí— y el bloque local de abajo no se toca.
+// A hosted service hands the database over as a single URL. When DATABASE_URL
+// is set it rules entirely (host, port, database, user, password and TLS all
+// come from it) and the local block below is left alone.
 //
-// Son dos ramas y no una configuración mezclada a propósito:
-// `new Pool({ connectionString, port: 5434 })` no combina las dos cosas. pg
-// hace `Object.assign({}, config, parse(connectionString))`, así que la URL
-// pisa lo que haya al lado, y el 5434 quedaría escrito sin significar nada.
+// Two branches and not a mixed configuration on purpose:
+// `new Pool({ connectionString, port: 5434 })` does not combine the two. pg
+// does `Object.assign({}, config, parse(connectionString))`, so the URL
+// overrides whatever sits beside it, and the 5434 would be written there
+// meaning nothing.
 const DATABASE_URL = process.env.DATABASE_URL || '';
 
 const pool = new Pool(DATABASE_URL
@@ -27,48 +29,49 @@ const pool = new Pool(DATABASE_URL
         connectionString: DATABASE_URL,
         max: 10,
         idleTimeoutMillis: 30_000,
-        // Más holgado que en local: la base gestionada suspende el cómputo
-        // cuando nadie la usa, y la primera conexión después de eso paga el
-        // arranque además de la red y el TLS.
+        // More generous than locally: the managed database suspends compute
+        // when nobody uses it, and the first connection after that pays for
+        // the startup on top of the network and TLS.
         connectionTimeoutMillis: 15_000,
     }
     : {
-        // Autocolor tiene su propio servidor Postgres, en su propio puerto — no
-        // comparte clúster con los demás proyectos de la máquina (ver
-        // server/pgserver.sh). El puerto va escrito aquí y no se deja en manos de
-        // libpq justamente por eso: sin él, el valor por omisión es el 5432 del
-        // Postgres general, y la aplicación terminaría escribiendo en el clúster
-        // compartido sin que nadie lo note.
+        // Autocolor has its own Postgres server, on its own port; it does not
+        // share a cluster with the machine's other projects (see
+        // server/pgserver.sh). The port is written here and not left to libpq
+        // precisely for that reason: without it, the default is the general
+        // Postgres's 5432, and the application would end up writing to the
+        // shared cluster without anyone noticing.
         host: process.env.PGHOST || 'localhost',
         port: Number(process.env.PGPORT) || 5434,
         database: process.env.PGDATABASE || 'autocolor',
-        user: process.env.PGUSER,          // por omisión, el usuario del sistema
+        user: process.env.PGUSER,          // defaults to the system user
         password: process.env.PGPASSWORD,
         max: 10,
         idleTimeoutMillis: 30_000,
         connectionTimeoutMillis: 5_000,
     });
 
-// node-postgres emite 'error' en el pool cuando se cae una conexión que estaba
-// ociosa —Postgres reiniciado, la red cortada, el servidor reciclándola—. En
-// Node un 'error' de un EventEmitter sin escucha es una excepción no capturada,
-// así que sin estas líneas basta un reinicio de la base para matar el proceso.
+// node-postgres emits 'error' on the pool when an idle connection drops
+// (Postgres restarted, the network cut, the server recycling it). In Node an
+// 'error' from an EventEmitter with no listener is an uncaught exception, so
+// without these lines a database restart is enough to kill the process.
 //
-// No se relanza a propósito: la conexión rota ya la descarta el pool solo, y la
-// siguiente consulta abrirá otra. Lo único que hace falta es que quede escrito.
+// Not rethrown on purpose: the pool already discards the broken connection
+// on its own, and the next query will open another. All that is needed is
+// for it to be logged.
 //
-// Contra una base gestionada esto deja de ser una precaución y pasa a ser el
-// caso normal: suspende el cómputo cuando nadie la usa y corta las conexiones
-// ociosas ella misma, así que la línea se ve en el registro cada tanto.
+// Against a managed database this stops being a precaution and becomes the
+// normal case: it suspends compute when nobody uses it and cuts idle
+// connections itself, so the line shows up in the log now and then.
 pool.on('error', (err) => {
     console.error('[db] conexión ociosa perdida:', err.message);
 });
 
-// Un código de exactamente 10 dígitos, sin cero inicial para que siempre se
-// muestre con sus 10 cifras. Al azar y no correlativo: el código es la única
-// credencial para consultar una solicitud, y uno correlativo dejaría leer los
-// datos de otros clientes probando números vecinos. crypto.randomInt evita
-// además que los códigos sean predecibles a partir de uno conocido.
+// A code of exactly 10 digits, with no leading zero so it always shows with
+// its 10 figures. Random and not sequential: the code is the only credential
+// for looking up a request, and a sequential one would let other customers'
+// data be read by trying neighbouring numbers. crypto.randomInt also keeps
+// codes from being predictable from a known one.
 function generateId() {
     return String(crypto.randomInt(1_000_000_000, 10_000_000_000));
 }
@@ -81,55 +84,55 @@ const INSERT_REQUEST = `
     RETURNING id, status, created_at
 `;
 
-/* La base gestionada se duerme, y despertarla tarda más que conectarse.
+/* The managed database sleeps, and waking it takes longer than connecting.
  *
- * Neon suspende el cómputo cuando nadie le pregunta nada —que para el sitio de
- * un taller es casi todo el día— y la primera conexión después de eso paga el
- * arranque entera. ping() ya lo sabía y reintentaba cuatro veces AL ARRANCAR;
- * las consultas de después no reintentaban ninguna. Así que el primer cliente
- * de la mañana pulsaba «Confirmar pedido», la conexión se agotaba mientras la
- * base despertaba, y la excepción salía por el catch general como un 500
- * genérico: «No pudimos procesar la solicitud». El pedido no se guardaba y no
- * quedaba dicho en ninguna parte que la culpa fuera de la base.
+ * Neon suspends compute when nobody asks it anything (which for a workshop's
+ * site is nearly all day) and the first connection after that pays the whole
+ * startup. ping() already knew and retried four times AT STARTUP; the queries
+ * after that retried none. So the first customer of the morning pressed
+ * «Confirmar pedido», the connection timed out while the database woke, and
+ * the exception went out through the general catch as a generic 500: «No
+ * pudimos procesar la solicitud». The order was not stored and nothing said
+ * anywhere that the database was to blame.
  *
- * Lo que se reintenta es SOLO conseguir la conexión, nunca la consulta. Esa
- * distinción es la que hace que esto sea seguro para un INSERT: si
- * pool.connect() falla, no se envió nada, y volver a pedir conexión no puede
- * duplicar un pedido. Si la conexión se cae con la consulta ya enviada, no se
- * reintenta: más vale un error que dos pedidos iguales con dos códigos
- * distintos, porque el segundo lo prepara el taller y lo paga alguien.
+ * What is retried is ONLY getting the connection, never the query. That
+ * distinction is what makes this safe for an INSERT: if pool.connect()
+ * fails, nothing was sent, and asking for a connection again cannot duplicate
+ * an order. If the connection drops with the query already sent, it is not
+ * retried: an error beats two identical orders with two different codes,
+ * because the workshop prepares the second one and somebody pays for it.
  */
 const UNREACHABLE_CODES = new Set([
     'ENOTFOUND', 'EAI_AGAIN', 'ETIMEDOUT', 'ECONNRESET', 'ECONNREFUSED',
     'EHOSTUNREACH', 'ENETUNREACH', 'EPIPE',
-    // La base se apagó, se está apagando, o todavía está arrancando.
+    // The database shut down, is shutting down, or is still starting.
     '57P01', '57P02', '57P03',
 ]);
 
 function unreachable(err) {
     const code = err && err.code ? String(err.code) : '';
     if (UNREACHABLE_CODES.has(code)) return true;
-    // Clase 08: toda la familia de «connection exception» de Postgres.
+    // Class 08: Postgres's whole «connection exception» family.
     if (code.startsWith('08')) return true;
-    // pg y pg-pool dan estas como Error pelado, sin code.
-    // Tres redacciones distintas para lo mismo, y hay que nombrar las tres:
-    // pg-pool dice "timeout exceeded when trying to connect" cuando se agota
-    // esperando una conexión libre —que es justo lo que pasa con la base
-    // dormida—, el Client de pg dice "timeout expired", y "Connection
-    // terminated due to connection timeout" viene de un tercer sitio. Ninguna
-    // trae code. Lo que NO puede entrar aquí es "timeout" a secas: eso también
-    // dice "canceling statement due to statement timeout" (57014), que es una
-    // consulta lenta o un error nuestro, no una base que no está.
+    // pg and pg-pool report these as plain Errors, with no code.
+    // Three different wordings for the same thing, and all three have to be
+    // named: pg-pool says "timeout exceeded when trying to connect" when it
+    // times out waiting for a free connection (exactly what happens with the
+    // database asleep), pg's Client says "timeout expired", and "Connection
+    // terminated due to connection timeout" comes from a third place. None
+    // carries a code. What must NOT go in here is a bare "timeout": that also
+    // matches "canceling statement due to statement timeout" (57014), which is
+    // a slow query or our own bug, not a database that is not there.
     return /timeout exceeded|timeout expired|connection timeout|connection terminated|socket hang up/i
         .test(err && err.message ? err.message : '');
 }
 
 const CONNECT_ATTEMPTS = 3;
 
-/* Conseguir una conexión, esperando a que la base despierte si hace falta.
- * Las esperas suben —400ms, 800ms— porque lo que se espera es un arranque, no
- * un paquete perdido, y sumadas al connectionTimeoutMillis de arriba dan al
- * cómputo bastante más de medio minuto para levantarse. */
+/* Getting a connection, waiting for the database to wake if needed. The
+ * waits grow (400ms, 800ms) because what is awaited is a startup, not a lost
+ * packet, and added to the connectionTimeoutMillis above they give compute
+ * well over half a minute to come up. */
 async function connect() {
     for (let attempt = 1; ; attempt++) {
         try {
@@ -143,8 +146,8 @@ async function connect() {
     }
 }
 
-/* El reemplazo de pool.query() en todo este archivo: consigue la conexión con
- * reintentos y lanza la consulta una sola vez. */
+/* The replacement for pool.query() throughout this file: gets the connection
+ * with retries and sends the query exactly once. */
 async function query(text, values) {
     const client = await connect();
     try {
@@ -158,12 +161,12 @@ const UNIQUE_VIOLATION = '23505';
 const ID_ATTEMPTS = 5;
 
 /**
- * Guarda una solicitud y devuelve el código asignado.
+ * Stores a request and returns the assigned code.
  *
- * El código se sortea aquí y no en la base, así que puede chocar con uno ya
- * usado. Con 9 000 millones de códigos posibles eso es rarísimo, pero la
- * clave primaria lo convierte en un error limpio (23505) en vez de un
- * sobrescribir silencioso, y basta con volver a sortear.
+ * The code is drawn here and not in the database, so it can clash with one
+ * already used. With 9,000 million possible codes that is very rare, but the
+ * primary key turns it into a clean error (23505) instead of a silent
+ * overwrite, and drawing again is enough.
  */
 async function createRequest(data) {
     for (let attempt = 1; attempt <= ID_ATTEMPTS; attempt++) {
@@ -195,14 +198,13 @@ async function createRequest(data) {
             if (err.code !== UNIQUE_VIOLATION || attempt === ID_ATTEMPTS) throw err;
         }
     }
-    throw new Error('No se pudo generar un código libre'); // inalcanzable: el bucle lanza antes
+    throw new Error('No se pudo generar un código libre'); // unreachable: the loop throws first
 }
 
 /**
- * Busca una solicitud por su código. Devuelve solo lo que se le muestra a
- * quien consulta — nunca el teléfono, el correo ni las notas: el código viaja
- * en mensajes y papeles, y no debería alcanzar para sacar los datos de
- * contacto de nadie.
+ * Finds a request by its code. Returns only what is shown to whoever looks it
+ * up, never the phone, the email or the notes: the code travels in messages
+ * and on paper, and should not be enough to pull anyone's contact details.
  */
 async function findRequest(id) {
     const { rows } = await query(
@@ -215,9 +217,9 @@ async function findRequest(id) {
     const row = rows[0];
     return {
         id: row.id.trim(),
-        // La marca y el modelo son lo que el cliente reconoce como «su»
-        // vehículo; `vehicle` (la silueta 3D) queda para las solicitudes
-        // anteriores a que el asistente los pidiera.
+        // Make and model are what the customer recognises as «their»
+        // vehicle; `vehicle` (the 3D silhouette) remains for requests from
+        // before the wizard asked for them.
         brand: row.brand,
         model: row.model,
         vehicle: row.vehicle,
@@ -228,11 +230,11 @@ async function findRequest(id) {
 }
 
 /* -----------------------------------------------------------------------------
-   paint_orders — los pedidos de matizado de pgs/paintings.html
+   paint_orders: the matizado orders from pgs/paintings.html
 
-   Una tabla aparte de `requests` porque es otro negocio: aquí nadie deja un
-   vehículo. Lo único que comparten es la forma del código, que se sortea con
-   el mismo generateId() y por la misma razón.
+   A table apart from `requests` because it is another business: nobody
+   leaves a vehicle here. All they share is the shape of the code, drawn with
+   the same generateId() and for the same reason.
 -------------------------------------------------------------------------- */
 
 const INSERT_PAINT_ORDER = `
@@ -247,11 +249,11 @@ const INSERT_PAINT_ORDER = `
 `;
 
 /**
- * Guarda un pedido de matizado y devuelve el código asignado.
+ * Stores a matizado order and returns the assigned code.
  *
- * Mismo sorteo del código y mismo reintento ante un choque que
- * createRequest(): los dos códigos salen del mismo espacio de 10 dígitos,
- * aunque vivan en tablas distintas.
+ * Same code draw and same retry on a clash as createRequest(): both codes
+ * come from the same 10-digit space, even though they live in different
+ * tables.
  */
 async function createPaintOrder(data) {
     for (let attempt = 1; attempt <= ID_ATTEMPTS; attempt++) {
@@ -287,7 +289,7 @@ async function createPaintOrder(data) {
             if (err.code !== UNIQUE_VIOLATION || attempt === ID_ATTEMPTS) throw err;
         }
     }
-    throw new Error('No se pudo generar un código libre'); // inalcanzable: el bucle lanza antes
+    throw new Error('No se pudo generar un código libre'); // unreachable: the loop throws first
 }
 
 const PAINT_ORDER_COLUMNS = `
@@ -320,7 +322,7 @@ function mapPaintOrder(row) {
  * The counter's queue of matizado orders for the workshop table, newest first,
  * optionally by status. Same ceiling as listRequests and for the same reason:
  * every order still open comes back whatever its age, and only the finished
- * ones — the part that grows without end — are capped at the 200 newest.
+ * ones (the part that grows without end) are capped at the 200 newest.
  *
  * No email, RUC, zone or reading: the table does not show them, and data that
  * does not need showing does not need fetching.
@@ -345,7 +347,7 @@ async function listPaintOrders(options) {
 
 /**
  * Moves a matizado order along. Nobody holds a paint order the way they hold a
- * vehicle — it is one tin mixed at the counter — so there is no «who may»
+ * vehicle (it is one tin mixed at the counter), so there is no «who may»
  * inside the statement: whoever is working the shift moves it. Returns the
  * order, or null when the code does not exist.
  */
@@ -365,7 +367,7 @@ async function updatePaintOrderStatus(id, status) {
  * was quoted on screen, and rewriting it here would change what they agreed to.
  * The method stays 'in_person', which is still how the colour was found.
  *
- * Returns { ok: true, order }, or { ok: false, reason } — 'not_found', or
+ * Returns { ok: true, order }, or { ok: false, reason }: 'not_found', or
  * 'not_in_person' when the order came with its colour already chosen.
  */
 async function definePaintOrder(id, data) {
@@ -392,12 +394,12 @@ async function definePaintOrder(id, data) {
 
 
 /**
- * La cola de trabajo del taller: las solicitudes, la más reciente primero,
- * opcionalmente filtradas por estado.
+ * The workshop's work queue: the requests, newest first, optionally filtered
+ * by status.
  *
- * Trae el teléfono, que `findRequest` esconde a propósito. Aquí sí: quien lee
- * esto ya pasó por la contraseña del taller y llamar al cliente es justamente
- * el trabajo. El correo y las notas siguen fuera hasta que haga falta.
+ * It brings the phone, which `findRequest` hides on purpose. Here it does:
+ * whoever reads this has already passed the workshop password, and calling
+ * the customer is precisely the job. Email and notes stay out until needed.
  *
  * The ceiling applies to finished jobs only. Every request still in the shop
  * comes back whatever its age: the panel searches and filters «Mis vehículos»
@@ -486,15 +488,15 @@ async function listOccupied() {
 /**
  * Changes a request's status, but only for somebody who is holding it: a
  * worker moves along the vehicles they are working on and no others. An
- * available one is not touched — it has to be taken first — and neither is one
+ * available one is not touched (it has to be taken first) and neither is one
  * held by other people. The test goes in the WHERE itself so that the check and
  * the change are a single step, with no gap between "I looked at who holds it"
  * and "I changed it".
  *
- * Returns { ok: true, ... } with the row; or { ok: false, reason } — 'not_found'
+ * Returns { ok: true, ... } with the row; or { ok: false, reason }: 'not_found'
  * when the code does not exist, 'forbidden' when the caller is not one of its
- * holders (with `occupiedBy`: the array of who is holding it, empty when it was
- * free) — so that server.js answers 404 or 403. `updated_at` is the trigger's.
+ * holders (with `occupiedBy`, the array of who is holding it, empty when it was
+ * free), so that server.js answers 404 or 403. `updated_at` is the trigger's.
  *
  * `viewerId` is the session's code (see server/auth.js); it never arrives in
  * the request body, so it cannot be faked to touch somebody else's vehicle.
@@ -504,7 +506,7 @@ async function listOccupied() {
 // and asking which one of the pair may touch the status would only mean the
 // other one waiting for them.
 //
-// Moving a job to a finished status also releases the vehicle — from both
+// Moving a job to a finished status also releases the vehicle, from both
 // holders at once. A delivered or cancelled car is in nobody's hands, and
 // leaving it occupied kept it on the boss's monitor as «held» forever.
 //
@@ -547,7 +549,7 @@ async function updateRequestStatus(id, status, viewerId) {
  * around, and the panel would have nowhere left to say who is doing what.
  *
  * The column CHECKs the same number (see server/schema.sql). This is where the
- * refusal comes from — the CHECK is what makes the rule true even if a query
+ * refusal comes from; the CHECK is what makes the rule true even if a query
  * here were to get it wrong.
  */
 const MAX_HOLDERS = 2;
@@ -558,8 +560,8 @@ const MAX_HOLDERS = 2;
  * asking at once do not tread on each other: the second one sees it with one
  * place fewer and, if that was the last, changes no row and is told it is full.
  *
- * Returns { ok: true, occupiedBy } — the whole array, not just whoever has come
- * in — on success; { ok: false, reason } otherwise ('not_found' or 'full', the
+ * Returns { ok: true, occupiedBy } (the whole array, not just whoever has come
+ * in) on success; { ok: false, reason } otherwise ('not_found' or 'full', the
  * latter with the codes of the people holding it).
  */
 async function occupyRequest(id, workerId) {
@@ -583,8 +585,8 @@ async function occupyRequest(id, workerId) {
     const row = rows[0];
     if (row.id) return { ok: true, occupiedBy: row.taken || [] };
     const holders = row.holders || [];
-    // Si ya la tenía este mismo trabajador, no es un error: ocupar lo que uno ya
-    // ocupa es idempotente y se responde éxito.
+    // If this same worker already held it, it is not an error: taking what
+    // one already holds is idempotent and answers success.
     if (holders.indexOf(workerId) !== -1) return { ok: true, occupiedBy: holders };
     return { ok: false, reason: 'full', occupiedBy: holders };
 }
@@ -594,7 +596,7 @@ async function occupyRequest(id, workerId) {
  * demands that their code be in `occupied_by`, and array_remove takes theirs
  * out and leaves the other person where they were.
  *
- * Returns { ok: true, occupiedBy } — who is still holding it — on releasing it
+ * Returns { ok: true, occupiedBy } (who is still holding it) on releasing it
  * or when it was already free (idempotent); { ok: false, reason } otherwise
  * ('not_found', or 'forbidden' with the codes of the people holding it).
  */
@@ -621,7 +623,7 @@ async function releaseRequest(id, workerId) {
 }
 
 /* -----------------------------------------------------------------------------
-   worker_notes — what the boss has told each worker
+   worker_notes: what the boss has told each worker
 
    One row per worker (see server/schema.sql), so writing replaces rather than
    piles up. Only the boss writes; the worker reads their own on their profile.
@@ -652,7 +654,7 @@ async function findWorkerNote(workerId) {
  * note and an old one exist, so there is nothing to decide between.
  *
  * `updated_at` is set here and not defaulted, because the DEFAULT only applies
- * to the INSERT half — an ON CONFLICT update would otherwise keep the date of
+ * to the INSERT half: an ON CONFLICT update would otherwise keep the date of
  * the first note forever, and the profile shows that date.
  */
 async function setWorkerNote(workerId, note, writtenBy) {
@@ -684,16 +686,16 @@ function mapNote(row) {
 }
 
 /**
- * Se llama al arrancar, para fallar con un mensaje claro si la base no está
- * levantada en vez de al primer cliente que envíe el formulario.
+ * Called at startup, to fail with a clear message if the database is not up
+ * instead of on the first customer to send the form.
  *
- * `attempts` existe por las bases gestionadas, que suspenden el cómputo cuando
- * nadie las usa: el primer intento después de eso se agota mientras la base
- * despierta. Sin reintento, arrancar contra una base dormida mata el proceso
- * antes de abrir el puerto, y el alojamiento da el despliegue por fallido.
+ * `attempts` exists for managed databases, which suspend compute when nobody
+ * uses them: the first attempt after that times out while the database
+ * wakes. Without a retry, starting against a sleeping database kills the
+ * process before the port opens, and the host marks the deploy as failed.
  *
- * Por omisión un solo intento, que es lo que corresponde en local: allí una
- * base que no responde es una base apagada, y esperar no la va a encender.
+ * By default a single attempt, which is right locally: there a database that
+ * does not answer is a database that is off, and waiting will not turn it on.
  */
 async function ping(options) {
     const attempts = (options || {}).attempts || 1;
@@ -709,10 +711,10 @@ async function ping(options) {
 }
 
 /**
- * A qué base se conectó, para los mensajes de arranque.
+ * Which database it connected to, for the startup messages.
  *
- * Nunca la contraseña: DATABASE_URL la lleva dentro, y estas líneas terminan
- * en el registro del alojamiento, que es justo donde no debe quedar escrita.
+ * Never the password: DATABASE_URL carries it inside, and these lines end up
+ * in the host's log, which is exactly where it must not be written.
  */
 function describe() {
     if (!DATABASE_URL) {

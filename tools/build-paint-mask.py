@@ -84,9 +84,9 @@ def main():
     warm = np.minimum(ramp(hue, 4, 20), 1 - ramp(hue, 68, 92))
     raw = warm * ramp(sat, 0.035, 0.105) * ramp(light, 0.14, 0.30) * alpha
 
-    # El beige es de saturación baja y el PNG trae ruido de compresión, así que
-    # la medida cruda sale moteada. Un desenfoque promedia el ruido, un escalón
-    # lo vuelve a endurecer y un segundo desenfoque deja el borde limpio.
+    # The beige has low saturation and the PNG carries compression noise, so
+    # the raw measure comes out mottled. A blur averages the noise, a step
+    # hardens it again and a second blur leaves the edge clean.
     mask = blur(raw, 3.0)
     mask = ramp(mask, 0.22, 0.52)
     mask = mask * mask * (3 - 2 * mask)          # smoothstep
@@ -100,7 +100,7 @@ def main():
     Image.open(SOURCE).save(SOURCE_WEBP, quality=88, alpha_quality=100, exact=True, method=6)
 
     share = 100 * mask.sum() / max(alpha.sum(), 1)
-    print("%s escrito — la chapa es el %.1f%% del vehículo" % (os.path.relpath(TARGET, ROOT), share))
+    print("%s written: the bodywork is %.1f%% of the vehicle" % (os.path.relpath(TARGET, ROOT), share))
     if not 30 <= share <= 55:
         sys.exit("La cobertura se salió de lo esperado (30-55%%): mira la máscara antes de usarla.")
 

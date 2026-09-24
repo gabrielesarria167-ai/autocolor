@@ -2,25 +2,25 @@
 'use strict';
 
 /* =============================================================================
-   Imprime los dos correos de una solicitud sin mandar nada.
+   Prints the two emails of a request without sending anything.
 
        node tools/mailpreview.js
 
-   server/mail.js arma los cuerpos y los manda en el mismo módulo, así que sin
-   esto la única forma de ver cómo queda un correo era enviarlo de verdad —a
-   un cliente inventado y con la cuenta de correo puesta—. Aquí se ven los dos
-   con datos de mentira, incluido el caso de quien no dejó su correo.
+   server/mail.js builds the bodies and sends them in the same module, so
+   without this the only way to see how an email looks was to really send it
+   (to a made-up customer, with the mail account configured). Here both are
+   shown with fake data, including the case of someone who left no email.
 
-   Toma la solicitud de ejemplo tal como sale de validateRequest(): con sus
-   `null` donde el formulario venía vacío, que es lo que recibe mail.js en
-   producción.
+   It takes the sample request exactly as it comes out of validateRequest():
+   with its `null`s where the form was empty, which is what mail.js receives
+   in production.
    ========================================================================== */
 
-// El logotipo y los botones de los correos salen de la dirección del sitio, y
-// en la máquina de trabajo no hay ninguna: sin esto la vista previa enseña el
-// nombre escrito y ningún enlace, que es justo lo que no se quiere mirar. Se
-// apunta al repositorio, que un navegador abre igual. Se pone ANTES de cargar
-// server/mail.js, que lee la variable al cargarse.
+// The logo and the buttons in the emails come from the site's address, and
+// the work machine has none: without this the preview shows the name written
+// out and no links, which is exactly what we do not want to look at. It
+// points at the repository, which a browser opens just the same. It is set
+// BEFORE loading server/mail.js, which reads the variable on load.
 process.env.AUTOCOLOR_SITE_URL = process.env.AUTOCOLOR_SITE_URL
     || `file://${require('node:path').join(__dirname, '..')}`;
 
@@ -48,10 +48,10 @@ const FULL = {
     notes: 'El capó tiene un rayón profundo.\nEl techo solo necesita pulido.',
 };
 
-// Lo mínimo que HOY puede llegar: sin kilometraje, sin código de color y sin
-// notas, que son los tres campos que el asistente sigue dejando vacíos. El
-// correo, el departamento y la provincia ya no pueden faltar —validateRequest
-// los exige—, así que ponerlos a null probaba una carga imposible.
+// The minimum that can arrive TODAY: no mileage, no colour code and no notes,
+// the three fields the wizard still leaves empty. Email, department and
+// province can no longer be missing (validateRequest requires them), so
+// setting them to null tested an impossible payload.
 const MINIMAL = {
     ...FULL,
     mileage: null,
@@ -60,9 +60,9 @@ const MINIMAL = {
     parts: ['hood'],
 };
 
-// Una fila anterior a que el correo fuera obligatorio. No sale del asistente,
-// pero sí de la base, y mail.js tiene una guarda para ella (el `if (data.email)`
-// de notifyNewRequest): esto es lo que se ve al reenviar una de esas.
+// A row from before email was required. It does not come from the wizard,
+// but it does from the database, and mail.js has a guard for it (the
+// `if (data.email)` in notifyNewRequest): this is what resending one looks like.
 const LEGACY = {
     ...MINIMAL,
     department: null,
@@ -70,11 +70,11 @@ const LEGACY = {
     email: null,
 };
 
-// Un vehículo que llegó al local y se registró desde el panel del taller
-// (POST /api/staff/requests). El jefe contesta seis cosas, así que casi todo lo
-// demás llega vacío: sin marca, sin modelo, sin placa, sin piezas y sin zona.
-// La silueta 3D y el acabado sí, que son de las seis. Es el caso que prueba que
-// el correo sigue nombrando el vehículo cuando no hay marca ni modelo.
+// A vehicle that arrived at the shop and was registered from the workshop
+// panel (POST /api/staff/requests). The boss answers six things, so almost
+// everything else arrives empty: no make, no model, no plate, no panels and
+// no zone. The 3D silhouette and the finish do, being among the six. It is the
+// case that proves the email still names the vehicle with no make or model.
 const WALK_IN = {
     brand: null,
     model: null,
@@ -95,9 +95,9 @@ const WALK_IN = {
     notes: 'Rayón en la puerta derecha.',
 };
 
-// El HTML se escribe a disco además de resumirse: mirarlo en un navegador es
-// la única forma de ver si la maqueta quedó bien, y `node tools/mailpreview.js`
-// no puede enseñar una tarjeta de 600 px en la terminal.
+// The HTML is written to disk as well as summarised: looking at it in a
+// browser is the only way to see whether the layout came out right, and
+// `node tools/mailpreview.js` cannot show a 600 px card in the terminal.
 const OUT_DIR = process.env.MAILPREVIEW_OUT || require('node:os').tmpdir();
 
 function writeHtml(name, message) {
@@ -121,24 +121,24 @@ const customer = mail.customerMessage(CREATED, FULL);
 const shop = mail.shopMessage(CREATED, FULL);
 const shopMinimal = mail.shopMessage(CREATED, MINIMAL);
 const shopLegacy = mail.shopMessage(CREATED, LEGACY);
-// El tercer argumento es lo único que separa un vehículo del local de una
-// solicitud del sitio: los dos mensajes salen igual, con otra redacción.
+// The third argument is all that separates a vehicle from the shop from a
+// request from the site: both messages go out the same, with other wording.
 const walkInCustomer = mail.customerMessage(CREATED, WALK_IN, true);
 const walkInShop = mail.shopMessage(CREATED, WALK_IN, true);
 
-// Los dos correos de un pedido de matizado (pgs/paintings.html), tal como
-// salen de validatePaintOrder(). Dos casos, que son los dos que existen: un
-// pedido con su color y su envase, y una visita al taller, que llega sin
-// ninguna de las dos cosas y por eso tiene su propia redacción.
+// The two emails of a matizado order (pgs/paintings.html), as they come out
+// of validatePaintOrder(). Two cases, the only two there are: an order with
+// its colour and container, and a workshop visit, which arrives with neither
+// and so has its own wording.
 const PAINT_ORDER = {
     method: 'code',
     brand: 'Toyota',
     colorCode: '1F7',
     colorName: 'Plata Metálico',
     finish: 'metalico',
-    // El hex que confirmColour() (server/server.js) resuelve contra la base de
-    // colores al guardar el pedido. Antes no viajaba y colourHex() lo buscaba
-    // en el catálogo local; ahora el correo pinta esta muestra directamente.
+    // The hex confirmColour() (server/server.js) resolves against the colour
+    // database when storing the order. It used to not travel and colourHex()
+    // looked it up in the local catalogue; now the email paints this swatch directly.
     hex: '#bdc7c8',
     reading: null,
     size: '1_4',
@@ -176,8 +176,8 @@ const PAINT_VISIT = {
     notes: null,
 };
 
-// Una lectura del espectrofotómetro del cliente: el caso que prueba que los
-// tres valores CIELAB llegan al correo del taller, que es quien los usa.
+// A reading from the customer's spectrophotometer: the case that proves the
+// three CIELAB values reach the workshop email, which is the one that uses them.
 const PAINT_READING = {
     ...PAINT_ORDER,
     method: 'reading',
@@ -197,16 +197,16 @@ const paintShop = mail.paintShopMessage(CREATED, PAINT_ORDER);
 const paintVisitCustomer = mail.paintCustomerMessage(CREATED, PAINT_VISIT);
 const paintReadingShop = mail.paintShopMessage(CREATED, PAINT_READING);
 
-show('AL CLIENTE — solicitud completa', customer);
-show('AL TALLER — solicitud completa', shop);
-show('AL TALLER — sin los datos opcionales', shopMinimal);
-show('AL TALLER — fila antigua, sin correo ni zona', shopLegacy);
-show('AL CLIENTE — vehículo registrado en el local', walkInCustomer);
-show('AL TALLER — vehículo registrado en el local', walkInShop);
-show('AL CLIENTE — pedido de matizado', paintCustomer);
-show('AL TALLER — pedido de matizado', paintShop);
-show('AL CLIENTE — visita para medir el color', paintVisitCustomer);
-show('AL TALLER — matizado con lectura del cliente', paintReadingShop);
+show('AL CLIENTE: solicitud completa', customer);
+show('AL TALLER: solicitud completa', shop);
+show('AL TALLER: sin los datos opcionales', shopMinimal);
+show('AL TALLER: fila antigua, sin correo ni zona', shopLegacy);
+show('AL CLIENTE: vehículo registrado en el local', walkInCustomer);
+show('AL TALLER: vehículo registrado en el local', walkInShop);
+show('AL CLIENTE: pedido de matizado', paintCustomer);
+show('AL TALLER: pedido de matizado', paintShop);
+show('AL CLIENTE: visita para medir el color', paintVisitCustomer);
+show('AL TALLER: matizado con lectura del cliente', paintReadingShop);
 
 const written = [
     ['cliente', writeHtml('autocolor-cliente.html', customer)],

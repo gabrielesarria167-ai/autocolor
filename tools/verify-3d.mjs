@@ -1,17 +1,17 @@
 /* =============================================================================
-   verify-3d.mjs — que un GLB comprimido siga sirviendo para elegir piezas.
+   verify-3d.mjs: checks that a compressed GLB still works for picking panels.
 
-   El visor busca cada panel por NOMBRE: resolvePaintMesh() en src/carVisual.js
-   resuelve los ids de VEHICLE_MODELS[*].parts contra los nodos del GLB. Casi
-   toda herramienta de optimización fusiona, reordena o renombra nodos, y cuando
-   lo hace el archivo carga igual de bien y la pieza simplemente deja de poder
-   pintarse. Sin error. Por eso esto se comprueba antes de commitear.
+   The viewer finds each panel by NAME: resolvePaintMesh() in src/carVisual.js
+   resolves the ids in VEHICLE_MODELS[*].parts against the GLB's nodes. Nearly
+   every optimisation tool merges, reorders or renames nodes, and when it does
+   the file loads just as well and the panel simply stops being paintable.
+   No error. That is why this is checked before committing.
 
-   Uso:
-       node tools/verify-3d.mjs                       # línea base de los tres
-       node tools/verify-3d.mjs base.glb nuevo.glb    # comparar antes/después
+   Usage:
+       node tools/verify-3d.mjs                       # baseline of the models
+       node tools/verify-3d.mjs base.glb new.glb      # compare before/after
 
-   Sin dependencias: lee el chunk JSON del GLB y nada más.
+   No dependencies: it reads the GLB's JSON chunk and nothing else.
    ========================================================================== */
 
 import { readFileSync } from 'node:fs';
@@ -22,29 +22,29 @@ import path from 'node:path';
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 /* -----------------------------------------------------------------------------
-   Lo que el visor espera de cada modelo.
+   What the viewer expects from each model.
 
-   Se lee de src/carVisual.js en vez de repetirlo aquí: una copia a mano se
-   desincroniza y esta comprobación dejaría de comprobar lo que importa.
+   Read from src/carVisual.js instead of repeated here: a hand copy drifts
+   and this check would stop checking what matters.
    -------------------------------------------------------------------------- */
 
 function loadExpectations() {
     const src = readFileSync(path.join(ROOT, 'src/carVisual.js'), 'utf8');
     const models = {};
 
-    // Los nombres de los modelos, tal como los declara VEHICLE_MODELS: las
-    // claves con dos espacios de sangría dentro de ese objeto.
+    // The model names, as VEHICLE_MODELS declares them: the keys with two
+    // spaces of indentation inside that object.
     const block = src.slice(src.indexOf('export const VEHICLE_MODELS'));
     for (const m of block.matchAll(/\n  ([a-z][a-zA-Z0-9]*): \{/g)) models[m[1]] = null;
 
-    // Cada entrada de VEHICLE_MODELS: van: { ... }, wagon: { ... }, …
-    // Las claves se leen del propio archivo: una lista aquí se olvida el día
-    // que entra un modelo nuevo, y lo que hace esta herramienta es
-    // justamente comprobar los modelos que hay.
+    // Each VEHICLE_MODELS entry: van: { ... }, wagon: { ... }, and so on.
+    // The keys are read from the file itself: a list here gets forgotten the
+    // day a new model comes in, and what this tool does is precisely check
+    // the models that exist.
     for (const key of Object.keys(models)) {
         const start = src.indexOf(`\n  ${key}: {`);
         if (start === -1) throw new Error(`No encontré el modelo '${key}' en carVisual.js`);
-        // Hasta el comienzo del siguiente modelo o el fin del objeto.
+        // Up to the start of the next model or the end of the object.
         const rest = src.slice(start + 1);
         const end = rest.search(/\n  [a-z]+: \{|\n\};/);
         const block = rest.slice(0, end === -1 ? rest.length : end);
@@ -60,14 +60,14 @@ function loadExpectations() {
     return models;
 }
 
-// La expresión regular de un campo del bloque, si la hay. Sirve para
-// trimNodes, que no nombra nodos uno a uno sino por convención de nombre.
+// A block field's regular expression, if there is one. It is for trimNodes,
+// which does not name nodes one by one but by naming convention.
 function regexOf(block, field) {
     const m = block.match(new RegExp(`${field}:\\s*/(.+?)/([a-z]*),`));
     return m ? new RegExp(m[1], m[2]) : null;
 }
 
-// Los ids de un array del bloque, ignorando lo que haya en comentarios.
+// The ids of an array in the block, ignoring whatever sits in comments.
 function listOf(block, field) {
     const m = block.match(new RegExp(`${field}:\\s*\\[([\\s\\S]*?)\\]`));
     if (!m) return [];
@@ -76,7 +76,7 @@ function listOf(block, field) {
 }
 
 /* -----------------------------------------------------------------------------
-   Leer el GLB
+   Reading the GLB
    -------------------------------------------------------------------------- */
 
 function readGlbJson(file) {
@@ -87,14 +87,14 @@ function readGlbJson(file) {
     return { json: JSON.parse(buf.toString('utf8', 20, 20 + chunkLength)), size: buf.length };
 }
 
-// La misma normalización que THREE.PropertyBinding.sanitizeNodeName, que es la
-// que aplica GLTFLoader al cargar. Comparar en crudo daría falsos iguales.
+// The same normalisation as THREE.PropertyBinding.sanitizeNodeName, which
+// GLTFLoader applies on load. Comparing raw would give false matches.
 function sanitize(name) {
     return (name || '').replace(/\s/g, '_').replace(/[^\w-]/g, '');
 }
 
 /* -----------------------------------------------------------------------------
-   El retrato de un archivo: lo único que el visor necesita que no cambie
+   A file's portrait: the only thing the viewer needs to stay unchanged
    -------------------------------------------------------------------------- */
 
 function describe(file, expected) {
@@ -112,16 +112,17 @@ function describe(file, expected) {
         else byName.set(clean, node);
     });
 
-    // Por cada pieza: cuántas primitivas tiene y con qué materiales, en orden.
-    // Si dos primitivas se fusionan, el material deja de ser el de la pintura y
-    // la pieza se vuelve no pintable sin que nada avise.
-    // La malla de una pieza no siempre cuelga del nodo con nombre. Al cuantizar,
-    // gltf-transform deja la animación en el nodo animado y le mueve la malla a
-    // un hijo sin nombre (transformMeshParents), así que el nodo con nombre
-    // queda como un grupo vacío. El visor lo tolera: resolvePaintMesh() hace
-    // getObjectByName() y, si eso no es una malla, un traverse() hacia abajo.
-    // Esto mira igual que él —la malla del nodo, o la de su descendencia— y no
-    // menos: encontrar más de una sí es un cambio, y se reporta como tal.
+    // For each panel: how many primitives it has and with which materials, in
+    // order. If two primitives merge, the material stops being the paint and
+    // the panel becomes unpaintable with nothing to warn about.
+    // A panel's mesh does not always hang from the named node. When
+    // quantising, gltf-transform leaves the animation on the animated node and
+    // moves the mesh to an unnamed child (transformMeshParents), so the named
+    // node is left as an empty group. The viewer tolerates it:
+    // resolvePaintMesh() calls getObjectByName() and, if that is not a mesh, a
+    // traverse() downwards. This looks the same way it does (the node's mesh,
+    // or its descendants') and no less: finding more than one is a change, and
+    // it is reported as such.
     function meshesUnder(node) {
         const found = [];
         (function walk(n) {
@@ -143,9 +144,9 @@ function describe(file, expected) {
         parts[id] = (mesh.primitives || []).map((p) => (p.material !== undefined ? materials[p.material]?.name : null));
     }
 
-    // Los nodos que el export marca como tapa negra por su nombre. Si el
-    // modelo se vuelve a exportar sin esa convención, la regla deja de casar
-    // con nada y esas piezas salen del color de la carrocería sin avisar.
+    // The nodes the export marks as black trim by their name. If the model is
+    // re-exported without that convention, the rule stops matching anything
+    // and those panels come out body colour without warning.
     const trimNodes = expected.trimNodes
         ? [...byName.keys()].filter((n) => expected.trimNodes.test(n)).sort()
         : null;
@@ -171,15 +172,15 @@ function describe(file, expected) {
 function compare(before, after, expected) {
     const problems = [];
 
-    // 1. Ningún nombre puede desaparecer. Sobrar es raro pero no rompe nada.
+    // 1. No name may disappear. Extra ones are odd but break nothing.
     const gone = before.nodeNames.filter((n) => !after.nodeNames.includes(n));
     if (gone.length) problems.push(`desaparecieron ${gone.length} nombres de nodo: ${gone.slice(0, 8).join(', ')}${gone.length > 8 ? '…' : ''}`);
 
-    // 2. Duplicados: GLTFLoader renombraría el segundo a 'hood_1' y
-    //    resolvePaintMesh('hood') caería en el nodo equivocado.
+    // 2. Duplicates: GLTFLoader would rename the second to 'hood_1' and
+    //    resolvePaintMesh('hood') would land on the wrong node.
     if (after.duplicates.length) problems.push(`nombres duplicados tras normalizar: ${after.duplicates.join(', ')}`);
 
-    // 3. Cada pieza configurada, con sus primitivas y materiales intactos.
+    // 3. Each configured panel, with its primitives and materials intact.
     for (const id of Object.keys(before.parts)) {
         const b = before.parts[id], a = after.parts[id];
         if (a === null) { problems.push(`la pieza '${id}' ya no existe`); continue; }
@@ -188,19 +189,19 @@ function compare(before, after, expected) {
         if (JSON.stringify(a) !== JSON.stringify(b)) problems.push(`'${id}': materiales ${JSON.stringify(b)} -> ${JSON.stringify(a)}`);
     }
 
-    // 4. Los nodos de tapa negra, si el modelo usa esa convención.
+    // 4. The black trim nodes, if the model uses that convention.
     if (before.trimNodes && after.trimNodes.length !== before.trimNodes.length) {
         problems.push(`nodos de tapa negra: ${before.trimNodes.length} -> ${after.trimNodes.length}`);
     }
 
-    // 5. El material de pintura y sus extensiones.
+    // 5. The paint material and its extensions.
     if (!after.paintMaterial) problems.push(`falta el material de pintura '${expected.paintMaterial}'`);
     else if (before.paintMaterial &&
              JSON.stringify(after.paintMaterial.extensions) !== JSON.stringify(before.paintMaterial.extensions)) {
         problems.push(`extensiones de '${expected.paintMaterial}': ${JSON.stringify(before.paintMaterial.extensions)} -> ${JSON.stringify(after.paintMaterial.extensions)}`);
     }
 
-    // 6. Si corrió `instance`, los nodos con nombre se cambiaron por instancias.
+    // 6. If `instance` ran, named nodes were swapped for instances.
     if (after.extensionsRequired.includes('EXT_mesh_gpu_instancing')) {
         problems.push('apareció EXT_mesh_gpu_instancing: corrió `instance` y los nodos con nombre ya no son de fiar');
     }
@@ -214,7 +215,7 @@ const models = loadExpectations();
 const args = process.argv.slice(2);
 
 if (args.length === 2) {
-    // Modo comparación: se deduce el modelo por el nombre del archivo.
+    // Comparison mode: the model is inferred from the file name.
     const [beforeFile, afterFile] = args;
     const key = Object.keys(models).find((k) => afterFile.includes(path.basename(models[k].url, '.glb')))
              || Object.keys(models).find((k) => afterFile.includes(k));
@@ -269,7 +270,7 @@ for (const [key, expected] of Object.entries(models)) {
 
     const missing = Object.entries(d.parts).filter(([, v]) => v === null).map(([k]) => k);
     console.log(`\n${key}  (${path.basename(file)}, ${(d.size / 1e6).toFixed(1)} MB)`);
-    console.log(`  ${d.counts.nodes} nodos · ${d.counts.meshes} mallas · ${d.counts.materials} materiales · ${d.counts.images} imágenes`);
+    console.log(`  ${d.counts.nodes} nodos, ${d.counts.meshes} mallas, ${d.counts.materials} materiales, ${d.counts.images} imágenes`);
     console.log(`  piezas configuradas: ${expected.parts.length}   sin resolver: ${missing.length ? missing.join(', ') : 'ninguna'}`);
     console.log(`  nombres duplicados: ${d.duplicates.length ? d.duplicates.join(', ') : 'ninguno'}`);
     console.log(`  material de pintura '${expected.paintMaterial}': ${d.paintMaterial ? 'presente [' + (d.paintMaterial.extensions.join(', ') || 'sin extensiones') + ']' : 'NO ENCONTRADO'}`);

@@ -1,32 +1,32 @@
 'use strict';
 
 /* =============================================================================
-   Sesiones del panel del taller.
+   Workshop panel sessions.
 
-   Una sola contraseña compartida, la del taller, en la variable de entorno
-   AUTOCOLOR_STAFF_PASSWORD. Lo habitual es dejarla escrita una vez en el .env
-   de la raíz (ver .env.example y server/env.js) y arrancar con `npm start`;
-   ponerla delante del comando sigue funcionando y tiene prioridad:
+   A single shared password, the workshop's, in the environment variable
+   AUTOCOLOR_STAFF_PASSWORD. The usual way is to write it once in the root
+   .env (see .env.example and server/env.js) and start with `npm start`;
+   putting it in front of the command still works and takes priority:
 
        AUTOCOLOR_STAFF_PASSWORD='...' npm start
 
-   Sin ella el panel no existe: las rutas responden 503 en vez de quedar
-   abiertas. Es la diferencia entre olvidarse de configurarlo y publicar los
-   teléfonos de los clientes.
+   Without it the panel does not exist: the routes answer 503 instead of
+   staying open. That is the difference between forgetting to configure it
+   and publishing the customers' phone numbers.
 
-   Por qué la comprobación vive aquí y no en el navegador: pgs/taller.html es
-   un archivo estático como cualquier otro y su código fuente lo lee todo el
-   mundo. Lo que hay que cerrar es la API.
+   Why the check lives here and not in the browser: pgs/taller.html is a
+   static file like any other and anyone can read its source. What has to be
+   locked is the API.
    ========================================================================== */
 
-// Antes que nada: el .env tiene que estar en process.env cuando se lea
-// AUTOCOLOR_STAFF_PASSWORD, unas líneas más abajo.
+// First of all: the .env has to be in process.env when
+// AUTOCOLOR_STAFF_PASSWORD is read, a few lines below.
 require('./env');
 
 const crypto = require('node:crypto');
 
 const COOKIE_NAME = 'autocolor_staff';
-const SESSION_MS = 8 * 60 * 60 * 1000;   // una jornada
+const SESSION_MS = 8 * 60 * 60 * 1000;   // one working day
 const PASSWORD = process.env.AUTOCOLOR_STAFF_PASSWORD || '';
 
 // Who may enter, from AUTOCOLOR_WORKER_IDS: comma-separated entries, each one a
@@ -35,7 +35,7 @@ const PASSWORD = process.env.AUTOCOLOR_STAFF_PASSWORD || '';
 //     AUTOCOLOR_WORKER_IDS=AB12345:Ana Bravo,CD67890:Carlos Díaz
 //
 // A code is the first initial, the surname initial and five digits (AB12345).
-// Codes are normalised — trimmed and upper-cased — so that typing «ab12345»
+// Codes are normalised (trimmed and upper-cased) so that typing «ab12345»
 // matches the «AB12345» of the .env; the name is kept as written, because it is
 // shown as written. The password is still the shared secret; the code says who
 // came in, and the name is what the panel puts on screen instead of it.
@@ -76,7 +76,7 @@ const WORKER_IDS = roster.codes;
 const WORKER_NAMES = roster.names;
 
 // The workshop boss, in AUTOCOLOR_BOSS_ID. One entry, written exactly like the
-// ones above — code, colon, name. It does not need to be repeated in
+// ones above: code, colon, name. It does not need to be repeated in
 // AUTOCOLOR_WORKER_IDS: it is accepted on its own (see verifyWorkerId), because
 // naming the boss and forgetting to list him would lock out the very person
 // just configured.
@@ -100,9 +100,9 @@ if (bossName) WORKER_NAMES.set(BOSS_ID, bossName);
 // worker holding nothing, and could be sent notes.
 if (BOSS_ID) WORKER_IDS.delete(BOSS_ID);
 
-// Las sesiones viven en memoria y se pierden al reiniciar el servidor: el
-// panel es de una máquina y de un puñado de personas, y una tabla en la base
-// solo agregaría cosas que mantener para ahorrarles volver a entrar.
+// Sessions live in memory and are lost when the server restarts: the panel
+// belongs to one machine and a handful of people, and a table in the database
+// would only add things to maintain to save them logging in again.
 const sessions = new Map(); // token -> { expiresAt, workerId }
 
 function isConfigured() {
@@ -110,12 +110,12 @@ function isConfigured() {
 }
 
 /**
- * Compara la contraseña recibida con la configurada.
+ * Compares the password received with the configured one.
  *
- * Se comparan los digest y no las cadenas: timingSafeEqual exige que los dos
- * buffers midan lo mismo, y un SHA-256 siempre mide 32 bytes venga de donde
- * venga. Así el tiempo de la comparación no delata cuántos caracteres del
- * comienzo acertó quien prueba.
+ * The digests are compared, not the strings: timingSafeEqual requires both
+ * buffers to be the same length, and a SHA-256 is always 32 bytes wherever it
+ * comes from. That way the comparison time does not give away how many
+ * leading characters a prober got right.
  */
 function verifyPassword(entered) {
     if (!isConfigured() || typeof entered !== 'string' || entered.length === 0) return false;
@@ -150,7 +150,7 @@ function listWorkerIds() {
 }
 
 /**
- * The name configured for a code, or an empty string when there is none — an
+ * The name configured for a code, or an empty string when there is none: an
  * entry written without one, or a code that is not on the roster at all (an old
  * one still sitting on a row of the table). Callers fall back to the code, which
  * always identifies somebody even when nothing names them.
@@ -160,14 +160,14 @@ function workerName(code) {
 }
 
 /**
- * Comprueba un código de trabajador contra la lista de AUTOCOLOR_WORKER_IDS.
+ * Checks a worker code against the AUTOCOLOR_WORKER_IDS list.
  * The boss's code (AUTOCOLOR_BOSS_ID) is accepted too, listed or not.
  *
- * Devuelve el código ya normalizado (mayúsculas, sin espacios) si es válido, o
- * cadena vacía si no. Se normaliza igual que al cargarlos para que no importe
- * cómo lo escriba quien entra. A diferencia de la contraseña no se compara en
- * tiempo constante: el código identifica, no es el secreto —ese es la
- * contraseña—, y el límite de intentos ya frena probarlos a ciegas.
+ * Returns the code already normalised (upper case, no spaces) if it is valid,
+ * or an empty string if not. It is normalised the same way as when loading so
+ * it does not matter how whoever logs in types it. Unlike the password it is
+ * not compared in constant time: the code identifies, it is not the secret
+ * (that is the password), and the attempt limit already slows blind guessing.
  */
 function verifyWorkerId(entered) {
     if (typeof entered !== 'string') return '';
@@ -186,8 +186,8 @@ function destroySession(token) {
     if (token) sessions.delete(token);
 }
 
-// 'a=1; b=2' -> { a: '1', b: '2' }. No hace falta más: las cookies de este
-// servidor son una sola y su valor es base64url, sin nada que decodificar.
+// 'a=1; b=2' -> { a: '1', b: '2' }. Nothing more is needed: this server has a
+// single cookie and its value is base64url, with nothing to decode.
 function parseCookies(header) {
     const out = {};
     for (const part of (header || '').split(';')) {
@@ -202,7 +202,7 @@ function readToken(req) {
     return parseCookies(req.headers.cookie)[COOKIE_NAME] || '';
 }
 
-/** El token de la petición si su sesión sigue viva; si no, cadena vacía. */
+/** The request's token if its session is still alive; otherwise an empty string. */
 function readSession(req) {
     const token = readToken(req);
     const session = sessions.get(token);
@@ -214,17 +214,17 @@ function readSession(req) {
     return token;
 }
 
-/** El código del trabajador de la sesión viva, o cadena vacía si no la hay. */
+/** The worker code of the live session, or an empty string if there is none. */
 function sessionWorkerId(req) {
     const token = readSession(req);
     const session = token && sessions.get(token);
     return session ? (session.workerId || '') : '';
 }
 
-// HttpOnly para que ningún script pueda leer el token, y SameSite=Strict para
-// que la cookie no viaje en peticiones que nazcan en otro sitio. Secure queda
-// tras una variable porque en http://localhost el navegador descartaría la
-// cookie; al alojar el panel detrás de https hay que encenderla.
+// HttpOnly so no script can read the token, and SameSite=Strict so the cookie
+// does not travel on requests born on another site. Secure sits behind a
+// variable because on http://localhost the browser would drop the cookie;
+// when hosting the panel behind https it has to be turned on.
 function cookieHeader(token) {
     const parts = [
         `${COOKIE_NAME}=${token}`,
@@ -241,7 +241,7 @@ function clearCookieHeader() {
     return `${COOKIE_NAME}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0`;
 }
 
-// Las sesiones vencidas se acumularían para siempre si nadie las quita.
+// Expired sessions would pile up forever if nobody removed them.
 setInterval(() => {
     const now = Date.now();
     for (const [token, session] of sessions) {

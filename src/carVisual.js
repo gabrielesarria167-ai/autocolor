@@ -1,11 +1,11 @@
 /* =========================================================================
-   carVisual.js — 3D panel-picker for step 3 of the Autocolor wizard
+   carVisual.js: 3D panel-picker for step 3 of the Autocolor wizard
 
    One viewer, four vehicles: the furgoneta, the familiar, the pickup and the
    SUV. The camera is driven by buttons only (front initial view,
-   gimbal-lock-safe orientation) and flies in continuous arcs around the car —
-   see flyToView. What differs per model — the GLB, its paintable node names,
-   its paint material and its axis convention — lives in VEHICLE_MODELS below.
+   gimbal-lock-safe orientation) and flies in continuous arcs around the car
+   (see flyToView). What differs per model (the GLB, its paintable node names,
+   its paint material and its axis convention) lives in VEHICLE_MODELS below.
    The wizard (src/repair.js) and the walk-in form of the workshop panel
    (src/staff.js) both mount it.
 
@@ -17,13 +17,13 @@
      - It exposes a small controller API (resize / refreshSelection /
        resetView / destroy / loadFailed) instead of wiring its own sidebar,
        which lives in the host page so it can match the site's styling.
-     - It draws on demand (see requestRender), not in a permanent loop —
+     - It draws on demand (see requestRender), not in a permanent loop,
        except on the turntable of a read-only viewer (`spin`), which is the
        one mode whose whole point is that the picture keeps changing.
 
-   Import this lazily (`import('../src/carVisual.js')`) — only when a user
-   actually reaches step 3 — so nobody pays for three.js or a 7–13 MB
-   model download (5–9 MB compressed on the wire) before then. Exactly one
+   Import this lazily (`import('../src/carVisual.js')`), only when a user
+   actually reaches step 3, so nobody pays for three.js or a 7 to 13 MB
+   model download (5 to 9 MB compressed on the wire) before then. Exactly one
    viewer is alive at a time: picking a different vehicle destroys the
    previous one (see destroy() here and ensureCar3D() in repair.js), since
    resident models of this size are not free to keep on the GPU.
@@ -31,9 +31,9 @@
 
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-// Los cuatro GLB van comprimidos con EXT_meshopt_compression. El decodificador
-// es un módulo ES de unos 25 KB que resuelve por el mismo importmap que three
-// (ver pgs/repair.html), así que no hay una segunda versión que mantener.
+// All four GLBs are compressed with EXT_meshopt_compression. The decoder is
+// an ES module of about 25 KB that resolves through the same importmap as
+// three (see pgs/repair.html), so there is no second version to maintain.
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 
 /* -------------------------------------------------------------------------
@@ -42,7 +42,7 @@ import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
    Every field below was checked against the GLB files themselves (node
    names, primitive counts and material assignments read out of each file's
    glTF JSON; axis conventions derived from where the hood/bumper/fender
-   nodes actually sit in world space) — not taken on trust from the node
+   nodes actually sit in world space), not taken on trust from the node
    names, which are misleading in several places on every model.
 
    `front` / `left` are unit axes in the model's own space: `front` points
@@ -92,7 +92,7 @@ export const VEHICLE_MODELS = {
   },
 
   // Familiar (station wagon). Sketchfab-sourced, so its units are
-  // centimetres — ~476 long against the SUV's ~5 — which is why every
+  // centimetres (~476 long against the SUV's ~5), which is why every
   // camera distance and clipping plane in this file is derived from the
   // model's own bounding box rather than hardcoded.
   wagon: {
@@ -102,7 +102,7 @@ export const VEHICLE_MODELS = {
     left: [0, 0, -1],
     // Same story as the van: "carpaint" is authored as ~0.446 grey primer.
     // The material also carries KHR_materials_clearcoat, which GLTFLoader
-    // resolves into MeshPhysicalMaterial.clearcoat on its own — left alone.
+    // resolves into MeshPhysicalMaterial.clearcoat on its own; it is left alone.
     bodyColor: [0.93, 0.93, 0.94],
     maxRoughness: 0.3,
     parts: [
@@ -123,7 +123,7 @@ export const VEHICLE_MODELS = {
       // material, so they are selectable panels here.
       'bumper', 'back_bumper',
       // Undescriptive name, but a real visible trim strip along the roof's
-      // trailing edge above the hatch glass — listed so it isn't a hole in
+      // trailing edge above the hatch glass, listed so it isn't a hole in
       // the paintable surface.
       'Object_26',
     ],
@@ -173,7 +173,7 @@ export const VEHICLE_MODELS = {
     trimColor: [0.05, 0.05, 0.055],
     maxRoughness: 0.3,
     // The only model that needs a metalness CEILING. Its paint is authored
-    // at 0.553 against 0.0–0.1 on the other three, and a metal that
+    // at 0.553 against 0.0 to 0.1 on the other three, and a metal that
     // reflective takes its colour from what it reflects: the body came out
     // grey however light the bodyColor was set.
     maxMetalness: 0.25,
@@ -188,15 +188,15 @@ export const VEHICLE_MODELS = {
       'bumper', 'rear_bumper',
     ],
     // NOTE: the front bumper comes apart into 'bumper' plus five sibling
-    // nodes, 'bumper.001'–'bumper.005' (dots stripped by GLTFLoader). None of
-    // them is offered: three carry a sliver of the paint material — 1, 18 and
-    // 2 triangles — and the other two only plastic, and all five sit inside
+    // nodes, 'bumper.001' to 'bumper.005' (dots stripped by GLTFLoader). None of
+    // them is offered: three carry a sliver of the paint material (1, 18 and
+    // 2 triangles) and the other two only plastic, and all five sit inside
     // the bumper's own volume. Painting the whole assembly a loud colour and
     // sweeping every one of the five views for it turns up not one pixel, so
     // offering them would put panels in the list that nobody can click.
     // `material` names what to resolve when the node does not carry
     // `paintMaterial`; `finish: 'trim'` marks a panel that stays black
-    // although it is still selectable — a scraped bumper or skirt is
+    // although it is still selectable: a scraped bumper or skirt is
     // exactly the job this shop is asked for, it just isn't body colour.
     partOverrides: {
       roof: { material: 'blackpaint1' },
@@ -267,16 +267,16 @@ export function mountCar3D(options) {
     loadingLabelEl,
     errorEl,
     buttonsEl,       // container holding buttons with [data-view]
-    isPartSelected,  // fn(id) => bool — reads the host's shared state
-    onPartToggle,    // fn(id) => void — mutates the host's shared state
-    onLoadError,     // optional fn() — the GLB failed; the host can offer another way
-    // A viewer for looking at a selection somebody else already made — the
+    isPartSelected,  // fn(id) => bool, reads the host's shared state
+    onPartToggle,    // fn(id) => void, mutates the host's shared state
+    onLoadError,     // optional fn(): the GLB failed; the host can offer another way
+    // A viewer for looking at a selection somebody else already made: the
     // panel's «Piezas» column (src/staff.js). `interactive: false` leaves the
     // pointer alone, so nothing lights up under the cursor and no click can
     // reach onPartToggle; `spin: true` turns the car instead of waiting for a
     // camera button, since a page that only shows cannot ask anybody to press
-    // one. The two travel together — a turntable you could click would move
-    // the panel out from under the finger — and with `spin` the view buttons
+    // one. The two travel together (a turntable you could click would move
+    // the panel out from under the finger), and with `spin` the view buttons
     // are not used: the host passes no buttonsEl.
     interactive = true,
     spin = false,
@@ -297,7 +297,7 @@ export function mountCar3D(options) {
   // No scene.background: the canvas stays transparent so the car appears
   // to float directly on the page background instead of sitting in a box.
 
-  // near/far are placeholders until the model's own size is known — see the
+  // near/far are placeholders until the model's own size is known; see the
   // load handler, which resets both from its bounding sphere. They have to
   // be model-relative because the GLBs differ by ~100x in scale.
   const camera = new THREE.PerspectiveCamera(FOV_DEG, 1, 0.05, 500);
@@ -346,7 +346,7 @@ export function mountCar3D(options) {
   function resizeRenderer() {
     const w = canvasWrapEl.clientWidth;
     const h = canvasWrapEl.clientHeight;
-    if (!w || !h) return; // container is hidden/zero-sized — nothing to size yet
+    if (!w || !h) return; // container is hidden/zero-sized, nothing to size yet
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
@@ -365,7 +365,7 @@ export function mountCar3D(options) {
 
   // Returns the actual Mesh to paint for a node name, handling both plain
   // single-primitive nodes (already a Mesh) and multi-primitive ones, which
-  // GLTFLoader turns into a Group of child meshes — a door node that bundles
+  // GLTFLoader turns into a Group of child meshes: a door node that bundles
   // its chrome window trim, for example. The child carrying that panel's own
   // material is the one wanted in that case.
   function resolvePaintMesh(root, name) {
@@ -386,9 +386,9 @@ export function mountCar3D(options) {
   // happens to carry doesn't already provide it.
   //
   // It has to clone before recolouring: both materials involved are shared
-  // far beyond the one panel — the SUV's 'blackpaint1' by sixty nodes from
+  // far beyond the one panel (the SUV's 'blackpaint1' by sixty nodes from
   // the brake discs to the dashboard, its 'CarPaint' by every panel that DOES
-  // stay body colour — so painting either in place would repaint most of the
+  // stay body colour), so painting either in place would repaint most of the
   // vehicle along with it.
   // The clamps every material this file recolours gets. The paint is authored
   // for a showroom render, not for reading panel outlines under a coloured
@@ -481,8 +481,8 @@ export function mountCar3D(options) {
   let spinRadius = 0;
 
   // Interpolates a unit direction along the great circle between two others.
-  // Callers never pass a pair further apart than a quarter turn or so — any
-  // wider turn is split at the roof first — so the antipodal case, where the
+  // Callers never pass a pair further apart than a quarter turn or so (any
+  // wider turn is split at the roof first), so the antipodal case, where the
   // arc would be ambiguous, cannot arise here; the guard covers exact
   // coincidence only.
   function slerpDirection(from, to, t, out) {
@@ -529,8 +529,8 @@ export function mountCar3D(options) {
     const distLR  = fitDistance(lengthFB, heightUD, FOV_DEG, aspect, CAMERA_PADDING) + widthLR / 2;
     const distTop = fitDistance(widthLR, lengthFB, FOV_DEG, aspect, CAMERA_PADDING) + heightUD / 2;
 
-    // The turntable keeps one distance the whole way round — the widest of
-    // the two it passes through — so a car that fits head-on cannot grow out
+    // The turntable keeps one distance the whole way round, the widest of
+    // the two it passes through, so a car that fits head-on cannot grow out
     // of the frame as its flank comes round. Reframing per angle instead
     // would breathe in and out once a lap, which reads as the car changing
     // size rather than turning.
@@ -608,8 +608,8 @@ export function mountCar3D(options) {
 
     // Opposite views (front/back, left/right) have no one arc between them:
     // every great circle through both is equally valid and a straight line
-    // would pass through the car. Only those turns are routed over the roof
-    // — everything else sweeps directly, which is shorter and easier to
+    // would pass through the car. Only those turns are routed over the roof;
+    // everything else sweeps directly, which is shorter and easier to
     // follow than relaying every turn through the top view.
     const waypoints = fromDir.dot(toDir) < -0.9
       ? [fromDir, UP_AXIS.clone(), toDir]
@@ -656,7 +656,7 @@ export function mountCar3D(options) {
 
       if (t < 1) requestAnimationFrame(step);
       else {
-        // Land on the preset exactly, not on the last lerp — and on the preset
+        // Land on the preset exactly, not on the last lerp, and on the preset
         // as it is NOW: a resize during the flight recomputed the presets, and
         // `target` still holds the framing for the old aspect ratio.
         placeCamera(positionForView(view) || target);
@@ -681,7 +681,7 @@ export function mountCar3D(options) {
      The one place this file draws in a permanent loop, and it is the point of
      the mode: the car turns by itself for as long as the viewer is on screen.
      It is affordable because such a viewer is opened deliberately, shows one
-     vehicle and is destroyed on closing (see the parts view in src/staff.js) —
+     vehicle and is destroyed on closing (see the parts view in src/staff.js);
      the host must not leave one mounted behind a hidden panel.
 
      Somebody who asked their system not to animate gets the front view and no
@@ -756,14 +756,14 @@ export function mountCar3D(options) {
   // The GLB fetch happens after mountCar3D has already returned its controller,
   // so a failure has no other way to reach the host page. Without this the host
   // sees a mounted viewer and skips the remount, and step 3 stays dead until a
-  // reload — see ensureCar3D() in repair.js.
+  // reload (see ensureCar3D() in repair.js).
   let loadFailed = false;
 
   /* -----------------------------------------------------------------------
      Loading the GLB, with one fallback attempt
 
-     These are 9–13 MB files, and the failure that actually shows up is not a
-     404 — it is a transfer that never gets going, or that stops halfway. The
+     These are 9 to 13 MB files, and the failure that actually shows up is not a
+     404. It is a transfer that never gets going, or that stops halfway. The
      error callback never fires for that one: three's FileLoader has no
      timeout, so a request the network dropped silently leaves the overlay
      reading «Cargando modelo 3D…» for as long as the customer is willing to
@@ -777,8 +777,8 @@ export function mountCar3D(options) {
 
      The retry has to ask for a URL nobody has written off yet. FileLoader
      keeps an in-flight table keyed by URL (`loading[url]`) and hands a second
-     request for the same URL the callbacks of the first one — which is the
-     stalled request we are trying to get away from — and a browser that
+     request for the same URL the callbacks of the first one (which is the
+     stalled request we are trying to get away from), and a browser that
      already failed the fetch can answer the repeat from that failure without
      touching the network. The query string is what makes it a new request; it
      never reaches disk, because the static server routes on the path alone.
@@ -848,7 +848,7 @@ export function mountCar3D(options) {
     if (destroyed || modelReady) return;
     // Everything is here: the last chunk of a transfer that announced its
     // size disarms the watchdog, because what comes next is meshopt decoding
-    // and parsing — seconds of silence on a file this big, and none of it a
+    // and parsing: seconds of silence on a file this big, and none of it a
     // stall. Anything earlier re-arms it and starts the count again.
     if (xhr.total && xhr.loaded >= xhr.total) clearStallTimer();
     else armStallTimer();
@@ -1020,7 +1020,7 @@ export function mountCar3D(options) {
   // Forgets whatever the pointer was last over. On a mouse this is the cursor
   // leaving the canvas; on a touchscreen it is the finger lifting, which is
   // the case that needs it. A tap fires pointermove before click, so the
-  // panel under the finger becomes `hoveredMesh` — and then deselecting it
+  // panel under the finger becomes `hoveredMesh`, and then deselecting it
   // runs the last line of onPointerClick, which re-lights the hover overlay
   // because the mesh still matches. The finger is long gone, so the panel the
   // customer just REMOVED stays highlighted on the car while the list beside
@@ -1038,8 +1038,8 @@ export function mountCar3D(options) {
   // pointerup lands BEFORE click, which is what makes this work: by the time
   // onPointerClick reads `hoveredMesh` it is null, so its last line resolves
   // to false and the overlay it would have re-lit never comes back. A mouse is
-  // left alone — the cursor really is still over the panel, and hovering is
-  // the whole point — and gets cleared by pointerleave instead.
+  // left alone (the cursor really is still over the panel, and hovering is
+  // the whole point) and gets cleared by pointerleave instead.
   function onPointerUp(event) {
     if (event.pointerType !== 'mouse') clearHover();
   }
@@ -1062,12 +1062,12 @@ export function mountCar3D(options) {
     resizeRenderer();
     if (!(lengthFB || widthLR || heightUD)) return;
     // Framing distance depends on the aspect ratio, so the current view has
-    // to be re-placed at the recomputed distance — otherwise the car stays
+    // to be re-placed at the recomputed distance; otherwise the car stays
     // framed for the old container size until the next button press.
     computePresets();
     // The turntable places the camera every frame from the radius that
     // computePresets has just refreshed, so putting it on a view here would
-    // only be overwritten — after one frame of the car jumping.
+    // only be overwritten, after one frame of the car jumping.
     if (spinning) return;
     const here = positionForView(currentView);
     if (here && !flying) placeCamera(here);
@@ -1092,7 +1092,7 @@ export function mountCar3D(options) {
     loadFailed() {
       return loadFailed;
     },
-    // Call after un-hiding the container — its dimensions are 0 while
+    // Call after un-hiding the container: its dimensions are 0 while
     // hidden, so sizing (and the framing that depends on it) has to happen
     // once it's actually visible again.
     resize() {
@@ -1115,7 +1115,7 @@ export function mountCar3D(options) {
     // Called when the customer picks a different vehicle: this viewer's
     // model can weigh tens of MB on the GPU, so everything it allocated is
     // released rather than left for the collector. The canvas is single-use
-    // afterwards (its WebGL context is deliberately dropped) — repair.js
+    // afterwards (its WebGL context is deliberately dropped); repair.js
     // swaps in a fresh one before mounting the next vehicle.
     destroy() {
       destroyed = true;

@@ -1,29 +1,29 @@
 'use strict';
 
 /* =============================================================================
-   mailhtml.js — el cuerpo en HTML de los dos correos
+   mailhtml.js: the HTML body of the two emails
 
-   server/mail.js arma el texto plano y manda; aquí se arma la versión con
-   formato. Los dos viajan en el mismo mensaje (multipart/alternative): el
-   cliente de correo enseña el HTML si puede y cae al texto si no, así que el
-   texto no es un resto de antes, es la otra mitad y hay que mantenerla.
+   server/mail.js builds the plain text and sends; the formatted version is
+   built here. Both travel in the same message (multipart/alternative): the
+   mail client shows the HTML if it can and falls back to the text if not, so
+   the text is not a leftover, it is the other half and has to be kept up.
 
    The layout follows the mock-up the shop supplied: a tinted ground, a white
    600 px card with a thin border, small spaced capitals for the section
    labels and hairlines between rows. The colours follow the new logo: one
    ink, #262D40, as the only accent, as on the site.
 
-   POR QUÉ TABLAS Y ESTILOS EN LÍNEA. No es descuido: Outlook compone con el
-   motor de Word, que no sabe de flexbox, grid ni float, y Gmail borra el
-   <style> del <head> cuando reenvía un mensaje. Lo único que sobrevive en
-   todas partes son tablas anidadas con el estilo pegado a cada etiqueta. Las
-   media queries del <head> son la excepción a propósito: donde no se
-   entienden, la maqueta de 600 px sigue siendo legible.
+   WHY TABLES AND INLINE STYLES. It is not sloppiness: Outlook renders with
+   Word's engine, which knows nothing of flexbox, grid or float, and Gmail
+   strips the <style> in the <head> when a message is forwarded. The only
+   thing that survives everywhere is nested tables with the style stuck on
+   each tag. The media queries in the <head> are the deliberate exception:
+   where they are not understood, the 600 px layout is still readable.
 
-   TODO LO QUE ESCRIBE UNA PERSONA PASA POR escapeHtml(). Un apellido con «&»
-   o unas notas con «<» romperían la maqueta, y notes admite 2000 caracteres
-   de texto libre: es la vía por la que alguien podría colar etiquetas en un
-   correo que lee el taller.
+   EVERYTHING A PERSON TYPES GOES THROUGH escapeHtml(). A surname with «&» or
+   notes with «<» would break the layout, and notes accepts 2000 characters of
+   free text: it is the way someone could slip tags into an email the
+   workshop reads.
    ========================================================================== */
 
 // The palette, the site's own (see the tokens at the top of styles.css). It is
@@ -64,26 +64,26 @@ const DISPLAY = "'Jost','Century Gothic',Futura,Arial,sans-serif";
 const LABEL = "'Archivo',Arial,Helvetica,sans-serif";
 
 
-// Los datos del taller en el pie de los dos correos.
+// The workshop's details in the footer of both emails.
 //
-// SON UNA COPIA. El original está en la lista de contacto de index.html (busca
-// `contact__details`), y esto no puede leerlo: aquella es una página estática
-// que se sirve tal cual y esto corre en el servidor. Si cambia la dirección,
-// el teléfono o el horario, hay que cambiarlo en los dos sitios.
+// THEY ARE A COPY. The original is in the contact list in index.html (look
+// for `contact__details`), and this cannot read it: that is a static page
+// served as is and this runs on the server. If the address, the phone or the
+// hours change, they have to change in both places.
 //
-// La redacción sí difiere a propósito: en el correo van enteros («Lunes a
-// Sábado», y el país detrás de la dirección) porque un correo puede leerse
-// lejos del sitio y sin nada alrededor que dé contexto. Lo que tiene que
-// coincidir son los datos, no las palabras.
+// The wording does differ on purpose: the email spells them out («Lunes a
+// sábado», and the country after the address) because an email can be read
+// far from the site with nothing around it to give context. What has to match
+// is the data, not the words.
 const SHOP_ADDRESS = 'Jr. San Juan Masías, Ayacucho 05002, Perú';
 const SHOP_PHONE = '+51 935 646 304';
 const SHOP_PHONE_TEL = '+51935646304';
-const SHOP_HOURS = 'Lunes a Sábado · 07:30 – 20:00';
+const SHOP_HOURS = 'Lunes a sábado, de 07:30 a 20:00';
 
 /**
- * Escapa lo que vaya a ir dentro del HTML. Se aplica a TODO lo que venga del
- * formulario, sin excepción: es más fácil de revisar que ir decidiendo caso
- * por caso cuál de los campos es de fiar.
+ * Escapes whatever goes inside the HTML. Applied to EVERYTHING that comes from
+ * the form, no exceptions: easier to review than deciding case by case which
+ * field can be trusted.
  */
 function escapeHtml(value) {
     if (value === undefined || value === null) return '';
@@ -95,29 +95,29 @@ function escapeHtml(value) {
         .replace(/'/g, '&#39;');
 }
 
-/** Igual que escapeHtml, pero conservando los saltos de línea. Para las notas. */
+/** Same as escapeHtml, but keeping line breaks. For the notes. */
 function escapeMultiline(value) {
     return escapeHtml(value).replace(/\r?\n/g, '<br>');
 }
 
 /* -----------------------------------------------------------------------------
-   Piezas de la maqueta
+   Layout pieces
 -------------------------------------------------------------------------- */
 
-/** El antetítulo en tinta, en versalitas espaciadas que abre cada sección. */
+/** The small label in ink and spaced small capitals that opens each section. */
 function eyebrow(text) {
     return `<div class="c-accent" style="font-family:${FONT}; font-size:11px; line-height:14px; letter-spacing:3px; color:${ACCENT}; text-transform:uppercase; padding-bottom:12px;">${escapeHtml(text)}</div>`;
 }
 
-/** La línea fina que separa secciones. Es una tabla porque un <hr> se pinta
- *  distinto en cada cliente. */
+/** The hairline between sections. It is a table because an <hr> renders
+ *  differently in every client. */
 function hairline(padding) {
     return `<tr><td class="px" style="padding:${padding};"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td class="c-rule" style="border-top:1px solid ${LINE}; font-size:0; line-height:0;">&nbsp;</td></tr></table></td></tr>`;
 }
 
 /**
- * Las filas de «etiqueta / valor». Las que no traen valor se caen solas, para
- * que una solicitud sin kilometraje no deje un renglón vacío.
+ * The «label / value» rows. Rows with no value drop out on their own, so a
+ * request without a mileage does not leave an empty line.
  */
 function detailRows(rows) {
     const kept = rows.filter((r) => r && r.value !== '' && r.value !== null && r.value !== undefined);
@@ -131,7 +131,7 @@ function detailRows(rows) {
     }).join('\n');
 }
 
-/** El panel negro con el código, que es lo que la gente vuelve a buscar. */
+/** The dark panel with the code, which is what people come back looking for. */
 function codePanel(label, code) {
     return `<table role="presentation" class="c-panel" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid ${INK};">
               <tr>
@@ -143,7 +143,7 @@ function codePanel(label, code) {
             </table>`;
 }
 
-/** El botón. Va en su propia tabla con bgcolor para que Outlook lo pinte.
+/** The button. It sits in its own table with bgcolor so Outlook paints it.
  *  `compact` is the smaller one that sits beside the tracking code. */
 function button(href, text, compact) {
     const size = compact
@@ -218,39 +218,39 @@ function summaryRows(rows) {
 }
 
 /**
- * El logotipo de arriba, o el nombre escrito si no hay dónde ir a buscarlo.
+ * The logo at the top, or the name written out if there is nowhere to fetch it.
  *
- * VIAJABA PEGADO AL CORREO y ahora es una URL del propio sitio. Un logotipo
- * incrustado se referencia por un identificador (cid:), que es una cabecera
- * MIME, y la API por la que salen hoy los correos no la expone (ver LOGO_URL
- * en server/mail.js). La imagen la sirve el sitio, que es público.
+ * IT USED TO TRAVEL ATTACHED to the email and is now a URL on the site. An
+ * embedded logo is referenced by an identifier (cid:), which is a MIME
+ * header, and the API the emails go out through today does not expose it (see
+ * LOGO_URL in server/mail.js). The image is served by the site, which is public.
  *
- * Sin sitio conocido —la máquina de trabajo, donde no hay RENDER_EXTERNAL_URL—
- * no hay URL que poner, y una imagen rota se ve peor que un nombre bien
- * escrito. El texto alternativo hace lo mismo en los clientes que no bajan
- * imágenes remotas.
+ * With no known site (the work machine, where there is no
+ * RENDER_EXTERNAL_URL) there is no URL to put, and a broken image looks worse
+ * than a well-written name. The alt text does the same in clients that do not
+ * download remote images.
  */
 function wordmark(logoUrl, logoDarkUrl) {
     if (!logoUrl) {
         return `<div class="c-ink" style="font-family:${FONT}; font-size:28px; line-height:32px; letter-spacing:0; color:${INK}; font-weight:bold;">autocolor</div>`;
     }
 
-    const light = `<img class="c-logo-light" src="${escapeHtml(logoUrl)}" width="180" alt="Autocolor — Laboratorio de Matizado y Pintado al Horno" style="display:block; width:180px; max-width:60%; height:auto; margin:0 auto;">`;
+    const light = `<img class="c-logo-light" src="${escapeHtml(logoUrl)}" width="180" alt="Autocolor, laboratorio de matizado y pintado al horno" style="display:block; width:180px; max-width:60%; height:auto; margin:0 auto;">`;
     if (!logoDarkUrl) return light;
 
-    // El segundo logotipo va escondido y solo lo saca la media query de
-    // arriba. Dentro de un condicional «no mso» porque Outlook compone con el
-    // motor de Word: no entiende la media query, y sin esto enseñaría los dos.
-    const dark = `<!--[if !mso]><!--><img class="c-logo-dark" src="${escapeHtml(logoDarkUrl)}" width="180" alt="Autocolor — Laboratorio de Matizado y Pintado al Horno" style="display:none; width:180px; max-width:60%; height:auto; margin:0 auto;"><!--<![endif]-->`;
+    // The second logo is hidden and only the media query above brings it
+    // out. Inside a «not mso» conditional because Outlook renders with Word's
+    // engine: it does not understand the media query, and without this it would show both.
+    const dark = `<!--[if !mso]><!--><img class="c-logo-dark" src="${escapeHtml(logoDarkUrl)}" width="180" alt="Autocolor, laboratorio de matizado y pintado al horno" style="display:none; width:180px; max-width:60%; height:auto; margin:0 auto;"><!--<![endif]-->`;
     return light + dark;
 }
 
 /**
- * El armazón: fondo, tarjeta centrada de 600 px y el logotipo arriba.
+ * The frame: background, centred 600 px card and the logo on top.
  *
- * `preheader` es la línea que la bandeja de entrada enseña junto al asunto.
- * Va escondida en el cuerpo: sin ella, lo que se lee en la lista es el
- * principio del texto del correo, que casi nunca es lo que uno resumiría.
+ * `preheader` is the line the inbox shows next to the subject. It is hidden in
+ * the body: without it, what the list shows is the start of the email text,
+ * which is almost never what one would summarise.
  */
 function shell({ title, preheader, kicker, body, footerNote, logoUrl, logoDarkUrl }) {
     return `<!DOCTYPE html>
@@ -283,12 +283,12 @@ function shell({ title, preheader, kicker, body, footerNote, logoUrl, logoDarkUr
     .summary-label { width:100% !important; display:block !important; padding:6px 0 0 0 !important; }
     .summary-value { width:100% !important; display:block !important; padding:0 0 2px 0 !important; }
   }
-  /* Modo oscuro.
-     Todo lleva !important porque el color de verdad va en el atributo style de
-     cada etiqueta —así tiene que ser en correo (ver la cabecera)— y una regla
-     de hoja normal no le gana a un estilo en línea. Con !important sí.
-     La regla de los enlaces es la excepción: va SIN !important a propósito,
-     para no pisar el texto del botón, que tiene su propia regla (.c-button). */
+  /* Dark mode.
+     Everything carries !important because the real colour sits in each tag's
+     style attribute (that is how it has to be in email, see the header) and a
+     normal stylesheet rule does not beat an inline style. With !important it does.
+     The link rule is the exception: it goes WITHOUT !important on purpose,
+     so it does not override the button text, which has its own rule (.c-button). */
   @media (prefers-color-scheme: dark) {
     body, .c-ground { background-color:${GROUND_DARK} !important; }
     .c-card { background-color:${CARD_DARK} !important; border-color:${LINE_DARK} !important; }
@@ -389,7 +389,7 @@ function customerHtml(created, data, ctx, walkIn) {
         {
             label: 'Vehículo',
             value: vehicle || plate,
-            html: [vehicle && escapeHtml(vehicle), plate && plateHtml].filter(Boolean).join(' · '),
+            html: [vehicle && escapeHtml(vehicle), plate && plateHtml].filter(Boolean).join(', '),
         },
         { label: 'Piezas', value: ctx.partsLabel(data.parts) },
         { label: 'Acabado', value: ctx.qualityLabel(data.quality) },
@@ -465,7 +465,7 @@ ${hairline('36px 48px 0 48px')}
                   <table role="presentation" cellpadding="0" cellspacing="0" border="0">
                     <tr>
                       <td class="c-outline" style="border:1px solid ${INK};">
-                        <a class="c-accent" href="${whatsappUrl}" target="_blank" style="display:block; font-family:${FONT}; font-size:14px; line-height:20px; font-weight:bold; color:${ACCENT}; text-decoration:none; white-space:nowrap; padding:11px 16px;">WhatsApp · ${SHOP_PHONE}</a>
+                        <a class="c-accent" href="${whatsappUrl}" target="_blank" style="display:block; font-family:${FONT}; font-size:14px; line-height:20px; font-weight:bold; color:${ACCENT}; text-decoration:none; white-space:nowrap; padding:11px 16px;">WhatsApp ${SHOP_PHONE}</a>
                       </td>
                     </tr>
                   </table>
@@ -477,8 +477,8 @@ ${hairline('36px 48px 0 48px')}
 
     return shell({
         title: walkIn
-            ? `Tu vehículo en Autocolor — ${created.id}`
-            : `Tu solicitud en Autocolor — ${created.id}`,
+            ? `Tu vehículo en Autocolor (${created.id})`
+            : `Tu solicitud en Autocolor (${created.id})`,
         preheader: walkIn
             ? `Tu código de seguimiento es ${created.id}. Con él puedes ver el avance de tu vehículo.`
             : `Tu código de seguimiento es ${created.id}. Te contactaremos en 24 horas con tu presupuesto.`,
@@ -493,19 +493,19 @@ ${hairline('36px 48px 0 48px')}
 }
 
 /* -----------------------------------------------------------------------------
-   El correo del taller
+   The workshop's email
 
-   Mismo lenguaje visual y otro trabajo: esto no confirma nada, es la ficha con
-   la que se prepara un presupuesto. Cambia lo que hace falta que cambie:
+   Same visual language, different job: this confirms nothing, it is the sheet
+   a quote is prepared from. What needs to change, changes:
 
-     - Manda el contacto, no el saludo. El teléfono y el correo van arriba y
-       como enlaces, porque lo primero que se hace con esto es llamar, y
-       muchas veces desde el móvil.
-     - El titular es cliente y placa, que es como se reconoce un trabajo de un
-       vistazo en una bandeja con varios.
-     - Las piezas van con su nombre («Capó»), no con el identificador del
-       modelo 3D, y enumeradas: son las que hay que presupuestar.
-     - Sin botón de marca ni promesas: el enlace lleva al panel.
+     - Contact leads, not the greeting. Phone and email go at the top and as
+       links, because the first thing done with this is calling, often from a
+       phone.
+     - The headline is customer and plate, which is how a job is recognised
+       at a glance in an inbox with several.
+     - Panels go by their name («Capó»), not the 3D model's identifier, and
+       listed: they are the ones to quote.
+     - No brand button and no promises: the link goes to the panel.
 -------------------------------------------------------------------------- */
 
 function shopHtml(created, data, ctx, walkIn) {
@@ -516,9 +516,9 @@ function shopHtml(created, data, ctx, walkIn) {
     const phone = ctx.formatPhone(data.phone);
     const email = ctx.oneLine(data.email);
 
-    // Teléfono y correo como enlaces: llamar o escribir es lo primero que se
-    // hace al abrir esto, y en el móvil un número que no se pulsa se acaba
-    // copiando a mano.
+    // Phone and email as links: calling or writing is the first thing done
+    // on opening this, and on a phone a number that cannot be tapped ends up
+    // copied by hand.
     const contactRows = detailRows([
         {
             label: 'Teléfono',
@@ -539,8 +539,8 @@ function shopHtml(created, data, ctx, walkIn) {
         { label: 'Año', value: data.year },
         { label: 'Kilometraje', value: ctx.mileageLabel(data.mileage) },
         { label: 'Código de color', value: ctx.oneLine(data.colorCode) },
-        // La silueta del visor 3D no siempre coincide con la carrocería real
-        // (cuatro siluetas para ocho carrocerías), así que va aparte.
+        // The 3D viewer's silhouette does not always match the real body
+        // (four silhouettes for eight bodies), so it goes separately.
         { label: 'Silueta 3D', value: ctx.vehicleLabel(data.vehicle) },
     ]);
 
@@ -550,7 +550,7 @@ function shopHtml(created, data, ctx, walkIn) {
             label: `Piezas (${data.parts.length})`,
             // As in the text version: no parts only happens on rows from before
             // both forms required them. Then no list either, which would show
-            // as an empty bullet — detailRows prefers `html` over `value`.
+            // as an empty bullet; detailRows prefers `html` over `value`.
             value: ctx.partsLabel(data.parts) || 'Sin definir',
             html: data.parts.length
                 ? `<ul style="margin:0; padding-left:18px;">${data.parts.map((p) => `<li style="padding-bottom:2px;">${escapeHtml(ctx.partLabel(p))}</li>`).join('')}</ul>`
@@ -620,11 +620,11 @@ ${panelUrl ? `
         <tr><td class="px" style="padding:0 48px 36px 48px;">&nbsp;</td></tr>`;
 
     return shell({
-        title: data.plate ? `Solicitud ${created.id} — ${data.plate}` : `Solicitud ${created.id}`,
+        title: data.plate ? `Solicitud ${created.id}, placa ${data.plate}` : `Solicitud ${created.id}`,
         // A row with no plate (only from before walk-ins required one) drops
-        // out of the line instead of leaving an empty « ·  · ».
+        // out of the line instead of leaving an empty «, ,».
         preheader: [fullName || 'Cliente', data.plate, vehicle, `${data.parts.length} pieza(s)`]
-            .filter(Boolean).join(' · '),
+            .filter(Boolean).join(', '),
         kicker: 'Aviso interno del taller',
         body,
         footerNote: walkIn
@@ -636,17 +636,17 @@ ${panelUrl ? `
 }
 
 /* -----------------------------------------------------------------------------
-   Los dos correos de un pedido de matizado (pgs/paintings.html)
+   The two emails for a matizado order (pgs/paintings.html)
 
-   Misma maqueta y otro contenido. Lo que cambia respecto de una solicitud de
-   pintado es qué se está confirmando: aquí no hay vehículo en el taller ni
-   presupuesto por venir, hay un color, un envase y un precio referencial.
+   Same layout, different content. What changes from a paint request is what
+   is being confirmed: here there is no vehicle at the workshop and no quote
+   to come, there is a colour, a container and a referential price.
 
-   El cuadro del color es la pieza propia. Un pedido de matizado se reconoce
-   por su color antes que por su código, así que la muestra va arriba y grande
-   —un recuadro de color con su código al lado—, y lleva escrito que es
-   referencial: ningún cliente de correo pinta un metálico, y quien apruebe un
-   color mirando esto va a reclamar.
+   The colour box is the piece of its own. A matizado order is recognised by
+   its colour before its code, so the swatch goes on top and large (a colour
+   square with its code beside it), and it says in writing that it is
+   referential: no mail client paints a metallic, and whoever approves a
+   colour looking at this will complain.
 -------------------------------------------------------------------------- */
 
 /**
@@ -675,12 +675,12 @@ function swatchBox(hex, code, name) {
 }
 
 /**
- * La muestra en grande, para el correo del cliente: una banda del color a todo
- * el ancho con el código, el nombre y el acabado debajo. Es donde más importa
- * que el color se vea —era lo que salía en blanco cuando venía de la base
- * nueva— así que ocupa su propio bloque en vez de un cuadro de 64 px.
+ * The large swatch, for the customer's email: a full-width band of the colour
+ * with the code, the name and the finish below. It is where the colour
+ * matters most (it was what came out blank when it came from the new
+ * database), so it takes its own block instead of a 64 px square.
  *
- * Sin hex la banda se cambia por un aviso, y el bloque se arma igual.
+ * With no hex the band is swapped for a notice, and the block builds the same.
  */
 function swatchHero(hex, code, name, finish) {
     const band = hex
@@ -782,7 +782,7 @@ ${hairline('36px 48px 0 48px')}
                   <table role="presentation" cellpadding="0" cellspacing="0" border="0">
                     <tr>
                       <td class="c-outline" style="border:1px solid ${INK};">
-                        <a class="c-accent" href="https://wa.me/${SHOP_PHONE_TEL.replace(/\D/g, '')}" target="_blank" style="display:block; font-family:${FONT}; font-size:14px; line-height:20px; font-weight:bold; color:${ACCENT}; text-decoration:none; white-space:nowrap; padding:11px 16px;">WhatsApp · ${SHOP_PHONE}</a>
+                        <a class="c-accent" href="https://wa.me/${SHOP_PHONE_TEL.replace(/\D/g, '')}" target="_blank" style="display:block; font-family:${FONT}; font-size:14px; line-height:20px; font-weight:bold; color:${ACCENT}; text-decoration:none; white-space:nowrap; padding:11px 16px;">WhatsApp ${SHOP_PHONE}</a>
                       </td>
                     </tr>
                   </table>
@@ -793,7 +793,7 @@ ${hairline('36px 48px 0 48px')}
         </tr>`;
 
     return shell({
-        title: inPerson ? `Tu visita a Autocolor — ${created.id}` : `Tu pedido de matizado — ${created.id}`,
+        title: inPerson ? `Tu visita a Autocolor (${created.id})` : `Tu pedido de matizado (${created.id})`,
         preheader: inPerson
             ? `Tu código es ${created.id}. Te esperamos para medir el color.`
             : `Tu código es ${created.id}. Estamos preparando tu matizado.`,
@@ -880,9 +880,9 @@ ${ctx.oneLine(data.notes) ? `
         <tr><td style="height:36px; font-size:0; line-height:0;">&nbsp;</td></tr>`;
 
     return shell({
-        title: `Pedido de matizado ${created.id} — ${ctx.oneLine(data.company)}`,
+        title: `Pedido de matizado ${created.id}, ${ctx.oneLine(data.company)}`,
         preheader: [ctx.oneLine(data.company), ctx.colourName(data), ctx.orderLine(data)]
-            .filter(Boolean).join(' · '),
+            .filter(Boolean).join(', '),
         kicker: 'Aviso interno del taller',
         body,
         footerNote: 'Aviso automático de la página de venta de matizado. Responder a este correo le escribe al cliente.',

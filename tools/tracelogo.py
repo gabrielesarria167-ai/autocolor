@@ -218,7 +218,7 @@ def main():
     for suffix, colour in (('', INK), ('-white', '#FFFFFF')):
         write(f'lockup-stacked{suffix}.svg',
               f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {x1 - x0} {y1 - y0}" fill="{colour}">'
-              f'<title>Autocolor — Laboratorio de Matizado y Pintado al Horno</title>{stacked}</svg>\n')
+              f'<title>Autocolor, laboratorio de matizado y pintado al horno</title>{stacked}</svg>\n')
 
     # Horizontal lockup for headers: the mark at the wordmark's full height
     # (ascender to baseline), then the wordmark after a gap of one blade.
