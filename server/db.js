@@ -191,7 +191,6 @@ async function createRequest(data) {
                 data.phone,
                 data.email,
                 data.notes,
-                data.hex || null,
             ]);
             return { id: rows[0].id.trim(), status: rows[0].status, createdAt: rows[0].created_at };
         } catch (err) {
