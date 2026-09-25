@@ -10,6 +10,9 @@ vende pintura ya matizada a talleres y empresas en cuatro pasos —color,
 envase, empresa y resumen—, guarda el pedido en su propia tabla y entrega otro
 código de 10 dígitos.
 
+A guide to the code, in English, covering every feature file by file, is in
+[`docs/`](docs/README.md).
+
 ## Puesta en marcha
 
 Hace falta Node 18 o más nuevo y los binarios de Postgres instalados
